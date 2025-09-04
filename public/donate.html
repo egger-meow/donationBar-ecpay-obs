@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Support the Stream - Donation</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      background: linear-gradient(135deg, #0f1216 0%, #1a1f26 100%);
+      color: #ffffff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: rgba(27, 31, 38, 0.95);
+      backdrop-filter: blur(20px);
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      width: 100%;
+      max-width: 450px;
+      animation: slideIn 0.6s ease;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 28px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #46e65a, #5ef56d);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #a0a0a0;
+      margin-bottom: 30px;
+      font-size: 16px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #e0e0e0;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 15px;
+      border-radius: 12px;
+      border: 2px solid #2a2f36;
+      background: #0f1216;
+      color: #ffffff;
+      font-size: 16px;
+      transition: all 0.3s ease;
+    }
+
+    input[type="text"]:focus,
+    input[type="number"]:focus,
+    select:focus {
+      outline: none;
+      border-color: #46e65a;
+      box-shadow: 0 0 0 3px rgba(70, 230, 90, 0.1);
+    }
+
+    .amount-buttons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .amount-btn {
+      padding: 12px;
+      border: 2px solid #2a2f36;
+      background: transparent;
+      color: #ffffff;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+    }
+
+    .amount-btn:hover,
+    .amount-btn.active {
+      border-color: #46e65a;
+      background: rgba(70, 230, 90, 0.1);
+      color: #46e65a;
+    }
+
+    .donate-btn {
+      width: 100%;
+      padding: 18px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #46e65a, #5ef56d);
+      border: none;
+      color: #000000;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 10px;
+    }
+
+    .donate-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(70, 230, 90, 0.3);
+    }
+
+    .donate-btn:active {
+      transform: translateY(0);
+    }
+
+    .donate-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .progress-preview {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 15px;
+      padding: 20px;
+      margin-bottom: 25px;
+      text-align: center;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 12px;
+      background: #2a2f36;
+      border-radius: 6px;
+      overflow: hidden;
+      margin: 15px 0;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #46e65a, #5ef56d);
+      border-radius: 6px;
+      transition: width 0.5s ease;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 25px;
+      font-size: 14px;
+      color: #808080;
+    }
+
+    .success-message {
+      background: rgba(70, 230, 90, 0.1);
+      border: 2px solid #46e65a;
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 20px;
+      text-align: center;
+      color: #46e65a;
+      font-weight: 500;
+    }
+
+    .error-message {
+      background: rgba(255, 107, 107, 0.1);
+      border: 2px solid #ff6b6b;
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 20px;
+      text-align: center;
+      color: #ff6b6b;
+      font-weight: 500;
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        padding: 25px;
+        margin: 10px;
+      }
+      
+      h1 {
+        font-size: 24px;
+      }
+      
+      .amount-buttons {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Support the Stream</h1>
+    <p class="subtitle">幫助實況主達成目標！</p>
+    
+    <div id="successMessage" class="success-message" style="display: none;">
+      感謝您的支持！付款已完成。
+    </div>
+    
+    <div id="errorMessage" class="error-message" style="display: none;">
+      付款過程中發生錯誤，請重試。
+    </div>
+    
+    <div class="progress-preview" id="progressPreview">
+      <div><strong id="goalTitle">Loading...</strong></div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+      </div>
+      <div>NT$ <span id="currentAmount">0</span> / NT$ <span id="goalAmount">0</span> (<span id="progressPercent">0</span>%)</div>
+    </div>
+
+    <form id="donationForm" method="post" action="/create-order">
+      <div class="form-group">
+        <label for="nickname">暱稱 (可選)</label>
+        <input type="text" id="nickname" name="nickname" placeholder="在進度條上顯示的名稱" maxlength="20">
+      </div>
+
+      <div class="form-group">
+        <label for="amount">捐款金額 (NT$)</label>
+        <input type="number" id="amount" name="amount" min="1" max="999999" value="100" required>
+        
+        <div class="amount-buttons">
+          <button type="button" class="amount-btn" data-amount="50">NT$ 50</button>
+          <button type="button" class="amount-btn active" data-amount="100">NT$ 100</button>
+          <button type="button" class="amount-btn" data-amount="200">NT$ 200</button>
+          <button type="button" class="amount-btn" data-amount="500">NT$ 500</button>
+          <button type="button" class="amount-btn" data-amount="1000">NT$ 1,000</button>
+          <button type="button" class="amount-btn" data-amount="2000">NT$ 2,000</button>
+        </div>
+      </div>
+
+      <button type="submit" class="donate-btn" id="donateBtn">
+        💳 前往綠界付款
+      </button>
+    </form>
+
+    <div class="footer">
+      <p>※ 使用綠界金流服務，支援信用卡付款</p>
+      <p>※ 付款完成後會自動更新直播進度條</p>
+    </div>
+  </div>
+
+  <script>
+    // Elements
+    const form = document.getElementById('donationForm');
+    const amountInput = document.getElementById('amount');
+    const amountButtons = document.querySelectorAll('.amount-btn');
+    const donateBtn = document.getElementById('donateBtn');
+    const successMessage = document.getElementById('successMessage');
+    const errorMessage = document.getElementById('errorMessage');
+    
+    // Progress elements
+    const goalTitle = document.getElementById('goalTitle');
+    const currentAmount = document.getElementById('currentAmount');
+    const goalAmount = document.getElementById('goalAmount');
+    const progressPercent = document.getElementById('progressPercent');
+    const progressFill = document.getElementById('progressFill');
+
+    // Check URL parameters for success/error messages
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('success') === '1') {
+      successMessage.style.display = 'block';
+    }
+    if (urlParams.get('error') === '1') {
+      errorMessage.style.display = 'block';
+    }
+
+    // Load current progress
+    async function loadProgress() {
+      try {
+        const response = await fetch('/progress');
+        const data = await response.json();
+        
+        goalTitle.textContent = data.title || 'Donation Goal';
+        currentAmount.textContent = formatNumber(data.current);
+        goalAmount.textContent = formatNumber(data.goal);
+        progressPercent.textContent = data.percent || 0;
+        progressFill.style.width = `${Math.min(100, data.percent || 0)}%`;
+      } catch (error) {
+        console.error('Failed to load progress:', error);
+      }
+    }
+
+    function formatNumber(num) {
+      return (num || 0).toLocaleString('zh-TW');
+    }
+
+    // Amount button handlers
+    amountButtons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        
+        // Remove active class from all buttons
+        amountButtons.forEach(b => b.classList.remove('active'));
+        
+        // Add active class to clicked button
+        btn.classList.add('active');
+        
+        // Set amount input value
+        const amount = btn.dataset.amount;
+        amountInput.value = amount;
+      });
+    });
+
+    // Custom amount input handler
+    amountInput.addEventListener('input', () => {
+      // Clear active state from preset buttons if custom amount is entered
+      const currentValue = parseInt(amountInput.value);
+      let hasActiveButton = false;
+      
+      amountButtons.forEach(btn => {
+        const btnAmount = parseInt(btn.dataset.amount);
+        if (btnAmount === currentValue) {
+          amountButtons.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          hasActiveButton = true;
+        }
+      });
+      
+      if (!hasActiveButton) {
+        amountButtons.forEach(b => b.classList.remove('active'));
+      }
+    });
+
+    // Form submission
+    form.addEventListener('submit', (e) => {
+      const amount = parseInt(amountInput.value);
+      
+      if (!amount || amount < 1) {
+        e.preventDefault();
+        alert('請輸入有效的捐款金額');
+        return;
+      }
+      
+      if (amount > 999999) {
+        e.preventDefault();
+        alert('單次捐款金額不能超過 NT$999,999');
+        return;
+      }
+      
+      // Show loading state
+      donateBtn.disabled = true;
+      donateBtn.textContent = '處理中...';
+      
+      // Form will submit normally to /create-order
+    });
+
+    // Initialize
+    loadProgress();
+
+    // Real-time updates via SSE
+    const eventSource = new EventSource('/events');
+    eventSource.onmessage = function(event) {
+      try {
+        const data = JSON.parse(event.data);
+        currentAmount.textContent = formatNumber(data.current);
+        goalAmount.textContent = formatNumber(data.goal);
+        progressPercent.textContent = data.percent || 0;
+        progressFill.style.width = `${Math.min(100, data.percent || 0)}%`;
+      } catch (error) {
+        console.error('Error parsing SSE data:', error);
+      }
+    };
+  </script>
+</body>
+</html>

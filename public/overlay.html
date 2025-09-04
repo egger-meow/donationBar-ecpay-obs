@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Donation Goal Overlay</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    #wrap {
+      width: 900px;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    .title {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--fg);
+      text-shadow: 0 0 8px rgba(0,0,0,0.5);
+      text-align: center;
+      opacity: 0;
+      animation: fadeInUp 1s ease forwards;
+    }
+
+    .progress-container {
+      width: 100%;
+      height: 60px;
+      background: var(--bg);
+      border-radius: 30px;
+      overflow: hidden;
+      box-shadow: 
+        inset 0 0 0 3px rgba(255,255,255,0.1),
+        0 4px 20px rgba(0,0,0,0.3);
+      position: relative;
+      opacity: 0;
+      animation: fadeInUp 1s ease 0.2s forwards;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--bar), var(--bar-light));
+      width: 0%;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      transition: width 1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .progress-fill::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      animation: shimmer 2s infinite;
+    }
+
+    .progress-fill.animate::before {
+      animation: shimmer 2s infinite;
+    }
+
+    .percentage {
+      padding-right: 20px;
+      font-size: 24px;
+      color: #000;
+      font-weight: 700;
+      text-shadow: 0 1px 2px rgba(255,255,255,0.5);
+      min-width: 50px;
+      text-align: right;
+    }
+
+    .amount-info {
+      margin-top: 12px;
+      text-align: center;
+      color: var(--fg);
+      font-size: 20px;
+      font-weight: 500;
+      text-shadow: 0 0 6px rgba(0,0,0,0.5);
+      opacity: 0;
+      animation: fadeInUp 1s ease 0.4s forwards;
+    }
+
+    .recent-donations {
+      margin-top: 20px;
+      opacity: 0;
+      animation: fadeInUp 1s ease 0.6s forwards;
+    }
+
+    .donation-item {
+      background: rgba(0,0,0,0.3);
+      border-radius: 15px;
+      padding: 8px 15px;
+      margin: 5px 0;
+      color: var(--fg);
+      font-size: 14px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.1);
+      animation: slideInRight 0.5s ease;
+    }
+
+    .donation-amount {
+      color: var(--bar);
+      font-weight: 700;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes slideInRight {
+      from {
+        opacity: 0;
+        transform: translateX(50px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    @keyframes shimmer {
+      0% { left: -100%; }
+      100% { left: 100%; }
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+    }
+
+    .progress-container.new-donation {
+      animation: pulse 0.6s ease;
+    }
+
+    /* CSS Variables with defaults */
+    :root {
+      --fg: #ffffff;
+      --bg: #1a1a1a;
+      --bar: #46e65a;
+      --bar-light: #5ef56d;
+    }
+
+    /* Responsive design */
+    @media (max-width: 600px) {
+      #wrap { width: 100%; padding: 15px; }
+      .title { font-size: 24px; }
+      .progress-container { height: 45px; }
+      .percentage { font-size: 18px; }
+      .amount-info { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <div class="title" id="title">Loading...</div>
+    <div class="progress-container" id="progressContainer">
+      <div class="progress-fill" id="progressFill">
+        <span class="percentage" id="percentage">0%</span>
+      </div>
+    </div>
+    <div class="amount-info" id="amountInfo">NT$ 0 / NT$ 0</div>
+    <div class="recent-donations" id="recentDonations"></div>
+  </div>
+
+  <script>
+    // Parse URL parameters for customization
+    const urlParams = new URLSearchParams(window.location.search);
+    const colors = {
+      fg: urlParams.get('fg') || '#ffffff',
+      bg: urlParams.get('bg') || '#1a1a1a',
+      bar: urlParams.get('bar') || '#46e65a',
+      barLight: urlParams.get('bar_light') || '#5ef56d'
+    };
+
+    // Apply custom colors
+    document.documentElement.style.setProperty('--fg', colors.fg);
+    document.documentElement.style.setProperty('--bg', colors.bg);
+    document.documentElement.style.setProperty('--bar', colors.bar);
+    document.documentElement.style.setProperty('--bar-light', colors.barLight);
+
+    // Elements
+    const titleEl = document.getElementById('title');
+    const progressFillEl = document.getElementById('progressFill');
+    const percentageEl = document.getElementById('percentage');
+    const amountInfoEl = document.getElementById('amountInfo');
+    const recentDonationsEl = document.getElementById('recentDonations');
+    const progressContainerEl = document.getElementById('progressContainer');
+
+    let lastTotal = 0;
+
+    function formatNumber(num) {
+      return (num || 0).toLocaleString('zh-TW');
+    }
+
+    function renderProgress(data) {
+      const { title, current, goal, percent, donations } = data;
+      
+      // Update title
+      titleEl.textContent = title || 'Donation Goal';
+      
+      // Update progress bar with animation
+      const clampedPercent = Math.min(100, Math.max(0, percent || 0));
+      progressFillEl.style.width = `${clampedPercent}%`;
+      percentageEl.textContent = `${clampedPercent}%`;
+      
+      // Update amount info
+      amountInfoEl.textContent = `NT$ ${formatNumber(current)} / NT$ ${formatNumber(goal)}`;
+      
+      // Check for new donation (animate if total increased)
+      if (current > lastTotal && lastTotal > 0) {
+        progressContainerEl.classList.add('new-donation');
+        progressFillEl.classList.add('animate');
+        
+        setTimeout(() => {
+          progressContainerEl.classList.remove('new-donation');
+          progressFillEl.classList.remove('animate');
+        }, 600);
+      }
+      lastTotal = current;
+      
+      // Render recent donations
+      if (donations && donations.length > 0) {
+        const donationHTML = donations
+          .slice(-3) // Show last 3 donations
+          .reverse()
+          .map(donation => `
+            <div class="donation-item">
+              <strong>${donation.payer}</strong> donated 
+              <span class="donation-amount">NT$ ${formatNumber(donation.amount)}</span>
+            </div>
+          `).join('');
+        
+        recentDonationsEl.innerHTML = donationHTML;
+      }
+    }
+
+    // Initial load
+    async function loadInitialData() {
+      try {
+        const response = await fetch('/progress');
+        const data = await response.json();
+        renderProgress(data);
+      } catch (error) {
+        console.error('Failed to load initial data:', error);
+        titleEl.textContent = 'Connection Error';
+      }
+    }
+
+    // Server-Sent Events for real-time updates
+    function setupSSE() {
+      const eventSource = new EventSource('/events');
+      
+      eventSource.onmessage = function(event) {
+        try {
+          const data = JSON.parse(event.data);
+          renderProgress(data);
+        } catch (error) {
+          console.error('Error parsing SSE data:', error);
+        }
+      };
+      
+      eventSource.onerror = function(error) {
+        console.error('SSE connection error:', error);
+        // Try to reconnect after 5 seconds
+        setTimeout(() => {
+          if (eventSource.readyState === EventSource.CLOSED) {
+            setupSSE();
+          }
+        }, 5000);
+      };
+      
+      return eventSource;
+    }
+
+    // Initialize
+    loadInitialData();
+    const eventSource = setupSSE();
+
+    // Clean up on page unload
+    window.addEventListener('beforeunload', () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    });
+
+    // Test mode (if ?test=1 in URL)
+    if (urlParams.get('test') === '1') {
+      let testPercent = 0;
+      setInterval(() => {
+        testPercent = (testPercent + 1) % 101;
+        renderProgress({
+          title: 'Test Goal',
+          current: testPercent * 500,
+          goal: 50000,
+          percent: testPercent,
+          donations: [
+            { payer: 'TestUser1', amount: 100, at: new Date().toISOString() },
+            { payer: 'TestUser2', amount: 500, at: new Date().toISOString() }
+          ]
+        });
+      }, 100);
+    }
+  </script>
+</body>
+</html>
