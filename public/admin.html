@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin Panel - Donation Goal Management</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      background: linear-gradient(135deg, #0f1216 0%, #1a1f26 100%);
+      color: #ffffff;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .header h1 {
+      font-size: 36px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #46e65a, #5ef56d);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+    }
+
+    .header p {
+      color: #a0a0a0;
+      font-size: 16px;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 30px;
+      margin-bottom: 40px;
+    }
+
+    .card {
+      background: rgba(27, 31, 38, 0.95);
+      backdrop-filter: blur(20px);
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .card h2 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      color: #46e65a;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #e0e0e0;
+    }
+
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      padding: 12px 15px;
+      border-radius: 8px;
+      border: 2px solid #2a2f36;
+      background: #0f1216;
+      color: #ffffff;
+      font-size: 14px;
+      transition: border-color 0.3s ease;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #46e65a;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      display: inline-block;
+      text-align: center;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #46e65a, #5ef56d);
+      color: #000000;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(70, 230, 90, 0.3);
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+      color: #ffffff;
+    }
+
+    .btn-danger:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(255, 107, 107, 0.3);
+    }
+
+    .btn-secondary {
+      background: #2a2f36;
+      color: #ffffff;
+    }
+
+    .btn-secondary:hover {
+      background: #3a3f46;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .stat-item {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #46e65a;
+      margin-bottom: 5px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      color: #a0a0a0;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 20px;
+      background: #2a2f36;
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 20px 0;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #46e65a, #5ef56d);
+      border-radius: 10px;
+      transition: width 0.5s ease;
+    }
+
+    .donations-list {
+      max-height: 400px;
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 10px;
+      padding: 15px;
+    }
+
+    .donation-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      margin-bottom: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      border-left: 4px solid #46e65a;
+    }
+
+    .donation-info {
+      flex: 1;
+    }
+
+    .donation-amount {
+      font-weight: 700;
+      color: #46e65a;
+      font-size: 16px;
+    }
+
+    .donation-payer {
+      color: #ffffff;
+      margin-bottom: 2px;
+    }
+
+    .donation-time {
+      font-size: 12px;
+      color: #a0a0a0;
+    }
+
+    .quick-links {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      margin-bottom: 30px;
+    }
+
+    .alert {
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-weight: 500;
+    }
+
+    .alert-success {
+      background: rgba(70, 230, 90, 0.1);
+      border: 2px solid #46e65a;
+      color: #46e65a;
+    }
+
+    .alert-error {
+      background: rgba(255, 107, 107, 0.1);
+      border: 2px solid #ff6b6b;
+      color: #ff6b6b;
+    }
+
+    @media (max-width: 768px) {
+      .dashboard {
+        grid-template-columns: 1fr;
+      }
+      
+      .quick-links {
+        flex-direction: column;
+      }
+      
+      .btn {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Admin Panel</h1>
+      <p>管理捐款目標和監控直播進度</p>
+    </div>
+
+    <div class="quick-links">
+      <a href="/overlay" class="btn btn-secondary" target="_blank">📊 查看 Overlay</a>
+      <a href="/donate" class="btn btn-secondary" target="_blank">💰 捐款頁面</a>
+      <button class="btn btn-secondary" onclick="window.location.reload()">🔄 重新整理</button>
+    </div>
+
+    <div id="alertContainer"></div>
+
+    <div class="dashboard">
+      <!-- Current Progress -->
+      <div class="card">
+        <h2>當前進度</h2>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-value" id="currentTotal">NT$ 0</div>
+            <div class="stat-label">已募集金額</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="progressPercent">0%</div>
+            <div class="stat-label">完成度</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="donationCount">0</div>
+            <div class="stat-label">捐款次數</div>
+          </div>
+        </div>
+        
+        <div>
+          <strong id="goalTitle">Loading...</strong>
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+          </div>
+          <div style="text-align: center; color: #a0a0a0;">
+            NT$ <span id="remainingAmount">0</span> 還需要達成目標
+          </div>
+        </div>
+      </div>
+
+      <!-- Goal Settings -->
+      <div class="card">
+        <h2>目標設定</h2>
+        <form id="goalForm">
+          <div class="form-group">
+            <label for="goalTitleInput">目標標題</label>
+            <input type="text" id="goalTitleInput" placeholder="例：Gaming PC Goal" required>
+          </div>
+          
+          <div class="form-group">
+            <label for="goalAmountInput">目標金額 (NT$)</label>
+            <input type="number" id="goalAmountInput" min="1" placeholder="50000" required>
+          </div>
+          
+          <div class="form-group">
+            <label for="goalStartInput">開始日期</label>
+            <input type="date" id="goalStartInput">
+          </div>
+          
+          <div class="form-group">
+            <label for="goalEndInput">結束日期</label>
+            <input type="date" id="goalEndInput">
+          </div>
+          
+          <button type="submit" class="btn btn-primary">💾 更新目標</button>
+        </form>
+      </div>
+
+      <!-- Recent Donations -->
+      <div class="card">
+        <h2>最近捐款</h2>
+        <div class="donations-list" id="donationsList">
+          <div style="text-align: center; color: #a0a0a0; padding: 20px;">
+            載入中...
+          </div>
+        </div>
+      </div>
+
+      <!-- Admin Actions -->
+      <div class="card">
+        <h2>管理操作</h2>
+        <div style="display: flex; flex-direction: column; gap: 15px;">
+          <button class="btn btn-danger" onclick="resetProgress()">
+            🗑️ 重置進度 (清空所有捐款記錄)
+          </button>
+          
+          <div style="margin-top: 20px;">
+            <h3 style="margin-bottom: 15px; color: #e0e0e0;">OBS 設定</h3>
+            <p style="color: #a0a0a0; margin-bottom: 10px;">
+              在 OBS 中添加 Browser Source，使用以下 URL：
+            </p>
+            <div style="background: #0f1216; padding: 15px; border-radius: 8px; border: 1px solid #2a2f36;">
+              <code id="obsUrl" style="color: #46e65a; word-break: break-all;"></code>
+            </div>
+            <p style="color: #a0a0a0; margin-top: 10px; font-size: 14px;">
+              建議尺寸：900 x 150 pixels，啟用透明背景
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Elements
+    const alertContainer = document.getElementById('alertContainer');
+    const goalForm = document.getElementById('goalForm');
+    const currentTotal = document.getElementById('currentTotal');
+    const progressPercent = document.getElementById('progressPercent');
+    const donationCount = document.getElementById('donationCount');
+    const goalTitle = document.getElementById('goalTitle');
+    const progressFill = document.getElementById('progressFill');
+    const remainingAmount = document.getElementById('remainingAmount');
+    const donationsList = document.getElementById('donationsList');
+    const obsUrl = document.getElementById('obsUrl');
+
+    // Form inputs
+    const goalTitleInput = document.getElementById('goalTitleInput');
+    const goalAmountInput = document.getElementById('goalAmountInput');
+    const goalStartInput = document.getElementById('goalStartInput');
+    const goalEndInput = document.getElementById('goalEndInput');
+
+    // Set OBS URL
+    obsUrl.textContent = `${window.location.origin}/overlay`;
+
+    function showAlert(message, type = 'success') {
+      const alert = document.createElement('div');
+      alert.className = `alert alert-${type}`;
+      alert.textContent = message;
+      alertContainer.appendChild(alert);
+      
+      setTimeout(() => {
+        alert.remove();
+      }, 5000);
+    }
+
+    function formatNumber(num) {
+      return (num || 0).toLocaleString('zh-TW');
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '';
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('zh-TW');
+    }
+
+    function renderProgress(data) {
+      const { title, current, goal, percent, donations } = data;
+      
+      // Update stats
+      currentTotal.textContent = `NT$ ${formatNumber(current)}`;
+      progressPercent.textContent = `${percent || 0}%`;
+      donationCount.textContent = donations ? donations.length : 0;
+      
+      // Update progress bar
+      goalTitle.textContent = title || 'Goal';
+      progressFill.style.width = `${Math.min(100, percent || 0)}%`;
+      remainingAmount.textContent = formatNumber(Math.max(0, goal - current));
+      
+      // Update form with current values
+      goalTitleInput.value = title || '';
+      goalAmountInput.value = goal || '';
+      goalStartInput.value = data.start ? data.start.split('T')[0] : '';
+      goalEndInput.value = data.end ? data.end.split('T')[0] : '';
+      
+      // Render donations list
+      if (donations && donations.length > 0) {
+        const donationsHTML = donations
+          .slice()
+          .reverse()
+          .map(donation => `
+            <div class="donation-item">
+              <div class="donation-info">
+                <div class="donation-payer">${donation.payer}</div>
+                <div class="donation-amount">NT$ ${formatNumber(donation.amount)}</div>
+                <div class="donation-time">${new Date(donation.at).toLocaleString('zh-TW')}</div>
+              </div>
+            </div>
+          `).join('');
+        
+        donationsList.innerHTML = donationsHTML;
+      } else {
+        donationsList.innerHTML = '<div style="text-align: center; color: #a0a0a0; padding: 20px;">尚無捐款記錄</div>';
+      }
+    }
+
+    // Load initial data
+    async function loadData() {
+      try {
+        const response = await fetch('/progress');
+        const data = await response.json();
+        renderProgress(data);
+      } catch (error) {
+        console.error('Failed to load data:', error);
+        showAlert('載入資料失敗', 'error');
+      }
+    }
+
+    // Update goal
+    goalForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const formData = {
+        title: goalTitleInput.value,
+        amount: parseInt(goalAmountInput.value),
+        start: goalStartInput.value,
+        end: goalEndInput.value
+      };
+      
+      try {
+        const response = await fetch('/admin/goal', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          showAlert('目標設定已更新！');
+          loadData(); // Refresh data
+        } else {
+          showAlert('更新失敗', 'error');
+        }
+      } catch (error) {
+        console.error('Failed to update goal:', error);
+        showAlert('更新失敗', 'error');
+      }
+    });
+
+    // Reset progress
+    async function resetProgress() {
+      if (!confirm('確定要重置所有進度嗎？此操作無法復原。')) {
+        return;
+      }
+      
+      try {
+        const response = await fetch('/admin/reset', {
+          method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          showAlert('進度已重置！');
+          loadData(); // Refresh data
+        } else {
+          showAlert('重置失敗', 'error');
+        }
+      } catch (error) {
+        console.error('Failed to reset:', error);
+        showAlert('重置失敗', 'error');
+      }
+    }
+
+    // Real-time updates via SSE
+    const eventSource = new EventSource('/events');
+    eventSource.onmessage = function(event) {
+      try {
+        const data = JSON.parse(event.data);
+        renderProgress(data);
+      } catch (error) {
+        console.error('Error parsing SSE data:', error);
+      }
+    };
+
+    // Initialize
+    loadData();
+  </script>
+</body>
+</html>
