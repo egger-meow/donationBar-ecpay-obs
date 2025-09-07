@@ -267,9 +267,10 @@ app.post('/create-order', (req, res) => {
         .loading { text-align: center; }
         .spinner { border: 3px solid #333; border-top: 3px solid #46e65a; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #ecpayForm { display: none; }
       </style>
     </head>
-    <body>
+    <body onload="document.getElementById('ecpayForm').submit();">
       <div class="loading">
         <div class="spinner"></div>
         <p>Redirecting to ECPay payment gateway...</p>
@@ -277,11 +278,6 @@ app.post('/create-order', (req, res) => {
       <form id="ecpayForm" method="post" action="${action}">
         ${inputs}
       </form>
-      <script>
-        setTimeout(() => {
-          document.getElementById('ecpayForm').submit();
-        }, 1000);
-      </script>
     </body>
     </html>
   `;
