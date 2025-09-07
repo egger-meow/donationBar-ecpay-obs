@@ -118,30 +118,63 @@ function addDonation({ tradeNo, amount, payer }) {
   return true;
 }
 
-// ECPay CheckMacValue verification
+// ECPay date formatting
+function formatECPayDate(d = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  const MM   = pad(d.getMonth() + 1);
+  const dd   = pad(d.getDate());
+  const HH   = pad(d.getHours());
+  const mm   = pad(d.getMinutes());
+  const ss   = pad(d.getSeconds());
+  return `${yyyy}/${MM}/${dd} ${HH}:${mm}:${ss}`;
+}
+
+// ECPay URL encoding (different from standard encodeURIComponent)
+function ecpayUrlEncode(str) {
+  // 先做一般的 encodeURIComponent
+  let encoded = encodeURIComponent(str);
+
+  // ECPay 要求空白使用 '+'，且以下符號需還原為原字元
+  encoded = encoded
+    .replace(/%20/g, '+')
+    .replace(/%2D/gi, '-')
+    .replace(/%5F/gi, '_')
+    .replace(/%2E/gi, '.')
+    .replace(/%21/gi, '!')
+    .replace(/%2A/gi, '*')
+    .replace(/%28/gi, '(')
+    .replace(/%29/gi, ')');
+
+  return encoded.toLowerCase();
+}
+
+// ECPay CheckMacValue generation
 function generateCheckMacValue(params) {
-  // Sort parameters and create query string
-  const sortedParams = Object.keys(params)
-    .filter(key => key !== 'CheckMacValue')
-    .sort()
-    .map(key => `${key}=${params[key]}`)
-    .join('&');
-  
   const hashKey = process.env.HASH_KEY;
-  const hashIV = process.env.HASH_IV;
-  
-  // ECPay algorithm: HashKey + query + HashIV
-  const raw = `HashKey=${hashKey}&${sortedParams}&HashIV=${hashIV}`;
-  const urlEncoded = encodeURIComponent(raw).toLowerCase();
-  
+  const hashIV  = process.env.HASH_IV;
+
+  // 1) 排除 CheckMacValue，依 Key 排序
+  const sorted = Object.keys(params)
+    .filter(k => k !== 'CheckMacValue')
+    .sort((a, b) => a.localeCompare(b))
+    .map(k => `${k}=${params[k]}`)
+    .join('&');
+
+  // 2) 包上 HashKey / HashIV
+  const raw = `HashKey=${hashKey}&${sorted}&HashIV=${hashIV}`;
+
+  // 3) 依 ECPay 規則 UrlEncode + toLowerCase
+  const urlEncoded = ecpayUrlEncode(raw);
+
+  // 4) SHA256 → toUpperCase
   return crypto.createHash('sha256').update(urlEncoded).digest('hex').toUpperCase();
 }
 
 function verifyCheckMacValue(params) {
-  if (!params.CheckMacValue) return false;
-  
-  const calculatedMac = generateCheckMacValue(params);
-  return calculatedMac === params.CheckMacValue;
+  if (!params || !params.CheckMacValue) return false;
+  const mac = generateCheckMacValue(params);
+  return mac === params.CheckMacValue;
 }
 
 // Authentication middleware
@@ -196,45 +229,47 @@ app.get('/admin', requireAdmin, (req, res) => {
 
 // ECPay callback endpoint
 app.post('/ecpay/return', (req, res) => {
-  const params = req.body;
-  console.log('ECPay callback received:', params);
+  const p = req.body;
+  console.log('ECPay callback:', p);
 
-  // Verify the payment was successful
-  if (params.RtnCode === '1' && verifyCheckMacValue(params)) {
-    const success = addDonation({
-      tradeNo: params.MerchantTradeNo,
-      amount: params.TradeAmt,
-      payer: params.CustomField1 || 'Anonymous'
+  const validMac = verifyCheckMacValue(p);
+  const success  = p.RtnCode === '1';
+  const mine     = p.MerchantID === process.env.MERCHANT_ID;
+
+  if (validMac && success && mine) {
+    // （選配）比對金額：找回你建立訂單時的金額再比一次
+    addDonation({
+      tradeNo: p.MerchantTradeNo,
+      amount: p.TradeAmt,
+      payer: p.CustomField1 || 'Anonymous'
     });
-    
-    if (success) {
-      return res.send('1|OK');
-    }
+    return res.send('1|OK');
   }
-  
-  console.error('Payment verification failed:', params);
+
+  console.error('Return verify failed.', { success, validMac, mine });
   return res.status(400).send('0|FAIL');
 });
 
 // Create ECPay order
 app.post('/create-order', (req, res) => {
   const { amount, nickname } = req.body;
-  
-  if (!amount || amount < 1) {
+
+  const amt = parseInt(amount, 10);
+  if (!amt || amt < 1) {
     return res.status(400).json({ error: 'Invalid amount' });
   }
-  
-  const tradeNo = 'DONATE' + Date.now();
-  const tradeDate = new Date().toISOString().slice(0, 19).replace('T', ' ');
-  
+
+  const tradeNo   = 'DONATE' + Date.now();           // 長度 <= 20
+  const tradeDate = formatECPayDate(new Date());     // 正確格式
+
   const params = {
     MerchantID: process.env.MERCHANT_ID,
     MerchantTradeNo: tradeNo,
     MerchantTradeDate: tradeDate,
     PaymentType: 'aio',
-    TotalAmount: Number(amount),
+    TotalAmount: String(amt),            // 整數字串
     TradeDesc: 'Stream Donation',
-    ItemName: `Stream Support x1`,
+    ItemName: 'Stream Support x1',
     ReturnURL: `${process.env.BASE_URL}/ecpay/return`,
     ClientBackURL: `${process.env.BASE_URL}/donate?success=1`,
     OrderResultURL: `${process.env.BASE_URL}/donate?success=1`,
@@ -242,10 +277,9 @@ app.post('/create-order', (req, res) => {
     EncryptType: 1,
     CustomField1: nickname || 'Anonymous'
   };
-  
-  // Generate CheckMacValue
-  const checkMacValue = generateCheckMacValue(params);
-  params.CheckMacValue = checkMacValue;
+
+  // 產生簽章（最後再放入）
+  params.CheckMacValue = generateCheckMacValue(params);
   
   // Create auto-submit form
   const action = process.env.ENVIRONMENT === 'production' 
@@ -253,36 +287,18 @@ app.post('/create-order', (req, res) => {
     : 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5';
   
   const inputs = Object.entries(params)
-    .map(([key, value]) => `<input type="hidden" name="${key}" value="${String(value)}">`)
+    .map(([k, v]) => `<input type="hidden" name="${k}" value="${String(v)}">`)
     .join('\n');
-  
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <title>Redirecting to ECPay...</title>
-      <style>
-        body { font-family: system-ui; background: #0f1216; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; }
-        .loading { text-align: center; }
-        .spinner { border: 3px solid #333; border-top: 3px solid #46e65a; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #ecpayForm { display: none; }
-      </style>
-    </head>
-    <body onload="document.getElementById('ecpayForm').submit();">
-      <div class="loading">
-        <div class="spinner"></div>
-        <p>Redirecting to ECPay payment gateway...</p>
-      </div>
-      <form id="ecpayForm" method="post" action="${action}">
+
+  res.send(`
+    <!DOCTYPE html><html><head><meta charset="utf-8"><title>Redirecting…</title></head>
+    <body onload="document.forms[0].submit()">
+      <form method="post" action="${action}">
         ${inputs}
       </form>
-    </body>
-    </html>
-  `;
-  
-  res.send(html);
+      <p style="font-family:system-ui">Redirecting to ECPay…</p>
+    </body></html>
+  `);
 });
 
 // Admin API for goal management (protected routes)
