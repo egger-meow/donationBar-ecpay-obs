@@ -21,7 +21,7 @@ function readDB() {
     return JSON.parse(fs.readFileSync(DB_PATH, 'utf-8')); 
   } catch (error) {
     console.error('Error reading database:', error);
-    return { goal: { title: "Goal", amount: 10000, start: "", end: "" }, total: 0, donations: [], seenTradeNos: [] };
+    return { goal: { title: "Goal", amount: 10000 }, total: 0, donations: [], seenTradeNos: [] };
   }
 }
 
@@ -80,8 +80,6 @@ function getProgress() {
     current,
     goal,
     percent,
-    start: db.goal.start,
-    end: db.goal.end,
     donations: db.donations.slice(-5) // Last 5 donations for display
   };
 }
@@ -252,14 +250,12 @@ app.post('/create-order', (req, res) => {
 
 // Admin API for goal management
 app.post('/admin/goal', (req, res) => {
-  const { title, amount, start, end } = req.body;
+  const { title, amount } = req.body;
   const db = readDB();
   
   db.goal = {
     title: title || db.goal.title,
-    amount: Number(amount) || db.goal.amount,
-    start: start || db.goal.start,
-    end: end || db.goal.end
+    amount: Number(amount) || db.goal.amount
   };
   
   writeDB(db);

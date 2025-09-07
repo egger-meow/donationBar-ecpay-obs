@@ -320,15 +320,6 @@
             <input type="number" id="goalAmountInput" min="1" placeholder="50000" required>
           </div>
           
-          <div class="form-group">
-            <label for="goalStartInput">開始日期</label>
-            <input type="date" id="goalStartInput">
-          </div>
-          
-          <div class="form-group">
-            <label for="goalEndInput">結束日期</label>
-            <input type="date" id="goalEndInput">
-          </div>
           
           <button type="submit" class="btn btn-primary">💾 更新目標</button>
         </form>
@@ -358,7 +349,7 @@
               在 OBS 中添加 Browser Source，使用以下 URL：
             </p>
             <div style="background: #0f1216; padding: 15px; border-radius: 8px; border: 1px solid #2a2f36;">
-              <code id="obsUrl" style="color: #46e65a; word-break: break-all;"></code>
+              <code id="obsUrl" style="color: #454e46; word-break: break-all;"></code>
             </div>
             <p style="color: #a0a0a0; margin-top: 10px; font-size: 14px;">
               建議尺寸：900 x 150 pixels，啟用透明背景
@@ -385,8 +376,6 @@
     // Form inputs
     const goalTitleInput = document.getElementById('goalTitleInput');
     const goalAmountInput = document.getElementById('goalAmountInput');
-    const goalStartInput = document.getElementById('goalStartInput');
-    const goalEndInput = document.getElementById('goalEndInput');
 
     // Set OBS URL
     obsUrl.textContent = `${window.location.origin}/overlay`;
@@ -428,8 +417,6 @@
       // Update form with current values
       goalTitleInput.value = title || '';
       goalAmountInput.value = goal || '';
-      goalStartInput.value = data.start ? data.start.split('T')[0] : '';
-      goalEndInput.value = data.end ? data.end.split('T')[0] : '';
       
       // Render donations list
       if (donations && donations.length > 0) {
@@ -470,9 +457,7 @@
       
       const formData = {
         title: goalTitleInput.value,
-        amount: parseInt(goalAmountInput.value),
-        start: goalStartInput.value,
-        end: goalEndInput.value
+        amount: parseInt(goalAmountInput.value)
       };
       
       try {

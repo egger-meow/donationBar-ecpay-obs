@@ -1,9 +1,7 @@
 {
   "goal": {
-    "title": "Gaming PC Goal",
-    "amount": 50000,
-    "start": "2025-09-01",
-    "end": "2025-09-30"
+    "title": "斗內目標",
+    "amount": 1000
   },
   "total": 0,
   "donations": [],

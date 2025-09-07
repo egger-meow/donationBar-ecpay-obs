@@ -210,6 +210,7 @@
       return (num || 0).toLocaleString('zh-TW');
     }
 
+
     function renderProgress(data) {
       const { title, current, goal, percent, donations } = data;
       
@@ -314,7 +315,7 @@
           donations: [
             { payer: 'TestUser1', amount: 100, at: new Date().toISOString() },
             { payer: 'TestUser2', amount: 500, at: new Date().toISOString() }
-          ]
+          ],
         });
       }, 100);
     }
