@@ -272,6 +272,7 @@
       <a href="/overlay" class="btn btn-secondary" target="_blank">📊 查看 Overlay</a>
       <a href="/donate" class="btn btn-secondary" target="_blank">💰 捐款頁面</a>
       <button class="btn btn-secondary" onclick="window.location.reload()">🔄 重新整理</button>
+      <button class="btn btn-danger" onclick="logout()">🚪 登出</button>
     </div>
 
     <div id="alertContainer"></div>
@@ -518,6 +519,19 @@
         console.error('Error parsing SSE data:', error);
       }
     };
+
+    // Logout function
+    function logout() {
+      if (confirm('確定要登出嗎？')) {
+        fetch('/logout', { method: 'POST' })
+          .then(() => {
+            window.location.href = '/login';
+          })
+          .catch(() => {
+            window.location.href = '/login';
+          });
+      }
+    }
 
     // Initialize
     loadData();

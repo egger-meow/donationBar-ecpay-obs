@@ -4,6 +4,7 @@ import path from 'path';
 import express from 'express';
 import bodyParser from 'body-parser';
 import crypto from 'crypto';
+import session from 'express-session';
 
 const app = express();
 const __dirname = path.resolve();
@@ -12,6 +13,14 @@ const __dirname = path.resolve();
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
+
+// Session middleware
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'super-secret',
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: false } // Set to true if using HTTPS
+}));
 
 const DB_PATH = path.join(__dirname, 'db.json');
 
@@ -135,6 +144,12 @@ function verifyCheckMacValue(params) {
   return calculatedMac === params.CheckMacValue;
 }
 
+// Authentication middleware
+function requireAdmin(req, res, next) {
+  if (req.session.isAdmin) return next();
+  return res.redirect('/login');
+}
+
 // API Routes
 app.get('/progress', (req, res) => {
   res.json(getProgress());
@@ -149,7 +164,33 @@ app.get('/donate', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'donate.html'));
 });
 
-app.get('/admin', (req, res) => {
+// Login page
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// Handle login
+app.post('/login', (req, res) => {
+  const { username, password } = req.body;
+  if (username === process.env.ADMIN_USER && password === process.env.ADMIN_PASSWORD) {
+    req.session.isAdmin = true;
+    return res.redirect('/admin');
+  }
+  res.redirect('/login?error=invalid');
+});
+
+// Logout
+app.post('/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('Session destroy error:', err);
+    }
+    res.redirect('/login');
+  });
+});
+
+// Protected admin route
+app.get('/admin', requireAdmin, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
@@ -248,8 +289,8 @@ app.post('/create-order', (req, res) => {
   res.send(html);
 });
 
-// Admin API for goal management
-app.post('/admin/goal', (req, res) => {
+// Admin API for goal management (protected routes)
+app.post('/admin/goal', requireAdmin, (req, res) => {
   const { title, amount } = req.body;
   const db = readDB();
   
@@ -264,7 +305,7 @@ app.post('/admin/goal', (req, res) => {
   res.json({ success: true, goal: db.goal });
 });
 
-app.post('/admin/reset', (req, res) => {
+app.post('/admin/reset', requireAdmin, (req, res) => {
   const db = readDB();
   db.total = 0;
   db.donations = [];
