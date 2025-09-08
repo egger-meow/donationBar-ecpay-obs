@@ -289,11 +289,21 @@
 
     // Check URL parameters for success/error messages
     const urlParams = new URLSearchParams(window.location.search);
+    console.log('URL params:', urlParams.toString());
+    console.log('Success param:', urlParams.get('success'));
+    
     if (urlParams.get('success') === '1') {
+      console.log('Showing success message');
       successMessage.style.display = 'block';
+      // Scroll to top to ensure success message is visible
+      window.scrollTo(0, 0);
+      // Update the page title
+      document.title = 'Payment Success - Support the Stream';
     }
     if (urlParams.get('error') === '1') {
+      console.log('Showing error message');
       errorMessage.style.display = 'block';
+      window.scrollTo(0, 0);
     }
 
     // Load current progress
