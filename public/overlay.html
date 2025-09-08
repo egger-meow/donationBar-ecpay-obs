@@ -158,6 +158,92 @@
       --bar-light: #5ef56d;
     }
 
+    /* Donation Alert Popup */
+    .donation-alert {
+      position: fixed;
+      top: 50px;
+      right: 50px;
+      background: linear-gradient(135deg, #ff4757, #ff3838);
+      color: white;
+      padding: 25px 35px;
+      border-radius: 20px;
+      box-shadow: 
+        0 20px 40px rgba(255, 71, 87, 0.4),
+        0 0 0 3px rgba(255, 255, 255, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      z-index: 1000;
+      transform: translateX(500px) scale(0.8);
+      opacity: 0;
+      transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+      border: 2px solid rgba(255, 255, 255, 0.5);
+      backdrop-filter: blur(10px);
+      min-width: 300px;
+      text-align: center;
+    }
+
+    .donation-alert.show {
+      transform: translateX(0) scale(1);
+      opacity: 1;
+    }
+
+    .donation-alert.hide {
+      transform: translateX(500px) scale(0.8);
+      opacity: 0;
+    }
+
+    .alert-header {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .alert-donor {
+      font-size: 28px;
+      font-weight: 800;
+      margin-bottom: 5px;
+      color: white;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .alert-amount {
+      font-size: 36px;
+      font-weight: 900;
+      color: #fff200;
+      text-shadow: 
+        0 2px 4px rgba(0, 0, 0, 0.5),
+        0 0 20px rgba(255, 242, 0, 0.5);
+      margin-bottom: 8px;
+    }
+
+    .alert-message {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.8);
+      font-weight: 500;
+    }
+
+    @keyframes alertPulse {
+      0%, 100% {
+        box-shadow: 
+          0 20px 40px rgba(255, 71, 87, 0.4),
+          0 0 0 3px rgba(255, 255, 255, 0.3),
+          inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      }
+      50% {
+        box-shadow: 
+          0 25px 50px rgba(255, 71, 87, 0.6),
+          0 0 0 5px rgba(255, 255, 255, 0.5),
+          inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      }
+    }
+
+    .donation-alert.pulse {
+      animation: alertPulse 0.6s ease-in-out;
+    }
+
     /* Responsive design */
     @media (max-width: 600px) {
       #wrap { width: 100%; padding: 15px; }
@@ -165,6 +251,17 @@
       .progress-container { height: 45px; }
       .percentage { font-size: 18px; }
       .amount-info { font-size: 16px; }
+      
+      .donation-alert {
+        top: 20px;
+        right: 20px;
+        left: 20px;
+        min-width: auto;
+        padding: 20px;
+      }
+      
+      .alert-donor { font-size: 24px; }
+      .alert-amount { font-size: 28px; }
     }
   </style>
 </head>
@@ -179,6 +276,19 @@
     <div class="amount-info" id="amountInfo">NT$ 0 / NT$ 0</div>
     <div class="recent-donations" id="recentDonations"></div>
   </div>
+
+  <!-- Donation Alert Popup -->
+  <div class="donation-alert" id="donationAlert">
+    <div class="alert-header">New Donation!</div>
+    <div class="alert-donor" id="alertDonor">Anonymous</div>
+    <div class="alert-amount" id="alertAmount">NT$ 100</div>
+    <div class="alert-message">Thank you for your support! 💖</div>
+  </div>
+
+  <!-- Audio for donation sound -->
+  <audio id="donationSound" preload="auto">
+    <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFAlGn+DyvWMeB0CU3fPPfS8GJXzJ8+GSRQ4PVafh82YYDE2n3fDGgSEQRH7H8+KVQA0PU6Xd8W+YDA9XqOzm4F8kF1efxOTts2hCKUF+vOPz6pNhIzVpqdvo2YnU3T0ZNbc6ZmJJMEZaVGZbOGVGT1BJWzu" type="audio/wav">
+  </audio>
 
   <script>
     // Parse URL parameters for customization
@@ -205,6 +315,61 @@
     const progressContainerEl = document.getElementById('progressContainer');
 
     let lastTotal = 0;
+    let lastDonationCount = 0;
+    let alertQueue = [];
+    let isShowingAlert = false;
+
+    // Donation alert functions
+    function playDonationSound() {
+      try {
+        const audio = document.getElementById('donationSound');
+        audio.currentTime = 0;
+        audio.play().catch(e => console.log('Audio play failed:', e));
+      } catch (e) {
+        console.log('Audio not available:', e);
+      }
+    }
+
+    function showDonationAlert(donor, amount) {
+      if (isShowingAlert) {
+        // Queue the alert if one is already showing
+        alertQueue.push({ donor, amount });
+        return;
+      }
+
+      isShowingAlert = true;
+      const alertEl = document.getElementById('donationAlert');
+      const donorEl = document.getElementById('alertDonor');
+      const amountEl = document.getElementById('alertAmount');
+
+      // Update content
+      donorEl.textContent = donor || 'Anonymous';
+      amountEl.textContent = `NT$ ${formatNumber(amount)}`;
+
+      // Play sound
+      playDonationSound();
+
+      // Show alert with animation
+      alertEl.classList.remove('hide');
+      alertEl.classList.add('show', 'pulse');
+
+      // Hide after 4 seconds
+      setTimeout(() => {
+        alertEl.classList.remove('show', 'pulse');
+        alertEl.classList.add('hide');
+        
+        // Reset after hide animation
+        setTimeout(() => {
+          isShowingAlert = false;
+          
+          // Show next alert in queue
+          if (alertQueue.length > 0) {
+            const next = alertQueue.shift();
+            setTimeout(() => showDonationAlert(next.donor, next.amount), 200);
+          }
+        }, 500);
+      }, 4000);
+    }
 
     function formatNumber(num) {
       return (num || 0).toLocaleString('zh-TW');
@@ -236,6 +401,19 @@
         }, 600);
       }
       lastTotal = current;
+      
+      // Check for new donations and show alerts
+      if (donations && donations.length > lastDonationCount && lastDonationCount > 0) {
+        // Get new donations since last update
+        const newDonations = donations.slice(lastDonationCount);
+        newDonations.forEach(donation => {
+          showDonationAlert(donation.payer, donation.amount);
+        });
+      }
+      
+      if (donations) {
+        lastDonationCount = donations.length;
+      }
       
       // Render recent donations
       if (donations && donations.length > 0) {

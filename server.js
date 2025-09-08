@@ -194,7 +194,38 @@ app.get('/overlay', (req, res) => {
 });
 
 app.get('/donate', (req, res) => {
+  // Set proper headers to prevent caching issues
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(path.join(__dirname, 'public', 'donate.html'));
+});
+
+// Success page - handle both GET (ClientBackURL) and POST (OrderResultURL)
+app.get('/success', (req, res) => {
+  // Handle sandbox mode parameter
+  const { sandbox } = req.query;
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  
+  if (sandbox === '1') {
+    console.log('🧪 SANDBOX: Redirecting to success page');
+  }
+  
+  return res.redirect('/donate?success=1');
+});
+
+app.post('/success', (req, res) => {
+  // ECPay will POST a bunch of fields here (TradeNo, RtnCode, etc.)
+  const { RtnCode } = req.body || {};
+  // Use 303 to convert POST to GET and avoid "resubmit form" warnings on refresh
+  if (String(RtnCode) === '1') {
+    console.log('✅ PRODUCTION: ECPay payment successful');
+    return res.redirect(303, '/donate?success=1');
+  }
+  console.log('❌ PRODUCTION: ECPay payment failed');
+  return res.redirect(303, '/donate?error=1');
 });
 
 // Login page
@@ -262,6 +293,27 @@ app.post('/create-order', (req, res) => {
   const tradeNo   = 'DONATE' + Date.now();           // 長度 <= 20
   const tradeDate = formatECPayDate(new Date());     // 正確格式
 
+  // Sandbox mode: simulate successful payment without ECPay API
+  if (process.env.ENVIRONMENT === 'sandbox') {
+    console.log(`🧪 SANDBOX MODE: Simulating payment for ${nickname || 'Anonymous'} - NT$${amt}`);
+    
+    // Add donation directly to database (simulate successful payment)
+    const success = addDonation({
+      tradeNo: tradeNo,
+      amount: amt,
+      payer: nickname || 'Anonymous'
+    });
+
+    if (success) {
+      console.log(`✅ SANDBOX: Payment simulation successful`);
+      return res.redirect('/success?sandbox=1');
+    } else {
+      console.log(`❌ SANDBOX: Payment simulation failed (duplicate)`);
+      return res.redirect('/donate?error=1');
+    }
+  }
+
+  // Production mode: redirect to actual ECPay
   const params = {
     MerchantID: process.env.MERCHANT_ID,
     MerchantTradeNo: tradeNo,
@@ -271,8 +323,8 @@ app.post('/create-order', (req, res) => {
     TradeDesc: 'Stream Donation',
     ItemName: 'Stream Support x1',
     ReturnURL: `${process.env.BASE_URL}/ecpay/return`,
-    ClientBackURL: `${process.env.BASE_URL}/donate?success=1`,
-    OrderResultURL: `${process.env.BASE_URL}/donate?success=1`,
+    ClientBackURL: `${process.env.BASE_URL}/success`,
+    OrderResultURL: `${process.env.BASE_URL}/success`,
     ChoosePayment: 'Credit',
     EncryptType: 1,
     CustomField1: nickname || 'Anonymous'
@@ -282,9 +334,7 @@ app.post('/create-order', (req, res) => {
   params.CheckMacValue = generateCheckMacValue(params);
   
   // Create auto-submit form
-  const action = process.env.ENVIRONMENT === 'production' 
-    ? 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5'
-    : 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5';
+  const action = 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5';
   
   const inputs = Object.entries(params)
     .map(([k, v]) => `<input type="hidden" name="${k}" value="${String(v)}">`)
