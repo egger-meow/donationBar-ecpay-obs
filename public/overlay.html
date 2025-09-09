@@ -325,20 +325,112 @@
   </audio>
 
   <script>
-    // Parse URL parameters for customization
-    const urlParams = new URLSearchParams(window.location.search);
-    const colors = {
-      fg: urlParams.get('fg') || '#ffffff',
-      bg: urlParams.get('bg') || '#1a1a1a',
-      bar: urlParams.get('bar') || '#46e65a',
-      barLight: urlParams.get('bar_light') || '#5ef56d'
+    // Global settings object
+    let overlaySettings = {
+      fontSize: 16,
+      fontColor: '#ffffff',
+      backgroundColor: '#1a1a1a',
+      progressBarColor: '#46e65a',
+      progressBarHeight: 30,
+      progressBarCornerRadius: 15,
+      alertDuration: 5000,
+      position: 'top-center',
+      width: 900,
+      alertEnabled: true,
+      alertSound: true
     };
 
-    // Apply custom colors
-    document.documentElement.style.setProperty('--fg', colors.fg);
-    document.documentElement.style.setProperty('--bg', colors.bg);
-    document.documentElement.style.setProperty('--bar', colors.bar);
-    document.documentElement.style.setProperty('--bar-light', colors.barLight);
+    // Load overlay settings from server
+    async function loadOverlaySettings() {
+      try {
+        const response = await fetch('/overlay-settings');
+        const settings = await response.json();
+        overlaySettings = { ...overlaySettings, ...settings };
+        applySettings();
+      } catch (error) {
+        console.error('Failed to load overlay settings:', error);
+        // Use defaults if loading fails
+        applySettings();
+      }
+    }
+
+    // Apply settings to the overlay
+    function applySettings() {
+      // Apply CSS custom properties
+      document.documentElement.style.setProperty('--fg', overlaySettings.fontColor);
+      document.documentElement.style.setProperty('--bg', overlaySettings.backgroundColor);
+      document.documentElement.style.setProperty('--bar', overlaySettings.progressBarColor);
+      document.documentElement.style.setProperty('--bar-light', overlaySettings.progressBarColor);
+
+      // Apply position styling
+      const wrap = document.getElementById('wrap');
+      const body = document.body;
+      
+      // Reset positioning classes
+      body.className = '';
+      
+      // Apply position-specific styling
+      switch(overlaySettings.position) {
+        case 'top-left':
+          body.style.justifyContent = 'flex-start';
+          body.style.alignItems = 'flex-start';
+          body.style.paddingTop = '20px';
+          body.style.paddingLeft = '20px';
+          break;
+        case 'top-center':
+          body.style.justifyContent = 'center';
+          body.style.alignItems = 'flex-start';
+          body.style.paddingTop = '50px';
+          body.style.paddingLeft = '0';
+          break;
+        case 'top-right':
+          body.style.justifyContent = 'flex-end';
+          body.style.alignItems = 'flex-start';
+          body.style.paddingTop = '20px';
+          body.style.paddingRight = '20px';
+          break;
+        case 'center':
+          body.style.justifyContent = 'center';
+          body.style.alignItems = 'center';
+          body.style.paddingTop = '0';
+          break;
+        case 'bottom-left':
+          body.style.justifyContent = 'flex-start';
+          body.style.alignItems = 'flex-end';
+          body.style.paddingBottom = '20px';
+          body.style.paddingLeft = '20px';
+          break;
+        case 'bottom-center':
+          body.style.justifyContent = 'center';
+          body.style.alignItems = 'flex-end';
+          body.style.paddingBottom = '50px';
+          break;
+        case 'bottom-right':
+          body.style.justifyContent = 'flex-end';
+          body.style.alignItems = 'flex-end';
+          body.style.paddingBottom = '20px';
+          body.style.paddingRight = '20px';
+          break;
+      }
+      
+      // Apply width
+      if (wrap) {
+        wrap.style.width = `${overlaySettings.width}px`;
+      }
+      
+      // Apply font size to title
+      const title = document.getElementById('title');
+      if (title) {
+        title.style.fontSize = `${Math.max(overlaySettings.fontSize * 2, 24)}px`;
+      }
+      
+      // Apply progress bar height and corner radius
+      const progressContainer = document.getElementById('progressContainer');
+      if (progressContainer) {
+        progressContainer.style.height = `${overlaySettings.progressBarHeight}px`;
+        progressContainer.style.borderRadius = `${overlaySettings.progressBarCornerRadius}px`;
+      }
+    }
 
     // Elements
     const titleEl = document.getElementById('title');
@@ -385,6 +477,11 @@
     }
 
     function showDonationAlert(donor, amount) {
+      // Check if alerts are enabled
+      if (!overlaySettings.alertEnabled) {
+        return;
+      }
+
       if (isShowingAlert) {
         // Queue the alert if one is already showing
         alertQueue.push({ donor, amount });
@@ -400,8 +497,10 @@
       donorEl.textContent = donor || '匿名';
       amountEl.textContent = `NT$ ${formatNumber(amount)}`;
 
-      // Play sound
-      playDonationSound();
+      // Play sound if enabled
+      if (overlaySettings.alertSound) {
+        playDonationSound();
+      }
 
       // Force a reflow to ensure CSS is applied
       alertEl.offsetHeight;
@@ -413,8 +512,8 @@
       // Debug log
       console.log('Showing donation alert for:', donor, amount);
 
-      // Calculate dynamic duration based on amount
-      const duration = calculateAlertDuration(amount);
+      // Use configured duration or calculate dynamic duration
+      const duration = overlaySettings.alertDuration || calculateAlertDuration(amount);
       
       // Hide after calculated duration
       setTimeout(() => {
@@ -549,6 +648,18 @@
           console.error('Error parsing SSE data:', error);
         }
       };
+
+      // Listen for overlay settings updates
+      eventSource.addEventListener('overlay-settings', function(event) {
+        try {
+          const newSettings = JSON.parse(event.data);
+          console.log('Received overlay settings update:', newSettings);
+          overlaySettings = { ...overlaySettings, ...newSettings };
+          applySettings();
+        } catch (error) {
+          console.error('Error parsing overlay settings update:', error);
+        }
+      });
       
       eventSource.onerror = function(error) {
         console.error('SSE connection error:', error);
@@ -564,8 +675,10 @@
     }
 
     // Initialize
-    loadInitialData();
-    const eventSource = setupSSE();
+    loadOverlaySettings().then(() => {
+      loadInitialData();
+      const eventSource = setupSSE();
+    });
 
     // Clean up on page unload
     window.addEventListener('beforeunload', () => {

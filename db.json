@@ -5,5 +5,24 @@
   },
   "total": 0,
   "donations": [],
-  "seenTradeNos": []
+  "seenTradeNos": [],
+  "ecpay": {
+    "merchantId": "3307577",
+    "hashKey": "vLhFoYxfqIWrpyRG",
+    "hashIV": "s705ZCbrACtE77nc"
+  },
+  "overlaySettings": {
+    "showDonationAlert": true,
+    "fontSize": 10,
+    "fontColor": "#369bce",
+    "backgroundColor": "#1a1a1a",
+    "progressBarColor": "#46e65a",
+    "progressBarHeight": 30,
+    "progressBarCornerRadius": 15,
+    "alertDuration": 5000,
+    "position": "top-center",
+    "width": 900,
+    "alertEnabled": true,
+    "alertSound": true
+  }
 }
