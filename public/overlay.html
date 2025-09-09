@@ -30,7 +30,8 @@
     }
 
     .progress-container {
-      width: 100%;
+      width: 80%;
+      max-width: 700px;
       height: 60px;
       background: var(--bg);
       border-radius: 30px;
@@ -41,6 +42,7 @@
       position: relative;
       opacity: 0;
       animation: fadeInUp 1s ease 0.2s forwards;
+      margin: 0 auto;
     }
 
     .progress-fill {
@@ -95,6 +97,12 @@
       margin-top: 20px;
       opacity: 0;
       animation: fadeInUp 1s ease 0.6s forwards;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
     }
 
     .donation-item {
@@ -107,6 +115,9 @@
       backdrop-filter: blur(10px);
       border: 1px solid rgba(255,255,255,0.1);
       animation: slideInRight 0.5s ease;
+      text-align: center;
+      width: 100%;
+      box-sizing: border-box;
     }
 
     .donation-amount {
@@ -279,10 +290,10 @@
 
   <!-- Donation Alert Popup -->
   <div class="donation-alert" id="donationAlert">
-    <div class="alert-header">New Donation!</div>
+    <div class="alert-header">感謝斗內！</div>
     <div class="alert-donor" id="alertDonor">Anonymous</div>
     <div class="alert-amount" id="alertAmount">NT$ 100</div>
-    <div class="alert-message">Thank you for your support! 💖</div>
+    <div class="alert-message">感謝您的支持！💖</div>
   </div>
 
   <!-- Audio for donation sound -->
@@ -318,6 +329,16 @@
     let lastDonationCount = 0;
     let alertQueue = [];
     let isShowingAlert = false;
+    let currentGoal = 1000; // Default goal amount
+
+    // Exponential money-time mapping function (3-15 seconds)
+    function calculateAlertDuration(amount) {
+      // Normalize amount to 0-1 range based on current goal
+      const normalizedAmount = Math.min(amount / currentGoal, 1);
+      // Exponential curve: 3 + 12 * (normalized^2)
+      const duration = 3000 + (12000 * Math.pow(normalizedAmount, 2));
+      return Math.max(3000, Math.min(15000, duration));
+    }
 
     // Donation alert functions
     function playDonationSound() {
@@ -343,7 +364,7 @@
       const amountEl = document.getElementById('alertAmount');
 
       // Update content
-      donorEl.textContent = donor || 'Anonymous';
+      donorEl.textContent = donor || '匿名';
       amountEl.textContent = `NT$ ${formatNumber(amount)}`;
 
       // Play sound
@@ -353,7 +374,10 @@
       alertEl.classList.remove('hide');
       alertEl.classList.add('show', 'pulse');
 
-      // Hide after 4 seconds
+      // Calculate dynamic duration based on amount
+      const duration = calculateAlertDuration(amount);
+      
+      // Hide after calculated duration
       setTimeout(() => {
         alertEl.classList.remove('show', 'pulse');
         alertEl.classList.add('hide');
@@ -368,19 +392,35 @@
             setTimeout(() => showDonationAlert(next.donor, next.amount), 200);
           }
         }, 500);
-      }, 4000);
+      }, duration);
     }
 
     function formatNumber(num) {
       return (num || 0).toLocaleString('zh-TW');
     }
 
+    // Calculate donation amount color intensity (more money = more red)
+    function getDonationAmountColor(amount) {
+      // Normalize amount to 0-1 range based on half the current goal (for better color scaling)
+      const normalizedAmount = Math.min(amount / (currentGoal * 0.5), 1);
+      // Create red intensity gradient
+      const redIntensity = Math.floor(100 + (155 * normalizedAmount)); // 100-255 range
+      const green = Math.max(0, 100 - (100 * normalizedAmount)); // Decrease green as amount increases
+      const blue = Math.max(0, 100 - (100 * normalizedAmount)); // Decrease blue as amount increases
+      return `rgb(${redIntensity}, ${green}, ${blue})`;
+    }
+
 
     function renderProgress(data) {
       const { title, current, goal, percent, donations } = data;
       
+      // Update current goal for normalization calculations
+      if (goal) {
+        currentGoal = goal;
+      }
+      
       // Update title
-      titleEl.textContent = title || 'Donation Goal';
+      titleEl.textContent = title || '斗內目標';
       
       // Update progress bar with animation
       const clampedPercent = Math.min(100, Math.max(0, percent || 0));
@@ -420,12 +460,14 @@
         const donationHTML = donations
           .slice(-3) // Show last 3 donations
           .reverse()
-          .map(donation => `
+          .map(donation => {
+            const amountColor = getDonationAmountColor(donation.amount);
+            return `
             <div class="donation-item">
-              <strong>${donation.payer}</strong> donated 
-              <span class="donation-amount">NT$ ${formatNumber(donation.amount)}</span>
+              <strong>${donation.payer}</strong> 斗內了 
+              <span class="donation-amount" style="color: ${amountColor}; font-weight: bold;">NT$ ${formatNumber(donation.amount)}</span>！！
             </div>
-          `).join('');
+          `}).join('');
         
         recentDonationsEl.innerHTML = donationHTML;
       }
@@ -439,7 +481,7 @@
         renderProgress(data);
       } catch (error) {
         console.error('Failed to load initial data:', error);
-        titleEl.textContent = 'Connection Error';
+        titleEl.textContent = '連線錯誤';
       }
     }
 
@@ -486,7 +528,7 @@
       setInterval(() => {
         testPercent = (testPercent + 1) % 101;
         renderProgress({
-          title: 'Test Goal',
+          title: '測試目標',
           current: testPercent * 500,
           goal: 50000,
           percent: testPercent,
