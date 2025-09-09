@@ -10,12 +10,21 @@
       background: transparent;
       font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
       overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding-top: 50px;
+      box-sizing: border-box;
     }
 
     #wrap {
       width: 900px;
+      max-width: 90vw;
       padding: 20px;
       box-sizing: border-box;
+      position: relative;
     }
 
     .title {
@@ -116,7 +125,8 @@
       border: 1px solid rgba(255,255,255,0.1);
       animation: slideInRight 0.5s ease;
       text-align: center;
-      width: 100%;
+      display: inline-block;
+      max-width: 90%;
       box-sizing: border-box;
     }
 
@@ -171,9 +181,10 @@
 
     /* Donation Alert Popup */
     .donation-alert {
-      position: fixed;
-      top: 50px;
-      right: 50px;
+      position: absolute;
+      top: 170px;
+      left: 50%;
+      right: auto;
       background: linear-gradient(135deg, #ff4757, #ff3838);
       color: white;
       padding: 25px 35px;
@@ -184,23 +195,30 @@
         inset 0 1px 0 rgba(255, 255, 255, 0.2);
       font-family: 'Segoe UI', system-ui, sans-serif;
       z-index: 1000;
-      transform: translateX(500px) scale(0.8);
+      transform: translateX(-50%) translateY(-50px) scale(0.8);
       opacity: 0;
       transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
       border: 2px solid rgba(255, 255, 255, 0.5);
       backdrop-filter: blur(10px);
       min-width: 300px;
+      max-width: 90%;
       text-align: center;
+      visibility: hidden;
+      margin: 0;
     }
 
     .donation-alert.show {
-      transform: translateX(0) scale(1);
+      transform: translateX(-50%) translateY(0) scale(1);
       opacity: 1;
+      pointer-events: auto;
+      visibility: visible;
     }
 
     .donation-alert.hide {
-      transform: translateX(500px) scale(0.8);
+      transform: translateX(-50%) translateY(-50px) scale(0.8);
       opacity: 0;
+      pointer-events: none;
+      visibility: hidden;
     }
 
     .alert-header {
@@ -264,11 +282,16 @@
       .amount-info { font-size: 16px; }
       
       .donation-alert {
-        top: 20px;
-        right: 20px;
-        left: 20px;
+        top: 10px;
+        left: 50vw;
+        right: auto;
         min-width: auto;
         padding: 20px;
+        max-width: calc(100vw - 40px);
+      }
+      
+      body {
+        padding-top: 20px;
       }
       
       .alert-donor { font-size: 24px; }
@@ -326,10 +349,13 @@
     const progressContainerEl = document.getElementById('progressContainer');
 
     let lastTotal = 0;
-    let lastDonationCount = 0;
     let alertQueue = [];
     let isShowingAlert = false;
     let currentGoal = 1000; // Default goal amount
+    
+    // New tracking variables for reliable donation detection
+    let initialized = false;
+    let lastSeenTradeNo = null;
 
     // Exponential money-time mapping function (3-15 seconds)
     function calculateAlertDuration(amount) {
@@ -339,6 +365,13 @@
       const duration = 3000 + (12000 * Math.pow(normalizedAmount, 2));
       return Math.max(3000, Math.min(15000, duration));
     }
+
+    // Audio warm-up for browser autoplay restrictions
+    document.body.addEventListener('click', () => {
+      const a = document.getElementById('donationSound');
+      a.muted = false;
+      a.play().then(() => a.pause()).catch(()=>{});
+    }, { once: true });
 
     // Donation alert functions
     function playDonationSound() {
@@ -370,9 +403,15 @@
       // Play sound
       playDonationSound();
 
+      // Force a reflow to ensure CSS is applied
+      alertEl.offsetHeight;
+      
       // Show alert with animation
       alertEl.classList.remove('hide');
       alertEl.classList.add('show', 'pulse');
+      
+      // Debug log
+      console.log('Showing donation alert for:', donor, amount);
 
       // Calculate dynamic duration based on amount
       const duration = calculateAlertDuration(amount);
@@ -442,17 +481,24 @@
       }
       lastTotal = current;
       
-      // Check for new donations and show alerts
-      if (donations && donations.length > lastDonationCount && lastDonationCount > 0) {
-        // Get new donations since last update
-        const newDonations = donations.slice(lastDonationCount);
-        newDonations.forEach(donation => {
-          showDonationAlert(donation.payer, donation.amount);
-        });
-      }
-      
-      if (donations) {
-        lastDonationCount = donations.length;
+      // Check for new donations and show alerts (fixed detection)
+      if (donations && donations.length) {
+        // newest donation is the last item in the (last 5) list
+        const newest = donations[donations.length - 1];
+
+        if (initialized) {
+          if (newest.tradeNo && newest.tradeNo !== lastSeenTradeNo) {
+            // Try to show all unseen donations that are still within the last-5 window
+            const startIdx = donations.findIndex(d => d.tradeNo === lastSeenTradeNo);
+            const newOnes = startIdx === -1 ? [newest] : donations.slice(startIdx + 1);
+            newOnes.forEach(d => showDonationAlert(d.payer, d.amount));
+          }
+        } else {
+          // don't alert on initial load
+          initialized = true;
+        }
+
+        lastSeenTradeNo = newest.tradeNo || lastSeenTradeNo;
       }
       
       // Render recent donations
