@@ -232,6 +232,20 @@
       border-radius: 8px;
       margin-bottom: 20px;
       font-weight: 500;
+      animation: slideInDown 0.3s ease-out;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .alert::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 2px;
+      background: currentColor;
+      animation: progressBar 0.3s ease-out;
     }
 
     .alert-success {
@@ -244,6 +258,116 @@
       background: rgba(255, 107, 107, 0.1);
       border: 2px solid #ff6b6b;
       color: #ff6b6b;
+    }
+
+    .alert-info {
+      background: rgba(52, 152, 219, 0.1);
+      border: 2px solid #3498db;
+      color: #3498db;
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .btn.loading {
+      position: relative;
+      color: transparent;
+    }
+
+    .btn.loading::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 20px;
+      height: 20px;
+      margin: -10px 0 0 -10px;
+      border: 2px solid transparent;
+      border-top: 2px solid currentColor;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    .btn.loading.btn-primary::after {
+      border-top-color: #000000;
+    }
+
+    .btn.loading.btn-danger::after {
+      border-top-color: #ffffff;
+    }
+
+    .form-feedback {
+      margin-top: 5px;
+      font-size: 12px;
+      min-height: 16px;
+    }
+
+    .form-feedback.success {
+      color: #46e65a;
+    }
+
+    .form-feedback.error {
+      color: #ff6b6b;
+    }
+
+    @keyframes slideInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes progressBar {
+      from {
+        left: -100%;
+      }
+      to {
+        left: 100%;
+      }
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes pulse-success {
+      0% {
+        box-shadow: 0 0 0 0 rgba(70, 230, 90, 0.7);
+      }
+      70% {
+        box-shadow: 0 0 0 10px rgba(70, 230, 90, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(70, 230, 90, 0);
+      }
+    }
+
+    @keyframes pulse-error {
+      0% {
+        box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.7);
+      }
+      70% {
+        box-shadow: 0 0 0 10px rgba(255, 107, 107, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(255, 107, 107, 0);
+      }
+    }
+
+    .pulse-success {
+      animation: pulse-success 0.6s;
+    }
+
+    .pulse-error {
+      animation: pulse-error 0.6s;
     }
 
     @media (max-width: 768px) {
@@ -322,7 +446,8 @@
           </div>
           
           
-          <button type="submit" class="btn btn-primary">💾 更新目標</button>
+          <button type="submit" class="btn btn-primary" id="goalSubmitBtn">💾 更新目標</button>
+          <div class="form-feedback" id="goalFeedback"></div>
         </form>
       </div>
 
@@ -334,6 +459,104 @@
             載入中...
           </div>
         </div>
+      </div>
+
+      <!-- ECPay Configuration -->
+      <div class="card">
+        <h2>ECPay 金流設定</h2>
+        <form id="ecpayForm">
+          <div class="form-group">
+            <label for="merchantIdInput">商店代號 (MerchantID)</label>
+            <input type="text" id="merchantIdInput" placeholder="請輸入 ECPay 商店代號" required>
+          </div>
+          
+          <div class="form-group">
+            <label for="hashKeyInput">HashKey</label>
+            <input type="password" id="hashKeyInput" placeholder="請輸入 ECPay HashKey" required>
+          </div>
+          
+          <div class="form-group">
+            <label for="hashIVInput">HashIV</label>
+            <input type="password" id="hashIVInput" placeholder="請輸入 ECPay HashIV" required>
+          </div>
+          
+          <button type="submit" class="btn btn-primary" id="ecpaySubmitBtn">💾 更新 ECPay 設定</button>
+          <div class="form-feedback" id="ecpayFeedback"></div>
+        </form>
+      </div>
+
+      <!-- Overlay Settings -->
+      <div class="card">
+        <h2>Overlay 外觀設定</h2>
+        <form id="overlaySettingsForm">
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="alertEnabledInput"> 啟用捐款提醒彈窗
+            </label>
+          </div>
+          
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="alertSoundInput"> 播放捐款音效
+            </label>
+          </div>
+          
+          <div class="form-group">
+            <label for="fontSizeInput">字體大小 (px)</label>
+            <input type="number" id="fontSizeInput" min="10" max="50" value="16">
+          </div>
+          
+          <div class="form-group">
+            <label for="fontColorInput">字體顏色</label>
+            <input type="color" id="fontColorInput" value="#ffffff">
+          </div>
+          
+          <div class="form-group">
+            <label for="backgroundColorInput">背景顏色</label>
+            <input type="color" id="backgroundColorInput" value="#1a1a1a">
+          </div>
+          
+          <div class="form-group">
+            <label for="progressBarColorInput">進度條顏色</label>
+            <input type="color" id="progressBarColorInput" value="#46e65a">
+          </div>
+          
+          <div class="form-group">
+            <label for="progressBarHeightInput">進度條高度 (px)</label>
+            <input type="number" id="progressBarHeightInput" min="10" max="100" value="30">
+          </div>
+          
+          <div class="form-group">
+            <label for="progressBarCornerRadiusInput">進度條圓角 (px)</label>
+            <input type="number" id="progressBarCornerRadiusInput" min="0" max="50" value="15">
+          </div>
+          
+          <div class="form-group">
+            <label for="positionInput">位置</label>
+            <select id="positionInput">
+              <option value="top-left">左上</option>
+              <option value="top-center" selected>正上</option>
+              <option value="top-right">右上</option>
+              <option value="center">中央</option>
+              <option value="bottom-left">左下</option>
+              <option value="bottom-center">正下</option>
+              <option value="bottom-right">右下</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="widthInput">寬度 (px)</label>
+            <input type="number" id="widthInput" min="300" max="1920" value="900">
+          </div>
+          
+          <div class="form-group">
+            <label for="alertDurationInput">提醒顯示時間 (毫秒)</label>
+            <input type="number" id="alertDurationInput" min="1000" max="30000" value="5000">
+          </div>
+          
+          <button type="submit" class="btn btn-primary" id="overlaySubmitBtn">💾 更新 Overlay 設定</button>
+          <div class="form-feedback" id="overlayFeedback"></div>
+        </form>
       </div>
 
       <!-- Admin Actions -->
@@ -373,6 +596,26 @@
     const remainingAmount = document.getElementById('remainingAmount');
     const donationsList = document.getElementById('donationsList');
     const obsUrl = document.getElementById('obsUrl');
+    
+    // ECPay form elements
+    const ecpayForm = document.getElementById('ecpayForm');
+    const merchantIdInput = document.getElementById('merchantIdInput');
+    const hashKeyInput = document.getElementById('hashKeyInput');
+    const hashIVInput = document.getElementById('hashIVInput');
+    
+    // Overlay settings form elements
+    const overlaySettingsForm = document.getElementById('overlaySettingsForm');
+    const alertEnabledInput = document.getElementById('alertEnabledInput');
+    const alertSoundInput = document.getElementById('alertSoundInput');
+    const fontSizeInput = document.getElementById('fontSizeInput');
+    const fontColorInput = document.getElementById('fontColorInput');
+    const backgroundColorInput = document.getElementById('backgroundColorInput');
+    const progressBarColorInput = document.getElementById('progressBarColorInput');
+    const progressBarHeightInput = document.getElementById('progressBarHeightInput');
+    const progressBarCornerRadiusInput = document.getElementById('progressBarCornerRadiusInput');
+    const positionInput = document.getElementById('positionInput');
+    const widthInput = document.getElementById('widthInput');
+    const alertDurationInput = document.getElementById('alertDurationInput');
 
     // Form inputs
     const goalTitleInput = document.getElementById('goalTitleInput');
@@ -388,8 +631,47 @@
       alertContainer.appendChild(alert);
       
       setTimeout(() => {
-        alert.remove();
+        if (alert.parentNode) {
+          alert.style.animation = 'slideInDown 0.3s ease-out reverse';
+          setTimeout(() => alert.remove(), 300);
+        }
       }, 5000);
+    }
+
+    function showFormFeedback(elementId, message, type = 'success') {
+      const feedback = document.getElementById(elementId);
+      if (feedback) {
+        feedback.textContent = message;
+        feedback.className = `form-feedback ${type}`;
+        setTimeout(() => {
+          if (feedback.textContent === message) {
+            feedback.textContent = '';
+            feedback.className = 'form-feedback';
+          }
+        }, 3000);
+      }
+    }
+
+    function setButtonLoading(buttonId, loading = true) {
+      const button = document.getElementById(buttonId);
+      if (button) {
+        if (loading) {
+          button.disabled = true;
+          button.classList.add('loading');
+        } else {
+          button.disabled = false;
+          button.classList.remove('loading');
+        }
+      }
+    }
+
+    function pulseCard(cardElement, type = 'success') {
+      if (cardElement) {
+        cardElement.classList.add(`pulse-${type}`);
+        setTimeout(() => {
+          cardElement.classList.remove(`pulse-${type}`);
+        }, 600);
+      }
     }
 
     function formatNumber(num) {
@@ -456,6 +738,9 @@
     goalForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       
+      setButtonLoading('goalSubmitBtn', true);
+      showFormFeedback('goalFeedback', '正在更新目標設定...', 'info');
+      
       const formData = {
         title: goalTitleInput.value,
         amount: parseInt(goalAmountInput.value)
@@ -472,15 +757,24 @@
         
         const result = await response.json();
         
+        setButtonLoading('goalSubmitBtn', false);
+        
         if (result.success) {
-          showAlert('目標設定已更新！');
+          showAlert('✅ 目標設定已更新！');
+          showFormFeedback('goalFeedback', '✅ 目標設定成功更新', 'success');
+          pulseCard(goalForm.closest('.card'), 'success');
           loadData(); // Refresh data
         } else {
-          showAlert('更新失敗', 'error');
+          showAlert('❌ 更新失敗', 'error');
+          showFormFeedback('goalFeedback', '❌ 更新失敗，請重試', 'error');
+          pulseCard(goalForm.closest('.card'), 'error');
         }
       } catch (error) {
         console.error('Failed to update goal:', error);
-        showAlert('更新失敗', 'error');
+        setButtonLoading('goalSubmitBtn', false);
+        showAlert('❌ 網路連線錯誤', 'error');
+        showFormFeedback('goalFeedback', '❌ 網路連線錯誤，請檢查連線', 'error');
+        pulseCard(goalForm.closest('.card'), 'error');
       }
     });
 
@@ -533,8 +827,144 @@
       }
     }
 
+    // Load ECPay credentials
+    async function loadECPayCredentials() {
+      try {
+        const response = await fetch('/admin/ecpay');
+        const data = await response.json();
+        merchantIdInput.value = data.merchantId || '';
+        // Don't populate password fields for security
+      } catch (error) {
+        console.error('Failed to load ECPay credentials:', error);
+      }
+    }
+
+    // Load overlay settings
+    async function loadOverlaySettings() {
+      try {
+        const response = await fetch('/admin/overlay');
+        const settings = await response.json();
+        
+        alertEnabledInput.checked = settings.alertEnabled !== false;
+        alertSoundInput.checked = settings.alertSound !== false;
+        fontSizeInput.value = settings.fontSize || 16;
+        fontColorInput.value = settings.fontColor || '#ffffff';
+        backgroundColorInput.value = settings.backgroundColor || '#1a1a1a';
+        progressBarColorInput.value = settings.progressBarColor || '#46e65a';
+        progressBarHeightInput.value = settings.progressBarHeight || 30;
+        progressBarCornerRadiusInput.value = settings.progressBarCornerRadius || 15;
+        positionInput.value = settings.position || 'top-center';
+        widthInput.value = settings.width || 900;
+        alertDurationInput.value = settings.alertDuration || 5000;
+      } catch (error) {
+        console.error('Failed to load overlay settings:', error);
+      }
+    }
+
+    // Update ECPay credentials
+    ecpayForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      setButtonLoading('ecpaySubmitBtn', true);
+      showFormFeedback('ecpayFeedback', '正在更新 ECPay 設定...', 'info');
+      
+      const formData = {
+        merchantId: merchantIdInput.value,
+        hashKey: hashKeyInput.value,
+        hashIV: hashIVInput.value
+      };
+      
+      try {
+        const response = await fetch('/admin/ecpay', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json();
+        
+        setButtonLoading('ecpaySubmitBtn', false);
+        
+        if (result.success) {
+          showAlert('✅ ECPay 金流設定已更新！');
+          showFormFeedback('ecpayFeedback', '✅ ECPay 設定成功更新', 'success');
+          pulseCard(ecpayForm.closest('.card'), 'success');
+          // Clear password fields after successful update
+          hashKeyInput.value = '';
+          hashIVInput.value = '';
+          loadECPayCredentials(); // Reload to show masked values
+        } else {
+          showAlert(`❌ ${result.error || '更新失敗'}`, 'error');
+          showFormFeedback('ecpayFeedback', `❌ ${result.error || '更新失敗，請重試'}`, 'error');
+          pulseCard(ecpayForm.closest('.card'), 'error');
+        }
+      } catch (error) {
+        console.error('Failed to update ECPay credentials:', error);
+        setButtonLoading('ecpaySubmitBtn', false);
+        showAlert('❌ 網路連線錯誤', 'error');
+        showFormFeedback('ecpayFeedback', '❌ 網路連線錯誤，請檢查連線', 'error');
+        pulseCard(ecpayForm.closest('.card'), 'error');
+      }
+    });
+
+    // Update overlay settings
+    overlaySettingsForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      setButtonLoading('overlaySubmitBtn', true);
+      showFormFeedback('overlayFeedback', '正在更新 Overlay 設定...', 'info');
+      
+      const settings = {
+        alertEnabled: alertEnabledInput.checked,
+        alertSound: alertSoundInput.checked,
+        fontSize: parseInt(fontSizeInput.value),
+        fontColor: fontColorInput.value,
+        backgroundColor: backgroundColorInput.value,
+        progressBarColor: progressBarColorInput.value,
+        progressBarHeight: parseInt(progressBarHeightInput.value),
+        progressBarCornerRadius: parseInt(progressBarCornerRadiusInput.value),
+        position: positionInput.value,
+        width: parseInt(widthInput.value),
+        alertDuration: parseInt(alertDurationInput.value)
+      };
+      
+      try {
+        const response = await fetch('/admin/overlay', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(settings)
+        });
+        
+        const result = await response.json();
+        
+        setButtonLoading('overlaySubmitBtn', false);
+        
+        if (result.success) {
+          showAlert('✅ Overlay 外觀設定已更新！');
+          showFormFeedback('overlayFeedback', '✅ Overlay 設定成功更新', 'success');
+          pulseCard(overlaySettingsForm.closest('.card'), 'success');
+        } else {
+          showAlert(`❌ ${result.error || '更新失敗'}`, 'error');
+          showFormFeedback('overlayFeedback', `❌ ${result.error || '更新失敗，請重試'}`, 'error');
+          pulseCard(overlaySettingsForm.closest('.card'), 'error');
+        }
+      } catch (error) {
+        console.error('Failed to update overlay settings:', error);
+        setButtonLoading('overlaySubmitBtn', false);
+        showAlert('❌ 網路連線錯誤', 'error');
+        showFormFeedback('overlayFeedback', '❌ 網路連線錯誤，請檢查連線', 'error');
+        pulseCard(overlaySettingsForm.closest('.card'), 'error');
+      }
+    });
+
     // Initialize
     loadData();
+    loadECPayCredentials();
+    loadOverlaySettings();
   </script>
 </body>
 </html>

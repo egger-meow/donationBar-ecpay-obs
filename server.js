@@ -30,8 +30,61 @@ function readDB() {
     return JSON.parse(fs.readFileSync(DB_PATH, 'utf-8')); 
   } catch (error) {
     console.error('Error reading database:', error);
-    return { goal: { title: "Goal", amount: 10000 }, total: 0, donations: [], seenTradeNos: [] };
+    return { 
+      goal: { title: "Goal", amount: 10000 }, 
+      total: 0, 
+      donations: [], 
+      seenTradeNos: [],
+      ecpay: { merchantId: "", hashKey: "", hashIV: "" },
+      overlaySettings: {
+        showDonationAlert: true,
+        fontSize: 16,
+        fontColor: "#ffffff",
+        backgroundColor: "#1a1a1a",
+        progressBarColor: "#46e65a",
+        progressBarHeight: 30,
+        progressBarCornerRadius: 15,
+        alertDuration: 5000,
+        position: "top-center",
+        width: 900,
+        alertEnabled: true,
+        alertSound: true
+      }
+    };
   }
+}
+
+// ECPay credential helpers
+function getECPayCredentials() {
+  const db = readDB();
+  
+  // Check if credentials exist in database and are not empty
+  if (db.ecpay && db.ecpay.merchantId && db.ecpay.hashKey && db.ecpay.hashIV) {
+    return {
+      merchantId: db.ecpay.merchantId,
+      hashKey: db.ecpay.hashKey,
+      hashIV: db.ecpay.hashIV
+    };
+  }
+  
+  // Fallback to environment variables
+  const envCredentials = {
+    merchantId: process.env.MERCHANT_ID,
+    hashKey: process.env.HASH_KEY,
+    hashIV: process.env.HASH_IV
+  };
+  
+  // If env variables exist and db doesn't have them, save to db
+  if (envCredentials.merchantId && envCredentials.hashKey && envCredentials.hashIV) {
+    if (!db.ecpay) db.ecpay = {};
+    db.ecpay.merchantId = envCredentials.merchantId;
+    db.ecpay.hashKey = envCredentials.hashKey;
+    db.ecpay.hashIV = envCredentials.hashIV;
+    writeDB(db);
+    console.log('💾 ECPay credentials migrated from .env to database');
+  }
+  
+  return envCredentials;
 }
 
 function writeDB(data) { 
@@ -44,6 +97,18 @@ const sseClients = new Set();
 function broadcastProgress() {
   const data = getProgress();
   const payload = `data: ${JSON.stringify(data)}\n\n`;
+  for (const res of sseClients) {
+    try {
+      res.write(payload);
+    } catch (error) {
+      sseClients.delete(res);
+    }
+  }
+}
+
+function broadcastOverlaySettings() {
+  const db = readDB();
+  const payload = `event: overlay-settings\ndata: ${JSON.stringify(db.overlaySettings || {})}\n\n`;
   for (const res of sseClients) {
     try {
       res.write(payload);
@@ -151,8 +216,9 @@ function ecpayUrlEncode(str) {
 
 // ECPay CheckMacValue generation
 function generateCheckMacValue(params) {
-  const hashKey = process.env.HASH_KEY;
-  const hashIV  = process.env.HASH_IV;
+  const credentials = getECPayCredentials();
+  const hashKey = credentials.hashKey;
+  const hashIV = credentials.hashIV;
 
   // 1) 排除 CheckMacValue，依 Key 排序
   const sorted = Object.keys(params)
@@ -221,8 +287,9 @@ app.get('/success', (req, res) => {
 
 app.post('/success', (req, res) => {
   const p = req.body || {};
+  const credentials = getECPayCredentials();
   const ok = String(p.RtnCode) === '1' &&
-             p.MerchantID === process.env.MERCHANT_ID &&
+             p.MerchantID === credentials.merchantId &&
              verifyCheckMacValue(p);
 
   if (ok) {
@@ -274,9 +341,10 @@ app.post('/ecpay/return', (req, res) => {
   const p = req.body;
   console.log('ECPay callback:', p);
 
+  const credentials = getECPayCredentials();
   const validMac = verifyCheckMacValue(p);
   const success  = p.RtnCode === '1';
-  const mine     = p.MerchantID === process.env.MERCHANT_ID;
+  const mine     = p.MerchantID === credentials.merchantId;
 
   if (validMac && success && mine) {
     // （選配）比對金額：找回你建立訂單時的金額再比一次
@@ -325,8 +393,9 @@ app.post('/create-order', (req, res) => {
   }
 
   // Production mode: redirect to actual ECPay
+  const credentials = getECPayCredentials();
   const params = {
-    MerchantID: process.env.MERCHANT_ID,
+    MerchantID: credentials.merchantId,
     MerchantTradeNo: tradeNo,
     MerchantTradeDate: tradeDate,
     PaymentType: 'aio',
@@ -388,6 +457,104 @@ app.post('/admin/reset', requireAdmin, (req, res) => {
   broadcastProgress();
   
   res.json({ success: true });
+});
+
+// ECPay credentials management
+app.get('/admin/ecpay', requireAdmin, (req, res) => {
+  const db = readDB();
+  const credentials = getECPayCredentials();
+  res.json({
+    merchantId: credentials.merchantId || '',
+    hashKey: credentials.hashKey ? '••••••••' : '', // Mask for security
+    hashIV: credentials.hashIV ? '••••••••' : ''
+  });
+});
+
+app.post('/admin/ecpay', requireAdmin, (req, res) => {
+  const { merchantId, hashKey, hashIV } = req.body;
+  
+  if (!merchantId || !hashKey || !hashIV) {
+    return res.status(400).json({ error: 'All ECPay credentials are required' });
+  }
+  
+  const db = readDB();
+  if (!db.ecpay) db.ecpay = {};
+  
+  db.ecpay.merchantId = merchantId.trim();
+  db.ecpay.hashKey = hashKey.trim();
+  db.ecpay.hashIV = hashIV.trim();
+  
+  writeDB(db);
+  
+  res.json({ success: true, message: 'ECPay credentials updated successfully' });
+});
+
+// Overlay settings management
+app.get('/admin/overlay', requireAdmin, (req, res) => {
+  const db = readDB();
+  res.json(db.overlaySettings || {});
+});
+
+app.post('/admin/overlay', requireAdmin, (req, res) => {
+  const settings = req.body;
+  const db = readDB();
+  
+  // Validate and sanitize settings
+  if (!db.overlaySettings) db.overlaySettings = {};
+  
+  // Update settings with validation
+  if (typeof settings.showDonationAlert === 'boolean') {
+    db.overlaySettings.showDonationAlert = settings.showDonationAlert;
+  }
+  if (typeof settings.fontSize === 'number' && settings.fontSize > 0) {
+    db.overlaySettings.fontSize = Math.max(10, Math.min(50, settings.fontSize));
+  }
+  if (typeof settings.fontColor === 'string' && /^#[0-9A-Fa-f]{6}$/.test(settings.fontColor)) {
+    db.overlaySettings.fontColor = settings.fontColor;
+  }
+  if (typeof settings.backgroundColor === 'string' && /^#[0-9A-Fa-f]{6}$/.test(settings.backgroundColor)) {
+    db.overlaySettings.backgroundColor = settings.backgroundColor;
+  }
+  if (typeof settings.progressBarColor === 'string' && /^#[0-9A-Fa-f]{6}$/.test(settings.progressBarColor)) {
+    db.overlaySettings.progressBarColor = settings.progressBarColor;
+  }
+  if (typeof settings.progressBarHeight === 'number' && settings.progressBarHeight > 0) {
+    db.overlaySettings.progressBarHeight = Math.max(10, Math.min(100, settings.progressBarHeight));
+  }
+  if (typeof settings.progressBarCornerRadius === 'number' && settings.progressBarCornerRadius >= 0) {
+    db.overlaySettings.progressBarCornerRadius = Math.max(0, Math.min(50, settings.progressBarCornerRadius));
+  }
+  if (typeof settings.alertDuration === 'number' && settings.alertDuration > 0) {
+    db.overlaySettings.alertDuration = Math.max(1000, Math.min(30000, settings.alertDuration));
+  }
+  if (typeof settings.position === 'string') {
+    const validPositions = ['top-left', 'top-center', 'top-right', 'center', 'bottom-left', 'bottom-center', 'bottom-right'];
+    if (validPositions.includes(settings.position)) {
+      db.overlaySettings.position = settings.position;
+    }
+  }
+  if (typeof settings.width === 'number' && settings.width > 0) {
+    db.overlaySettings.width = Math.max(300, Math.min(1920, settings.width));
+  }
+  if (typeof settings.alertEnabled === 'boolean') {
+    db.overlaySettings.alertEnabled = settings.alertEnabled;
+  }
+  if (typeof settings.alertSound === 'boolean') {
+    db.overlaySettings.alertSound = settings.alertSound;
+  }
+  
+  writeDB(db);
+  
+  // Broadcast settings update to all connected overlays
+  broadcastOverlaySettings();
+  
+  res.json({ success: true, message: 'Overlay settings updated successfully', settings: db.overlaySettings });
+});
+
+// Overlay settings endpoint for overlay.html
+app.get('/overlay-settings', (req, res) => {
+  const db = readDB();
+  res.json(db.overlaySettings || {});
 });
 
 // Start server
