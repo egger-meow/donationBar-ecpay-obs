@@ -220,14 +220,22 @@ app.get('/success', (req, res) => {
 });
 
 app.post('/success', (req, res) => {
-  // ECPay will POST a bunch of fields here (TradeNo, RtnCode, etc.)
-  const { RtnCode } = req.body || {};
-  // Use 303 to convert POST to GET and avoid "resubmit form" warnings on refresh
-  if (String(RtnCode) === '1') {
-    console.log('✅ PRODUCTION: ECPay payment successful');
+  const p = req.body || {};
+  const ok = String(p.RtnCode) === '1' &&
+             p.MerchantID === process.env.MERCHANT_ID &&
+             verifyCheckMacValue(p);
+
+  if (ok) {
+    // Safe fallback: add donation here too (idempotent via seenTradeNos)
+    addDonation({
+      tradeNo: p.MerchantTradeNo,
+      amount: p.TradeAmt,
+      payer: p.CustomField1 || 'Anonymous'
+    });
     return res.redirect(303, '/donate?success=1');
   }
-  console.log('❌ PRODUCTION: ECPay payment failed');
+
+  console.warn('OrderResultURL POST not valid or failed:', p);
   return res.redirect(303, '/donate?error=1');
 });
 

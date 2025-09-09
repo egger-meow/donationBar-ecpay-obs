@@ -501,7 +501,7 @@
         lastSeenTradeNo = newest.tradeNo || lastSeenTradeNo;
       }
       
-      // Render recent donations
+      // Render recent donations (and clear when none)
       if (donations && donations.length > 0) {
         const donationHTML = donations
           .slice(-3) // Show last 3 donations
@@ -516,6 +516,12 @@
           `}).join('');
         
         recentDonationsEl.innerHTML = donationHTML;
+      } else {
+        // NEW: actively clear UI and internal trackers
+        recentDonationsEl.innerHTML = '';
+        lastSeenTradeNo = null;     // so next donation will trigger alert
+        initialized = true;         // avoids "first-load" alert
+        lastTotal = current || 0;   // keep total consistent for animation check
       }
     }
 
