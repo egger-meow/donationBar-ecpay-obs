@@ -5,6 +5,7 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import crypto from 'crypto';
 import session from 'express-session';
+import database from './database.js';
 
 const app = express();
 const __dirname = path.resolve();
@@ -25,38 +26,13 @@ app.use(session({
 const DB_PATH = path.join(__dirname, 'db.json');
 
 // Database helpers
-function readDB() { 
-  try {
-    return JSON.parse(fs.readFileSync(DB_PATH, 'utf-8')); 
-  } catch (error) {
-    console.error('Error reading database:', error);
-    return { 
-      goal: { title: "Goal", amount: 10000 }, 
-      total: 0, 
-      donations: [], 
-      seenTradeNos: [],
-      ecpay: { merchantId: "", hashKey: "", hashIV: "" },
-      overlaySettings: {
-        showDonationAlert: true,
-        fontSize: 16,
-        fontColor: "#ffffff",
-        backgroundColor: "#1a1a1a",
-        progressBarColor: "#46e65a",
-        progressBarHeight: 30,
-        progressBarCornerRadius: 15,
-        alertDuration: 5000,
-        position: "top-center",
-        width: 900,
-        alertEnabled: true,
-        alertSound: true
-      }
-    };
-  }
+async function readDB() {
+  return await database.readDB();
 }
 
 // ECPay credential helpers
-function getECPayCredentials() {
-  const db = readDB();
+async function getECPayCredentials() {
+  const db = await readDB();
   
   // Check if credentials exist in database and are not empty
   if (db.ecpay && db.ecpay.merchantId && db.ecpay.hashKey && db.ecpay.hashIV) {
@@ -80,22 +56,22 @@ function getECPayCredentials() {
     db.ecpay.merchantId = envCredentials.merchantId;
     db.ecpay.hashKey = envCredentials.hashKey;
     db.ecpay.hashIV = envCredentials.hashIV;
-    writeDB(db);
+    await writeDB(db);
     console.log('💾 ECPay credentials migrated from .env to database');
   }
   
   return envCredentials;
 }
 
-function writeDB(data) { 
-  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2)); 
+async function writeDB(data) {
+  return await database.writeDB(data);
 }
 
 // SSE: Server-Sent Events for real-time updates
 const sseClients = new Set();
 
-function broadcastProgress() {
-  const data = getProgress();
+async function broadcastProgress() {
+  const data = await getProgress();
   const payload = `data: ${JSON.stringify(data)}\n\n`;
   for (const res of sseClients) {
     try {
@@ -106,8 +82,8 @@ function broadcastProgress() {
   }
 }
 
-function broadcastOverlaySettings() {
-  const db = readDB();
+async function broadcastOverlaySettings() {
+  const db = await readDB();
   const payload = `event: overlay-settings\ndata: ${JSON.stringify(db.overlaySettings || {})}\n\n`;
   for (const res of sseClients) {
     try {
@@ -119,7 +95,7 @@ function broadcastOverlaySettings() {
 }
 
 // SSE endpoint
-app.get('/events', (req, res) => {
+app.get('/events', async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -127,7 +103,7 @@ app.get('/events', (req, res) => {
   res.flushHeaders();
 
   // Send initial data
-  res.write(`data: ${JSON.stringify(getProgress())}\n\n`);
+  res.write(`data: ${JSON.stringify(await getProgress())}\n\n`);
 
   // Keep connection alive
   const keepAlive = setInterval(() => {
@@ -143,8 +119,8 @@ app.get('/events', (req, res) => {
 });
 
 // Helper functions
-function getProgress() {
-  const db = readDB();
+async function getProgress() {
+  const db = await readDB();
   const current = db.total || 0;
   const goal = db.goal.amount;
   const percent = Math.min(100, Math.round((current / goal) * 100));
@@ -158,29 +134,12 @@ function getProgress() {
   };
 }
 
-function addDonation({ tradeNo, amount, payer }) {
-  const db = readDB();
-  
-  // Prevent duplicate processing
-  if (db.seenTradeNos.includes(tradeNo)) {
-    console.log(`Duplicate trade number: ${tradeNo}`);
-    return false;
+async function addDonation({ tradeNo, amount, payer }) {
+  const success = await database.addDonation({ tradeNo, amount, payer });
+  if (success) {
+    await broadcastProgress();
   }
-  
-  db.seenTradeNos.push(tradeNo);
-  db.total = (db.total || 0) + Number(amount);
-  db.donations.push({
-    tradeNo,
-    amount: Number(amount),
-    payer: payer || 'Anonymous',
-    at: new Date().toISOString()
-  });
-  
-  writeDB(db);
-  broadcastProgress();
-  console.log(`New donation: ${payer} donated NT$${amount}`);
-  
-  return true;
+  return success;
 }
 
 // ECPay date formatting
@@ -215,8 +174,8 @@ function ecpayUrlEncode(str) {
 }
 
 // ECPay CheckMacValue generation
-function generateCheckMacValue(params) {
-  const credentials = getECPayCredentials();
+async function generateCheckMacValue(params) {
+  const credentials = await getECPayCredentials();
   const hashKey = credentials.hashKey;
   const hashIV = credentials.hashIV;
 
@@ -237,9 +196,9 @@ function generateCheckMacValue(params) {
   return crypto.createHash('sha256').update(urlEncoded).digest('hex').toUpperCase();
 }
 
-function verifyCheckMacValue(params) {
+async function verifyCheckMacValue(params) {
   if (!params || !params.CheckMacValue) return false;
-  const mac = generateCheckMacValue(params);
+  const mac = await generateCheckMacValue(params);
   return mac === params.CheckMacValue;
 }
 
@@ -250,8 +209,8 @@ function requireAdmin(req, res, next) {
 }
 
 // API Routes
-app.get('/progress', (req, res) => {
-  res.json(getProgress());
+app.get('/progress', async (req, res) => {
+  res.json(await getProgress());
 });
 
 // Page routes
@@ -285,16 +244,16 @@ app.get('/success', (req, res) => {
   return res.redirect('/donate?success=1');
 });
 
-app.post('/success', (req, res) => {
+app.post('/success', async (req, res) => {
   const p = req.body || {};
-  const credentials = getECPayCredentials();
+  const credentials = await getECPayCredentials();
   const ok = String(p.RtnCode) === '1' &&
              p.MerchantID === credentials.merchantId &&
-             verifyCheckMacValue(p);
+             await verifyCheckMacValue(p);
 
   if (ok) {
     // Safe fallback: add donation here too (idempotent via seenTradeNos)
-    addDonation({
+    await addDonation({
       tradeNo: p.MerchantTradeNo,
       amount: p.TradeAmt,
       payer: p.CustomField1 || 'Anonymous'
@@ -337,18 +296,18 @@ app.get('/admin', requireAdmin, (req, res) => {
 });
 
 // ECPay callback endpoint
-app.post('/ecpay/return', (req, res) => {
+app.post('/ecpay/return', async (req, res) => {
   const p = req.body;
   console.log('ECPay callback:', p);
 
-  const credentials = getECPayCredentials();
-  const validMac = verifyCheckMacValue(p);
+  const credentials = await getECPayCredentials();
+  const validMac = await verifyCheckMacValue(p);
   const success  = p.RtnCode === '1';
   const mine     = p.MerchantID === credentials.merchantId;
 
   if (validMac && success && mine) {
     // （選配）比對金額：找回你建立訂單時的金額再比一次
-    addDonation({
+    await addDonation({
       tradeNo: p.MerchantTradeNo,
       amount: p.TradeAmt,
       payer: p.CustomField1 || 'Anonymous'
@@ -361,7 +320,7 @@ app.post('/ecpay/return', (req, res) => {
 });
 
 // Create ECPay order
-app.post('/create-order', (req, res) => {
+app.post('/create-order', async (req, res) => {
   const { amount, nickname } = req.body;
 
   const amt = parseInt(amount, 10);
@@ -377,7 +336,7 @@ app.post('/create-order', (req, res) => {
     console.log(`🧪 SANDBOX MODE: Simulating payment for ${nickname || 'Anonymous'} - NT$${amt}`);
     
     // Add donation directly to database (simulate successful payment)
-    const success = addDonation({
+    const success = await addDonation({
       tradeNo: tradeNo,
       amount: amt,
       payer: nickname || 'Anonymous'
@@ -393,7 +352,7 @@ app.post('/create-order', (req, res) => {
   }
 
   // Production mode: redirect to actual ECPay
-  const credentials = getECPayCredentials();
+  const credentials = await getECPayCredentials();
   const params = {
     MerchantID: credentials.merchantId,
     MerchantTradeNo: tradeNo,
@@ -411,7 +370,7 @@ app.post('/create-order', (req, res) => {
   };
 
   // 產生簽章（最後再放入）
-  params.CheckMacValue = generateCheckMacValue(params);
+  params.CheckMacValue = await generateCheckMacValue(params);
   
   // Create auto-submit form
   const action = 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5';
@@ -432,37 +391,37 @@ app.post('/create-order', (req, res) => {
 });
 
 // Admin API for goal management (protected routes)
-app.post('/admin/goal', requireAdmin, (req, res) => {
+app.post('/admin/goal', requireAdmin, async (req, res) => {
   const { title, amount } = req.body;
-  const db = readDB();
+  const db = await readDB();
   
   db.goal = {
     title: title || db.goal.title,
     amount: Number(amount) || db.goal.amount
   };
   
-  writeDB(db);
-  broadcastProgress();
+  await writeDB(db);
+  await broadcastProgress();
   
   res.json({ success: true, goal: db.goal });
 });
 
-app.post('/admin/reset', requireAdmin, (req, res) => {
-  const db = readDB();
+app.post('/admin/reset', requireAdmin, async (req, res) => {
+  const db = await readDB();
   db.total = 0;
   db.donations = [];
   db.seenTradeNos = [];
   
-  writeDB(db);
-  broadcastProgress();
+  await writeDB(db);
+  await broadcastProgress();
   
   res.json({ success: true });
 });
 
 // ECPay credentials management
-app.get('/admin/ecpay', requireAdmin, (req, res) => {
-  const db = readDB();
-  const credentials = getECPayCredentials();
+app.get('/admin/ecpay', requireAdmin, async (req, res) => {
+  const db = await readDB();
+  const credentials = await getECPayCredentials();
   res.json({
     merchantId: credentials.merchantId || '',
     hashKey: credentials.hashKey ? '••••••••' : '', // Mask for security
@@ -470,34 +429,34 @@ app.get('/admin/ecpay', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/admin/ecpay', requireAdmin, (req, res) => {
+app.post('/admin/ecpay', requireAdmin, async (req, res) => {
   const { merchantId, hashKey, hashIV } = req.body;
   
   if (!merchantId || !hashKey || !hashIV) {
     return res.status(400).json({ error: 'All ECPay credentials are required' });
   }
   
-  const db = readDB();
+  const db = await readDB();
   if (!db.ecpay) db.ecpay = {};
   
   db.ecpay.merchantId = merchantId.trim();
   db.ecpay.hashKey = hashKey.trim();
   db.ecpay.hashIV = hashIV.trim();
   
-  writeDB(db);
+  await writeDB(db);
   
   res.json({ success: true, message: 'ECPay credentials updated successfully' });
 });
 
 // Overlay settings management
-app.get('/admin/overlay', requireAdmin, (req, res) => {
-  const db = readDB();
+app.get('/admin/overlay', requireAdmin, async (req, res) => {
+  const db = await readDB();
   res.json(db.overlaySettings || {});
 });
 
-app.post('/admin/overlay', requireAdmin, (req, res) => {
+app.post('/admin/overlay', requireAdmin, async (req, res) => {
   const settings = req.body;
-  const db = readDB();
+  const db = await readDB();
   
   // Validate and sanitize settings
   if (!db.overlaySettings) db.overlaySettings = {};
@@ -543,17 +502,17 @@ app.post('/admin/overlay', requireAdmin, (req, res) => {
     db.overlaySettings.alertSound = settings.alertSound;
   }
   
-  writeDB(db);
+  await writeDB(db);
   
   // Broadcast settings update to all connected overlays
-  broadcastOverlaySettings();
+  await broadcastOverlaySettings();
   
   res.json({ success: true, message: 'Overlay settings updated successfully', settings: db.overlaySettings });
 });
 
 // Overlay settings endpoint for overlay.html
-app.get('/overlay-settings', (req, res) => {
-  const db = readDB();
+app.get('/overlay-settings', async (req, res) => {
+  const db = await readDB();
   res.json(db.overlaySettings || {});
 });
 
