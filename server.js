@@ -121,13 +121,17 @@ app.get('/events', async (req, res) => {
 // Helper functions
 async function getProgress() {
   const db = await readDB();
-  const current = db.total || 0;
+  const actualDonations = db.total || 0;
+  const startFrom = db.goal.startFrom || 0;
+  const current = actualDonations + startFrom; // Add start_from to actual donations
   const goal = db.goal.amount;
   const percent = Math.min(100, Math.round((current / goal) * 100));
   
   return {
     title: db.goal.title,
     current,
+    actualDonations, // Actual donation amount without start_from
+    startFrom,
     goal,
     percent,
     donations: db.donations.slice(-5) // Last 5 donations for display
@@ -392,12 +396,13 @@ app.post('/create-order', async (req, res) => {
 
 // Admin API for goal management (protected routes)
 app.post('/admin/goal', requireAdmin, async (req, res) => {
-  const { title, amount } = req.body;
+  const { title, amount, startFrom } = req.body;
   const db = await readDB();
   
   db.goal = {
     title: title || db.goal.title,
-    amount: Number(amount) || db.goal.amount
+    amount: Number(amount) || db.goal.amount,
+    startFrom: Number(startFrom) || 0
   };
   
   await writeDB(db);

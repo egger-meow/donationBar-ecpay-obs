@@ -71,6 +71,7 @@ class Database {
           id VARCHAR(20) PRIMARY KEY DEFAULT 'main',
           goal_title VARCHAR(255) DEFAULT '斗內目標',
           goal_amount INTEGER DEFAULT 1000,
+          goal_start_from INTEGER DEFAULT 0,
           total INTEGER DEFAULT 0,
           seen_trade_nos TEXT[] DEFAULT '{}',
           ecpay_merchant_id VARCHAR(255) DEFAULT '',
@@ -79,6 +80,12 @@ class Database {
           overlay_settings JSONB DEFAULT '{}',
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         )
+      `);
+
+      // Add goal_start_from column if it doesn't exist (for existing databases)
+      await pgClient.query(`
+        ALTER TABLE app_data 
+        ADD COLUMN IF NOT EXISTS goal_start_from INTEGER DEFAULT 0
       `);
 
       // Insert default record if not exists
@@ -118,17 +125,19 @@ class Database {
         UPDATE app_data SET 
           goal_title = $1,
           goal_amount = $2,
-          total = $3,
-          seen_trade_nos = $4,
-          ecpay_merchant_id = $5,
-          ecpay_hash_key = $6,
-          ecpay_hash_iv = $7,
-          overlay_settings = $8,
+          goal_start_from = $3,
+          total = $4,
+          seen_trade_nos = $5,
+          ecpay_merchant_id = $6,
+          ecpay_hash_key = $7,
+          ecpay_hash_iv = $8,
+          overlay_settings = $9,
           updated_at = NOW()
         WHERE id = 'main'
       `, [
         jsonData.goal?.title || '斗內目標',
         jsonData.goal?.amount || 1000,
+        jsonData.goal?.startFrom || 0,
         jsonData.total || 0,
         jsonData.seenTradeNos || [],
         jsonData.ecpay?.merchantId || '',
@@ -180,7 +189,8 @@ class Database {
         return {
           goal: {
             title: appData.goal_title || '斗內目標',
-            amount: appData.goal_amount || 1000
+            amount: appData.goal_amount || 1000,
+            startFrom: appData.goal_start_from || 0
           },
           total: appData.total || 0,
           donations: donationsResult.rows.map(d => ({
@@ -220,17 +230,19 @@ class Database {
           UPDATE app_data SET 
             goal_title = $1,
             goal_amount = $2,
-            total = $3,
-            seen_trade_nos = $4,
-            ecpay_merchant_id = $5,
-            ecpay_hash_key = $6,
-            ecpay_hash_iv = $7,
-            overlay_settings = $8,
+            goal_start_from = $3,
+            total = $4,
+            seen_trade_nos = $5,
+            ecpay_merchant_id = $6,
+            ecpay_hash_key = $7,
+            ecpay_hash_iv = $8,
+            overlay_settings = $9,
             updated_at = NOW()
           WHERE id = 'main'
         `, [
           data.goal?.title || '斗內目標',
           data.goal?.amount || 1000,
+          data.goal?.startFrom || 0,
           data.total || 0,
           data.seenTradeNos || [],
           data.ecpay?.merchantId || '',
@@ -326,7 +338,7 @@ class Database {
 
   getDefaultData() {
     return {
-      goal: { title: "斗內目標", amount: 1000 },
+      goal: { title: "斗內目標", amount: 1000, startFrom: 0 },
       total: 0,
       donations: [],
       seenTradeNos: [],

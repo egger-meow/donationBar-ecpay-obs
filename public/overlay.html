@@ -550,7 +550,7 @@
 
 
     function renderProgress(data) {
-      const { title, current, goal, percent, donations } = data;
+      const { title, current, goal, percent, donations, actualDonations, startFrom } = data;
       
       // Update current goal for normalization calculations
       if (goal) {
@@ -565,7 +565,7 @@
       progressFillEl.style.width = `${clampedPercent}%`;
       percentageEl.textContent = `${clampedPercent}%`;
       
-      // Update amount info
+      // Update amount info - show total (including startFrom) vs goal
       amountInfoEl.textContent = `NT$ ${formatNumber(current)} / NT$ ${formatNumber(goal)}`;
       
       // Check for new donation (animate if total increased)

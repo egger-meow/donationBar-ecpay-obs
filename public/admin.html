@@ -445,6 +445,13 @@
             <input type="number" id="goalAmountInput" min="1" placeholder="50000" required>
           </div>
           
+          <div class="form-group">
+            <label for="goalStartFromInput">起始金額 (NT$)</label>
+            <input type="number" id="goalStartFromInput" min="0" value="0" placeholder="0">
+            <div style="background: #ff6b6b; color: white; padding: 10px; border-radius: 5px; margin-top: 8px; font-size: 12px; line-height: 1.4;">
+              ⚠️ <strong>道德提醒：</strong>設定起始金額可能會誤導觀眾，讓他們以為您已經收到更多捐款。請謹慎使用此功能，並考慮透明度對於建立觀眾信任的重要性。
+            </div>
+          </div>
           
           <button type="submit" class="btn btn-primary" id="goalSubmitBtn">💾 更新目標</button>
           <div class="form-feedback" id="goalFeedback"></div>
@@ -620,6 +627,7 @@
     // Form inputs
     const goalTitleInput = document.getElementById('goalTitleInput');
     const goalAmountInput = document.getElementById('goalAmountInput');
+    const goalStartFromInput = document.getElementById('goalStartFromInput');
 
     // Set OBS URL
     obsUrl.textContent = `${window.location.origin}/overlay`;
@@ -685,9 +693,9 @@
     }
 
     function renderProgress(data) {
-      const { title, current, goal, percent, donations } = data;
+      const { title, current, goal, percent, donations, actualDonations, startFrom } = data;
       
-      // Update stats
+      // Update stats - show total including startFrom
       currentTotal.textContent = `NT$ ${formatNumber(current)}`;
       progressPercent.textContent = `${percent || 0}%`;
       donationCount.textContent = donations ? donations.length : 0;
@@ -700,6 +708,7 @@
       // Update form with current values
       goalTitleInput.value = title || '';
       goalAmountInput.value = goal || '';
+      goalStartFromInput.value = startFrom || 0;
       
       // Render donations list
       if (donations && donations.length > 0) {
@@ -743,7 +752,8 @@
       
       const formData = {
         title: goalTitleInput.value,
-        amount: parseInt(goalAmountInput.value)
+        amount: parseInt(goalAmountInput.value),
+        startFrom: parseInt(goalStartFromInput.value) || 0
       };
       
       try {
