@@ -61,6 +61,7 @@ class Database {
           trade_no VARCHAR(50) UNIQUE NOT NULL,
           amount INTEGER NOT NULL,
           payer VARCHAR(255) DEFAULT 'Anonymous',
+          message TEXT DEFAULT '',
           created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         )
       `);
@@ -86,6 +87,12 @@ class Database {
       await pgClient.query(`
         ALTER TABLE app_data 
         ADD COLUMN IF NOT EXISTS goal_start_from INTEGER DEFAULT 0
+      `);
+
+      // Add message column to donations table if it doesn't exist (for existing databases)
+      await pgClient.query(`
+        ALTER TABLE donations 
+        ADD COLUMN IF NOT EXISTS message TEXT DEFAULT ''
       `);
 
       // Insert default record if not exists
@@ -151,13 +158,14 @@ class Database {
         for (const donation of jsonData.donations) {
           try {
             await pgClient.query(`
-              INSERT INTO donations (trade_no, amount, payer, created_at)
-              VALUES ($1, $2, $3, $4)
+              INSERT INTO donations (trade_no, amount, payer, message, created_at)
+              VALUES ($1, $2, $3, $4, $5)
               ON CONFLICT (trade_no) DO NOTHING
             `, [
               donation.tradeNo,
               donation.amount,
               donation.payer || 'Anonymous',
+              donation.message || '',
               new Date(donation.at)
             ]);
           } catch (err) {
@@ -183,7 +191,7 @@ class Database {
 
         // Get donations
         const donationsResult = await pgClient.query(
-          'SELECT trade_no, amount, payer, created_at FROM donations ORDER BY created_at DESC LIMIT 100'
+          'SELECT trade_no, amount, payer, message, created_at FROM donations ORDER BY created_at DESC LIMIT 100'
         );
         
         return {
@@ -197,6 +205,7 @@ class Database {
             tradeNo: d.trade_no,
             amount: d.amount,
             payer: d.payer,
+            message: d.message || '',
             at: d.created_at.toISOString()
           })),
           seenTradeNos: appData.seen_trade_nos || [],
@@ -263,7 +272,7 @@ class Database {
   }
 
   // Add donation
-  async addDonation({ tradeNo, amount, payer }) {
+  async addDonation({ tradeNo, amount, payer, message }) {
     if (this.isProduction && this.connected) {
       try {
         // Begin transaction
@@ -283,8 +292,8 @@ class Database {
 
         // Insert donation
         await pgClient.query(
-          'INSERT INTO donations (trade_no, amount, payer) VALUES ($1, $2, $3)',
-          [tradeNo, Number(amount), payer || 'Anonymous']
+          'INSERT INTO donations (trade_no, amount, payer, message) VALUES ($1, $2, $3, $4)',
+          [tradeNo, Number(amount), payer || 'Anonymous', message || '']
         );
 
         // Update app data
@@ -327,6 +336,7 @@ class Database {
         tradeNo,
         amount: Number(amount),
         payer: payer || 'Anonymous',
+        message: message || '',
         at: new Date().toISOString()
       });
       
