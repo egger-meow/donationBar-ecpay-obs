@@ -336,6 +336,16 @@
       margin-bottom: 8px;
     }
 
+    .alert-user-message {
+      font-size: 28px;
+      color: rgba(255, 255, 255, 0.95);
+      font-weight: 600;
+      margin: 10px 0 8px 0;
+      line-height: 1.3;
+      max-width: 100%;
+      word-wrap: break-word;
+    }
+
     .alert-message {
       font-size: 14px;
       color: rgba(255, 255, 255, 0.8);
@@ -404,6 +414,7 @@
     <div class="alert-header">感謝斗內！</div>
     <div class="alert-donor" id="alertDonor">Anonymous</div>
     <div class="alert-amount" id="alertAmount">NT$ 100</div>
+    <div class="alert-user-message" id="alertUserMessage"></div>
     <div class="alert-message">感謝您的支持！💖</div>
   </div>
 
@@ -588,7 +599,7 @@
       }
     }
 
-    function showDonationAlert(donor, amount) {
+    function showDonationAlert(donor, amount, message) {
       // Check if alerts are enabled
       if (!overlaySettings.alertEnabled) {
         return;
@@ -596,7 +607,7 @@
 
       if (isShowingAlert) {
         // Queue the alert if one is already showing
-        alertQueue.push({ donor, amount });
+        alertQueue.push({ donor, amount, message });
         return;
       }
 
@@ -604,10 +615,20 @@
       const alertEl = document.getElementById('donationAlert');
       const donorEl = document.getElementById('alertDonor');
       const amountEl = document.getElementById('alertAmount');
+      const messageEl = document.getElementById('alertUserMessage');
 
       // Update content
       donorEl.textContent = donor || '匿名';
       amountEl.textContent = `NT$ ${formatNumber(amount)}`;
+      
+      // Display message if it exists
+      if (message && message.trim()) {
+        messageEl.textContent = message;
+        messageEl.style.display = 'block';
+      } else {
+        messageEl.textContent = '';
+        messageEl.style.display = 'none';
+      }
 
       // Play sound if enabled
       if (overlaySettings.alertSound) {
@@ -639,7 +660,7 @@
           // Show next alert in queue
           if (alertQueue.length > 0) {
             const next = alertQueue.shift();
-            setTimeout(() => showDonationAlert(next.donor, next.amount), 200);
+            setTimeout(() => showDonationAlert(next.donor, next.amount, next.message), 200);
           }
         }, 500);
       }, duration);
@@ -769,7 +790,7 @@
             // Try to show all unseen donations that are still within the last-5 window
             const startIdx = donations.findIndex(d => d.tradeNo === lastSeenTradeNo);
             const newOnes = startIdx === -1 ? [newest] : donations.slice(startIdx + 1);
-            newOnes.forEach(d => showDonationAlert(d.payer, d.amount));
+            newOnes.forEach(d => showDonationAlert(d.payer, d.amount, d.message));
           }
         } else {
           // don't alert on initial load
@@ -786,10 +807,16 @@
           .reverse()
           .map(donation => {
             const amountColor = getDonationAmountColor(donation.amount);
+            const messageHTML = donation.message && donation.message.trim() 
+              ? `<div style="font-size: 13px; margin-top: 4px; opacity: 0.9;">${donation.message}</div>` 
+              : '';
             return `
             <div class="donation-item">
-              <strong>${donation.payer}</strong> 斗內了 
-              <span class="donation-amount" style="color: ${amountColor}; font-weight: bold;">NT$ ${formatNumber(donation.amount)}</span>！！
+              <div>
+                <strong>${donation.payer}</strong> 斗內了 
+                <span class="donation-amount" style="color: ${amountColor}; font-weight: bold;">NT$ ${formatNumber(donation.amount)}</span>！！
+              </div>
+              ${messageHTML}
             </div>
           `}).join('');
         

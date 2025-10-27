@@ -138,8 +138,8 @@ async function getProgress() {
   };
 }
 
-async function addDonation({ tradeNo, amount, payer }) {
-  const success = await database.addDonation({ tradeNo, amount, payer });
+async function addDonation({ tradeNo, amount, payer, message }) {
+  const success = await database.addDonation({ tradeNo, amount, payer, message });
   if (success) {
     await broadcastProgress();
   }
@@ -260,7 +260,8 @@ app.post('/success', async (req, res) => {
     await addDonation({
       tradeNo: p.MerchantTradeNo,
       amount: p.TradeAmt,
-      payer: p.CustomField1 || 'Anonymous'
+      payer: p.CustomField1 || 'Anonymous',
+      message: p.CustomField2 || ''
     });
     return res.redirect(303, '/donate?success=1');
   }
@@ -314,7 +315,8 @@ app.post('/ecpay/return', async (req, res) => {
     await addDonation({
       tradeNo: p.MerchantTradeNo,
       amount: p.TradeAmt,
-      payer: p.CustomField1 || 'Anonymous'
+      payer: p.CustomField1 || 'Anonymous',
+      message: p.CustomField2 || ''
     });
     return res.send('1|OK');
   }
@@ -325,7 +327,7 @@ app.post('/ecpay/return', async (req, res) => {
 
 // Create ECPay order
 app.post('/create-order', async (req, res) => {
-  const { amount, nickname } = req.body;
+  const { amount, nickname, message } = req.body;
 
   const amt = parseInt(amount, 10);
   if (!amt || amt < 1) {
@@ -343,7 +345,8 @@ app.post('/create-order', async (req, res) => {
     const success = await addDonation({
       tradeNo: tradeNo,
       amount: amt,
-      payer: nickname || 'Anonymous'
+      payer: nickname || 'Anonymous',
+      message: message || ''
     });
 
     if (success) {
@@ -370,7 +373,8 @@ app.post('/create-order', async (req, res) => {
     OrderResultURL: `${process.env.BASE_URL}/success`,
     ChoosePayment: 'Credit',
     EncryptType: 1,
-    CustomField1: nickname || 'Anonymous'
+    CustomField1: nickname || 'Anonymous',
+    CustomField2: message || ''
   };
 
   // 產生簽章（最後再放入）
