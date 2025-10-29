@@ -34,7 +34,13 @@ if (process.env.DATABASE_URL && process.env.ENVIRONMENT !== 'sandbox') {
   sessionConfig.store = new PgSession({
     conString: process.env.DATABASE_URL,
     tableName: 'session',
-    createTableIfMissing: true
+    createTableIfMissing: true,
+    // Enable SSL for secure database connections
+    pool: {
+      ssl: {
+        rejectUnauthorized: false
+      }
+    }
   });
   console.log('🔐 Using PostgreSQL session store');
 } else {

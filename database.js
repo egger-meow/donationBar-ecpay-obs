@@ -37,7 +37,7 @@ class Database {
 
       pgClient = new Client({
         connectionString: databaseUrl,
-        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+        ssl: { rejectUnauthorized: false }
       });
 
       await pgClient.connect();
