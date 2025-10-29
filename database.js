@@ -110,6 +110,12 @@ class Database {
 
   async migrateFromJSON() {
     try {
+      // Only migrate if SANDMODE is enabled
+      if (process.env.ENVIRONMENT !== 'sandbox') {
+        console.log('📊 Migration skipped: ENVIRONMENT is not sandbox');
+        return;
+      }
+
       // Check if we already have data in PostgreSQL
       const existingData = await pgClient.query('SELECT * FROM app_data WHERE id = $1', ['main']);
       if (existingData.rows[0] && existingData.rows[0].goal_title !== '斗內目標') {
