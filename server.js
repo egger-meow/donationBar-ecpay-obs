@@ -441,16 +441,18 @@ app.get('/admin/ecpay', requireAdmin, async (req, res) => {
 app.post('/admin/ecpay', requireAdmin, async (req, res) => {
   const { merchantId, hashKey, hashIV } = req.body;
   
-  if (!merchantId || !hashKey || !hashIV) {
-    return res.status(400).json({ error: 'All ECPay credentials are required' });
+  // Require at least one field to be provided
+  if (!merchantId && !hashKey && !hashIV) {
+    return res.status(400).json({ error: 'At least one ECPay credential is required' });
   }
   
   const db = await readDB();
   if (!db.ecpay) db.ecpay = {};
   
-  db.ecpay.merchantId = merchantId.trim();
-  db.ecpay.hashKey = hashKey.trim();
-  db.ecpay.hashIV = hashIV.trim();
+  // Only update fields that are provided
+  if (merchantId) db.ecpay.merchantId = merchantId.trim();
+  if (hashKey) db.ecpay.hashKey = hashKey.trim();
+  if (hashIV) db.ecpay.hashIV = hashIV.trim();
   
   await writeDB(db);
   

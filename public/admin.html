@@ -479,12 +479,12 @@
           
           <div class="form-group">
             <label for="hashKeyInput">HashKey</label>
-            <input type="password" id="hashKeyInput" placeholder="請輸入 ECPay HashKey" required>
+            <input type="password" id="hashKeyInput" placeholder="請輸入 ECPay HashKey">
           </div>
           
           <div class="form-group">
             <label for="hashIVInput">HashIV</label>
-            <input type="password" id="hashIVInput" placeholder="請輸入 ECPay HashIV" required>
+            <input type="password" id="hashIVInput" placeholder="請輸入 ECPay HashIV">
           </div>
           
           <button type="submit" class="btn btn-primary" id="ecpaySubmitBtn">💾 更新 ECPay 設定</button>
@@ -842,8 +842,11 @@
       try {
         const response = await fetch('/admin/ecpay');
         const data = await response.json();
+        merchantIdInput.placeholder = data.merchantId || '請輸入 ECPay 商店代號';
+        hashKeyInput.placeholder = data.hashKey || '請輸入 ECPay HashKey';
+        hashIVInput.placeholder = data.hashIV || '請輸入 ECPay HashIV';
+        // Set value for merchantId to show current value
         merchantIdInput.value = data.merchantId || '';
-        // Don't populate password fields for security
       } catch (error) {
         console.error('Failed to load ECPay credentials:', error);
       }
@@ -878,11 +881,11 @@
       setButtonLoading('ecpaySubmitBtn', true);
       showFormFeedback('ecpayFeedback', '正在更新 ECPay 設定...', 'info');
       
-      const formData = {
-        merchantId: merchantIdInput.value,
-        hashKey: hashKeyInput.value,
-        hashIV: hashIVInput.value
-      };
+      // Only send fields that have values (for partial updates)
+      const formData = {};
+      if (merchantIdInput.value.trim()) formData.merchantId = merchantIdInput.value.trim();
+      if (hashKeyInput.value.trim()) formData.hashKey = hashKeyInput.value.trim();
+      if (hashIVInput.value.trim()) formData.hashIV = hashIVInput.value.trim();
       
       try {
         const response = await fetch('/admin/ecpay', {
@@ -901,10 +904,11 @@
           showAlert('✅ ECPay 金流設定已更新！');
           showFormFeedback('ecpayFeedback', '✅ ECPay 設定成功更新', 'success');
           pulseCard(ecpayForm.closest('.card'), 'success');
-          // Clear password fields after successful update
+          // Clear all fields after successful update
+          merchantIdInput.value = '';
           hashKeyInput.value = '';
           hashIVInput.value = '';
-          loadECPayCredentials(); // Reload to show masked values
+          loadECPayCredentials(); // Reload to show updated values in placeholders
         } else {
           showAlert(`❌ ${result.error || '更新失敗'}`, 'error');
           showFormFeedback('ecpayFeedback', `❌ ${result.error || '更新失敗，請重試'}`, 'error');
