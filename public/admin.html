@@ -797,7 +797,8 @@
         const response = await fetch('/admin/goal', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
           },
           body: JSON.stringify(formData)
         });
@@ -928,7 +929,8 @@
         const response = await fetch('/admin/ecpay', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
           },
           body: JSON.stringify(formData)
         });
@@ -985,7 +987,8 @@
         const response = await fetch('/admin/overlay', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
           },
           body: JSON.stringify(settings)
         });
