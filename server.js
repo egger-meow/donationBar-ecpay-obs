@@ -209,12 +209,32 @@ async function verifyCheckMacValue(params) {
 // Authentication middleware
 function requireAdmin(req, res, next) {
   if (req.session.isAdmin) return next();
+  
+  // Return JSON error for API requests (AJAX)
+  if (req.xhr || req.headers.accept?.includes('application/json')) {
+    return res.status(401).json({ error: 'Unauthorized', message: 'Please login first' });
+  }
+  
   return res.redirect('/login');
 }
 
 // API Routes
 app.get('/progress', async (req, res) => {
-  res.json(await getProgress());
+  try {
+    const progress = await getProgress();
+    res.json(progress);
+  } catch (error) {
+    console.error('Error in /progress:', error);
+    res.status(500).json({ 
+      error: 'Failed to load progress', 
+      message: error.message,
+      title: '斗內目標',
+      current: 0,
+      goal: 1000,
+      percent: 0,
+      donations: []
+    });
+  }
 });
 
 // Page routes
