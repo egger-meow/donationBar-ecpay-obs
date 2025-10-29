@@ -31,16 +31,21 @@ const sessionConfig = {
 // Use PostgreSQL session store in production
 if (process.env.DATABASE_URL && process.env.ENVIRONMENT !== 'sandbox') {
   const PgSession = connectPgSimple(session);
+  
+  // Parse DATABASE_URL for connection config
+  const url = new URL(process.env.DATABASE_URL);
+  
   sessionConfig.store = new PgSession({
-    conString: process.env.DATABASE_URL,
+    conObject: {
+      host: url.hostname,
+      port: url.port || 5432,
+      database: url.pathname.slice(1),
+      user: url.username,
+      password: url.password,
+      ssl: { rejectUnauthorized: false }
+    },
     tableName: 'session',
-    createTableIfMissing: true,
-    // Enable SSL for secure database connections
-    pool: {
-      ssl: {
-        rejectUnauthorized: false
-      }
-    }
+    createTableIfMissing: true
   });
   console.log('🔐 Using PostgreSQL session store');
 } else {
