@@ -5,6 +5,7 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import crypto from 'crypto';
 import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
 import database from './database.js';
 
 const app = express();
@@ -15,13 +16,32 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-// Session middleware
-app.use(session({
+// Session middleware - use PostgreSQL store in production, memory in sandbox
+const sessionConfig = {
   secret: process.env.SESSION_SECRET || 'super-secret',
   resave: false,
-  saveUninitialized: true,
-  cookie: { secure: false } // Set to true if using HTTPS
-}));
+  saveUninitialized: false,
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+  }
+};
+
+// Use PostgreSQL session store in production
+if (process.env.DATABASE_URL && process.env.ENVIRONMENT !== 'sandbox') {
+  const PgSession = connectPgSimple(session);
+  sessionConfig.store = new PgSession({
+    conString: process.env.DATABASE_URL,
+    tableName: 'session',
+    createTableIfMissing: true
+  });
+  console.log('🔐 Using PostgreSQL session store');
+} else {
+  console.log('🔐 Using in-memory session store (sandbox mode)');
+}
+
+app.use(session(sessionConfig));
 
 const DB_PATH = path.join(__dirname, 'db.json');
 
@@ -211,7 +231,15 @@ function requireAdmin(req, res, next) {
   if (req.session.isAdmin) return next();
   
   // Return JSON error for API requests (AJAX)
-  if (req.xhr || req.headers.accept?.includes('application/json')) {
+  // Check multiple indicators of AJAX/JSON requests
+  const isApiRequest = 
+    req.xhr || 
+    req.headers['x-requested-with'] === 'XMLHttpRequest' ||
+    req.headers.accept?.includes('application/json') ||
+    req.headers['content-type']?.includes('application/json') ||
+    req.path.startsWith('/admin/');
+  
+  if (isApiRequest) {
     return res.status(401).json({ error: 'Unauthorized', message: 'Please login first' });
   }
   
@@ -236,6 +264,9 @@ app.get('/progress', async (req, res) => {
     });
   }
 });
+
+// Favicon route (prevent 404 errors)
+app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 // Page routes
 app.get('/overlay', (req, res) => {
