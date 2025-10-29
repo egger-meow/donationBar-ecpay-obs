@@ -12,8 +12,14 @@ let pgClient = null;
 
 class Database {
   constructor() {
-    this.isProduction = process.env.ENVIRONMENT === 'production' || process.env.DATABASE_URL;
+    // Always use local db.json in sandbox mode, even if DATABASE_URL exists
+    const isSandbox = process.env.ENVIRONMENT === 'sandbox';
+    this.isProduction = !isSandbox && (process.env.ENVIRONMENT === 'production' || process.env.DATABASE_URL);
     this.connected = false;
+    
+    if (isSandbox) {
+      console.log('🧪 Sandbox mode: Using local db.json file');
+    }
     
     if (this.isProduction) {
       this.initPostgreSQL();
@@ -229,6 +235,12 @@ class Database {
     } else {
       // Use JSON file
       try {
+        if (!fs.existsSync(DB_PATH)) {
+          console.log('📝 db.json not found, creating with default data...');
+          const defaultData = this.getDefaultData();
+          fs.writeFileSync(DB_PATH, JSON.stringify(defaultData, null, 2));
+          return defaultData;
+        }
         return JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
       } catch (error) {
         console.error('Error reading JSON database:', error);
@@ -274,6 +286,7 @@ class Database {
     } else {
       // Use JSON file
       fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+      console.log('💾 Data saved to local db.json');
     }
   }
 
