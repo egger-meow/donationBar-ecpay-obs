@@ -206,6 +206,24 @@ async function verifyCheckMacValue(params) {
   return mac === params.CheckMacValue;
 }
 
+// ECPay Data decryption for webhook (AES-CBC)
+async function decryptECPayData(encryptedData) {
+  const credentials = await getECPayCredentials();
+  const hashKey = credentials.hashKey;
+  const hashIV = credentials.hashIV;
+
+  try {
+    // ECPay uses AES-128-CBC encryption
+    const decipher = crypto.createDecipheriv('aes-128-cbc', hashKey, hashIV);
+    let decrypted = decipher.update(encryptedData, 'base64', 'utf8');
+    decrypted += decipher.final('utf8');
+    return JSON.parse(decrypted);
+  } catch (error) {
+    console.error('Failed to decrypt ECPay data:', error);
+    return null;
+  }
+}
+
 // Authentication middleware
 function requireAdmin(req, res, next) {
   if (req.session.isAdmin) return next();
@@ -343,6 +361,88 @@ app.post('/ecpay/return', async (req, res) => {
 
   console.error('Return verify failed.', { success, validMac, mine });
   return res.status(400).send('0|FAIL');
+});
+
+// ECPay Webhook endpoint - For payment notifications from ECPay merchant backend
+// Merchants can set this URL in ECPay's "付款完成通知回傳網址" (ReturnURL)
+// Reference: https://developers.ecpay.com.tw/?p=41030
+app.post('/webhook/ecpay', async (req, res) => {
+  console.log('📨 ECPay webhook received');
+
+  try {
+    const credentials = await getECPayCredentials();
+    const payload = req.body;
+
+    // Verify MerchantID first
+    if (payload.MerchantID !== credentials.merchantId) {
+      console.error('❌ Webhook: Merchant ID mismatch');
+      return res.status(400).send('0|Invalid merchant');
+    }
+
+    // Verify CheckMacValue signature
+    const validMac = await verifyCheckMacValue(payload);
+    if (!validMac) {
+      console.error('❌ Webhook: Invalid CheckMacValue');
+      return res.status(400).send('0|Invalid signature');
+    }
+
+    // Check TransCode (1 = data received successfully)
+    if (payload.TransCode !== 1) {
+      console.warn('⚠️ Webhook: TransCode is not 1:', payload.TransCode);
+      return res.send('1|OK'); // Still acknowledge
+    }
+
+    // Decrypt the Data field
+    const decryptedData = await decryptECPayData(payload.Data);
+    if (!decryptedData) {
+      console.error('❌ Webhook: Failed to decrypt Data field');
+      return res.status(400).send('0|Decryption failed');
+    }
+
+    console.log('📦 Decrypted data:', JSON.stringify(decryptedData, null, 2));
+
+    // Check RtnCode (1 = API execution successful)
+    if (decryptedData.RtnCode !== 1) {
+      console.warn('⚠️ Webhook: RtnCode is not 1:', decryptedData.RtnCode, decryptedData.RtnMsg);
+      return res.send('1|OK'); // Still acknowledge
+    }
+
+    // Check if this is a simulated payment
+    if (decryptedData.SimulatePaid === 1) {
+      console.warn('⚠️ Webhook: This is a SIMULATED payment, not real. Will not add to database.');
+      return res.send('1|OK');
+    }
+
+    // Check trade status (1 = paid)
+    const orderInfo = decryptedData.OrderInfo;
+    if (orderInfo.TradeStatus !== 1) {
+      console.warn('⚠️ Webhook: Trade not paid yet, status:', orderInfo.TradeStatus);
+      return res.send('1|OK');
+    }
+
+    // Add donation to database using the correct field names from ECPay
+    const donationAdded = await addDonation({
+      tradeNo: orderInfo.MerchantTradeNo,
+      amount: orderInfo.TradeAmt,
+      payer: decryptedData.PatronName || 'Anonymous',
+      message: decryptedData.PatronNote || ''
+    });
+
+    if (donationAdded) {
+      console.log(`✅ Webhook: Donation processed - ${decryptedData.PatronName || 'Anonymous'} donated NT$${orderInfo.TradeAmt}`);
+      console.log(`   Trade No: ${orderInfo.MerchantTradeNo}, ECPay No: ${orderInfo.TradeNo}`);
+      console.log(`   Payment: ${orderInfo.PaymentType} at ${orderInfo.PaymentDate}`);
+    } else {
+      console.log(`ℹ️ Webhook: Duplicate donation - ${orderInfo.MerchantTradeNo}`);
+    }
+
+    // Always return 1|OK to ECPay
+    return res.send('1|OK');
+
+  } catch (error) {
+    console.error('❌ Webhook error:', error);
+    return res.status(500).send('0|Server error');
+  }
 });
 
 // Create ECPay order
