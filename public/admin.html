@@ -374,6 +374,82 @@
       animation: pulse-error 0.6s;
     }
 
+    /* Modal Overlay Styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(10px);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: rgba(27, 31, 38, 0.98);
+      border-radius: 20px;
+      padding: 30px;
+      max-width: 1000px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      position: relative;
+      animation: slideUp 0.3s ease;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255, 107, 107, 0.2);
+      border: 2px solid #ff6b6b;
+      color: #ff6b6b;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: bold;
+      transition: all 0.3s ease;
+    }
+
+    .modal-close:hover {
+      background: #ff6b6b;
+      color: #ffffff;
+      transform: rotate(90deg);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
     @media (max-width: 768px) {
       .dashboard {
         grid-template-columns: 1fr;
@@ -385,6 +461,11 @@
       
       .btn {
         width: 100%;
+      }
+
+      .modal-content {
+        padding: 20px;
+        max-height: 85vh;
       }
     }
   </style>
@@ -398,7 +479,7 @@
 
     <div class="quick-links">
       <a href="/overlay" class="btn btn-secondary" target="_blank">📊 查看 Overlay</a>
-      <a href="/donate" class="btn btn-secondary" target="_blank">💰 捐款頁面</a>
+      <button class="btn btn-secondary" onclick="toggleDonationMethodsModal()">💰 捐款方式</button>
       <button class="btn btn-secondary" onclick="window.location.reload()">🔄 重新整理</button>
       <button class="btn btn-danger" onclick="logout()">🚪 登出</button>
     </div>
@@ -495,6 +576,7 @@
           <div class="form-feedback" id="ecpayFeedback"></div>
         </form>
       </div>
+
 
       <!-- Overlay Settings -->
       <div class="card">
@@ -626,6 +708,73 @@
         </p>
       </div>
     </div>
+
+    <!-- Donation Methods Modal -->
+    <div id="donationMethodsModal" class="modal-overlay">
+      <div class="modal-content">
+        <button class="modal-close" onclick="toggleDonationMethodsModal()">×</button>
+        
+        <h2 style="margin-bottom: 10px;">💰 接受捐款的方式</h2>
+        <p style="color: #a0a0a0; margin-bottom: 20px;">
+          您可以選擇以下兩種方式來接受觀眾的捐款：
+        </p>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px;">
+          <!-- Method 1: Donate Page -->
+          <div style="background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 12px; border: 2px solid #2a2f36;">
+            <h3 style="color: #46e65a; margin-bottom: 15px;">📄 方法一：使用捐款頁面</h3>
+            <p style="color: #e0e0e0; margin-bottom: 15px; line-height: 1.6;">
+              透過我們的捐款頁面，觀眾可以直接輸入金額和留言，系統會自動導向 ECPay 付款頁面。付款完成後會自動更新進度條。
+            </p>
+            <div style="background: #0f1216; padding: 12px; border-radius: 8px; border: 1px solid #2a2f36; margin-bottom: 15px;">
+              <div style="color: #808080; font-size: 12px; margin-bottom: 5px;">捐款頁面網址：</div>
+              <code id="donatePageUrl" style="color: #46e65a; word-break: break-all; font-size: 13px;"></code>
+            </div>
+            <button class="btn btn-secondary" onclick="copyToClipboard(document.getElementById('donatePageUrl').textContent, '捐款頁面網址已複製')">
+              📋 複製網址
+            </button>
+            <a href="/donate" class="btn" target="_blank" style="background: #3498db; margin-left: 10px;">
+              👁️ 查看頁面
+            </a>
+          </div>
+
+          <!-- Method 2: Webhook -->
+          <div style="background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 12px; border: 2px solid #2a2f36;">
+            <h3 style="color: #46e65a; margin-bottom: 15px;">🔗 方法二：ECPay Webhook</h3>
+            <p style="color: #e0e0e0; margin-bottom: 15px; line-height: 1.6;">
+              如果您已經有自己的商店或捐款方式，可以在 ECPay 商店後台設定 Webhook，讓系統自動接收付款通知並更新進度條。
+            </p>
+            <div style="background: #0f1216; padding: 12px; border-radius: 8px; border: 1px solid #2a2f36; margin-bottom: 15px;">
+              <div style="color: #808080; font-size: 12px; margin-bottom: 5px;">Webhook 網址：</div>
+              <code id="webhookUrl" style="color: #46e65a; word-break: break-all; font-size: 13px;"></code>
+            </div>
+            <button class="btn btn-secondary" onclick="copyToClipboard(document.getElementById('webhookUrl').textContent, 'Webhook 網址已複製')">
+              📋 複製網址
+            </button>
+            <div style="margin-top: 15px; padding: 12px; background: rgba(52, 152, 219, 0.1); border: 1px solid rgba(52, 152, 219, 0.3); border-radius: 8px;">
+              <div style="font-size: 13px; color: #3498db; margin-bottom: 8px;">⚙️ ECPay 設定步驟：</div>
+              <ol style="color: #a0a0a0; font-size: 13px; margin-left: 20px; line-height: 1.8;">
+                <li>登入 ECPay 商店後台</li>
+                <li>找到「付款完成通知回傳網址」設定</li>
+                <li>貼上上方的 Webhook 網址</li>
+                <li>確保使用 <strong style="color: #46e65a;">POST</strong> 方法</li>
+                <li>儲存設定即可</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 20px; padding: 15px; background: rgba(255, 193, 7, 0.1); border: 2px solid rgba(255, 193, 7, 0.3); border-radius: 10px;">
+          <div style="font-size: 14px; color: #ffc107; margin-bottom: 8px;">💡 提示</div>
+          <ul style="color: #e0e0e0; font-size: 13px; margin-left: 20px; line-height: 1.8;">
+            <li>兩種方式可以同時使用，不會衝突</li>
+            <li>Webhook 方式需要先在上方設定 ECPay 金流資訊</li>
+            <li>系統會自動去除重複的捐款記錄</li>
+            <li>如果您需要自訂捐款人名稱和留言，請在 ECPay 訂單中使用 CustomField1 (名稱) 和 CustomField2 (留言)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -668,6 +817,56 @@
 
     // Set OBS URL
     obsUrl.textContent = `${window.location.origin}/overlay`;
+
+    // Set donation methods URLs
+    const donatePageUrl = document.getElementById('donatePageUrl');
+    const webhookUrl = document.getElementById('webhookUrl');
+    if (donatePageUrl) {
+      donatePageUrl.textContent = `${window.location.origin}/donate`;
+    }
+    if (webhookUrl) {
+      webhookUrl.textContent = `${window.location.origin}/webhook/ecpay`;
+    }
+
+    // Copy to clipboard utility function
+    function copyToClipboard(text, successMessage = '已複製到剪貼簿') {
+      navigator.clipboard.writeText(text).then(() => {
+        showAlert(successMessage, 'success');
+      }).catch(err => {
+        showAlert('複製失敗，請手動複製', 'error');
+        console.error('Copy failed:', err);
+      });
+    }
+
+    // Toggle donation methods modal
+    function toggleDonationMethodsModal() {
+      const modal = document.getElementById('donationMethodsModal');
+      modal.classList.toggle('active');
+      
+      // Prevent body scroll when modal is open
+      if (modal.classList.contains('active')) {
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = '';
+      }
+    }
+
+    // Close modal when clicking outside the content
+    document.getElementById('donationMethodsModal')?.addEventListener('click', function(e) {
+      if (e.target === this) {
+        toggleDonationMethodsModal();
+      }
+    });
+
+    // Close modal with ESC key
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        const modal = document.getElementById('donationMethodsModal');
+        if (modal?.classList.contains('active')) {
+          toggleDonationMethodsModal();
+        }
+      }
+    });
 
     function showAlert(message, type = 'success') {
       const alert = document.createElement('div');
