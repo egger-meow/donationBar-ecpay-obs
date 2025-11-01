@@ -127,6 +127,22 @@ async function getProgress() {
   const goal = db.goal.amount;
   const percent = Math.min(100, Math.round((current / goal) * 100));
   
+  // Get donation display mode from overlay settings
+  const displayMode = db.overlaySettings?.donationDisplayMode || 'top3';
+  let displayDonations = [];
+  
+  if (displayMode === 'hidden') {
+    displayDonations = [];
+  } else if (displayMode === 'latest3') {
+    // Latest 3 donations by time (most recent first)
+    displayDonations = db.donations.slice(-3).reverse();
+  } else {
+    // Default: top 3 by amount (highest first)
+    displayDonations = [...db.donations]
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 3);
+  }
+  
   return {
     title: db.goal.title,
     current,
@@ -134,7 +150,7 @@ async function getProgress() {
     startFrom,
     goal,
     percent,
-    donations: db.donations.slice(-5) // Last 5 donations for display
+    donations: displayDonations
   };
 }
 
@@ -649,6 +665,12 @@ app.post('/admin/overlay', requireAdmin, async (req, res) => {
   }
   if (typeof settings.alertSound === 'boolean') {
     db.overlaySettings.alertSound = settings.alertSound;
+  }
+  if (typeof settings.donationDisplayMode === 'string') {
+    const validModes = ['top3', 'latest3', 'hidden'];
+    if (validModes.includes(settings.donationDisplayMode)) {
+      db.overlaySettings.donationDisplayMode = settings.donationDisplayMode;
+    }
   }
   
   await writeDB(db);

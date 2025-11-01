@@ -384,7 +384,8 @@ class Database {
         position: "top-center",
         width: 900,
         alertEnabled: true,
-        alertSound: true
+        alertSound: true,
+        donationDisplayMode: "top3" // "top3" | "latest3" | "hidden"
       }
     };
   }
