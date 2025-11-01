@@ -213,9 +213,12 @@ async function decryptECPayData(encryptedData) {
   const hashIV = credentials.hashIV;
 
   try {
+    // ECPay sends URL-encoded data, so decode it first
+    const urlDecoded = decodeURIComponent(encryptedData);
+    
     // ECPay uses AES-128-CBC encryption
     const decipher = crypto.createDecipheriv('aes-128-cbc', hashKey, hashIV);
-    let decrypted = decipher.update(encryptedData, 'base64', 'utf8');
+    let decrypted = decipher.update(urlDecoded, 'base64', 'utf8');
     decrypted += decipher.final('utf8');
     return JSON.parse(decrypted);
   } catch (error) {
@@ -389,7 +392,7 @@ app.post('/webhook/ecpay', async (req, res) => {
     // Decrypt the Data field
     const decryptedData = await decryptECPayData(payload.Data);
     if (!decryptedData) {
-      console.error('❌ Webhook: Failed to decrypt Data field');
+      console.error('❌ Webhook: Failed to decrypt Data field', payload.Data);
       return res.status(400).send('0|Decryption failed');
     }
 
