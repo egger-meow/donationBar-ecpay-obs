@@ -206,25 +206,36 @@ async function verifyCheckMacValue(params) {
   return mac === params.CheckMacValue;
 }
 
+// Helper to decode ECPay's URL-encoded JSON
+function decodeECPayJsonLike(str) {
+  // ECPay encodes spaces as '+', and uses percent-encoding with lowercased hex
+  // Convert '+' -> space and percent-decode safely
+  return decodeURIComponent(String(str).replace(/\+/g, '%20'));
+}
+
 // ECPay Data decryption for webhook (AES-CBC)
 async function decryptECPayData(encryptedData) {
-  const credentials = await getECPayCredentials();
-  const hashKey = credentials.hashKey;
-  const hashIV = credentials.hashIV;
+  const { hashKey, hashIV } = await getECPayCredentials();
 
   try {
-    console.log('🔐 Decryption attempt:');
-    console.log('  - HashKey length:', hashKey?.length, 'bytes');
-    console.log('  - HashIV length:', hashIV?.length, 'bytes');
-    console.log('  - Encrypted data length:', encryptedData?.length, 'bytes');
-    
-    // ECPay uses AES-128-CBC encryption
-    const decipher = crypto.createDecipheriv('aes-128-cbc', hashKey, hashIV);
+    if (typeof encryptedData !== 'string' || !encryptedData.trim()) {
+      throw new Error('Invalid Data payload');
+    }
+
+    // AES-128-CBC with PKCS#7 padding (Node's default)
+    const key = Buffer.from(hashKey, 'utf8');
+    const iv  = Buffer.from(hashIV,  'utf8');
+    const decipher = crypto.createDecipheriv('aes-128-cbc', key, iv);
+
     let decrypted = decipher.update(encryptedData, 'base64', 'utf8');
     decrypted += decipher.final('utf8');
-    
-    console.log('✅ Decryption successful');
-    return JSON.parse(decrypted);
+
+    // ECPay returns URL-encoded JSON, e.g. "%7b%22RtnCode%22%3a1...%7d"
+    const jsonText = decodeECPayJsonLike(decrypted);
+
+    const obj = JSON.parse(jsonText);
+    console.log('✅ Decryption + decode + parse OK');
+    return obj;
   } catch (error) {
     console.error('Failed to decrypt ECPay data:', error);
     console.error('Error details:', {
@@ -383,17 +394,18 @@ app.post('/webhook/ecpay', async (req, res) => {
 
   try {
     const credentials = await getECPayCredentials();
-    const payload = req.body;
+    const payload = req.body || {};
 
-    // Verify MerchantID first
-    if (payload.MerchantID !== credentials.merchantId) {
+    // Normalize types (ECPay often posts strings)
+    const transCode = Number(payload.TransCode);
+    const merchantIdOk = String(payload.MerchantID) === String(credentials.merchantId);
+
+    if (!merchantIdOk) {
       console.error('❌ Webhook: Merchant ID mismatch');
       return res.status(400).send('0|Invalid merchant');
     }
 
-
-    // Check TransCode (1 = data received successfully)
-    if (payload.TransCode !== 1) {
+    if (transCode !== 1) {
       console.warn('⚠️ Webhook: TransCode is not 1:', payload.TransCode);
       return res.send('1|OK'); // Still acknowledge
     }
@@ -401,27 +413,27 @@ app.post('/webhook/ecpay', async (req, res) => {
     // Decrypt the Data field
     const decryptedData = await decryptECPayData(payload.Data);
     if (!decryptedData) {
-      console.error('❌ Webhook: Failed to decrypt Data field', payload.Data);
+      console.error('❌ Webhook: Failed to decrypt Data field');
       return res.status(400).send('0|Decryption failed');
     }
 
     console.log('📦 Decrypted data:', JSON.stringify(decryptedData, null, 2));
 
-    // Check RtnCode (1 = API execution successful)
-    if (decryptedData.RtnCode !== 1) {
+    // Check RtnCode (1 = API execution successful) - normalize to number
+    if (Number(decryptedData.RtnCode) !== 1) {
       console.warn('⚠️ Webhook: RtnCode is not 1:', decryptedData.RtnCode, decryptedData.RtnMsg);
       return res.send('1|OK'); // Still acknowledge
     }
 
-    // Check if this is a simulated payment
-    if (decryptedData.SimulatePaid === 1) {
+    // Check if this is a simulated payment - normalize to number
+    if (Number(decryptedData.SimulatePaid) === 1) {
       console.warn('⚠️ Webhook: This is a SIMULATED payment, not real. Will not add to database.');
       return res.send('1|OK');
     }
 
-    // Check trade status (1 = paid)
+    // Check trade status (1 = paid) - normalize to number
     const orderInfo = decryptedData.OrderInfo;
-    if (orderInfo.TradeStatus !== 1) {
+    if (Number(orderInfo.TradeStatus) !== 1) {
       console.warn('⚠️ Webhook: Trade not paid yet, status:', orderInfo.TradeStatus);
       return res.send('1|OK');
     }
