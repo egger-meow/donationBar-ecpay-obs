@@ -647,6 +647,18 @@
             <input type="number" id="alertDurationInput" min="1000" max="30000" value="5000">
           </div>
           
+          <div class="form-group">
+            <label for="donationDisplayModeInput">進度條下方捐款顯示模式</label>
+            <select id="donationDisplayModeInput" style="width: 100%; padding: 12px 15px; border-radius: 8px; border: 2px solid #2a2f36; background: #0f1216; color: #ffffff; font-size: 14px;">
+              <option value="top3">顯示金額前 3 名 (從高到低)</option>
+              <option value="latest3">顯示最近 3 筆 (從新到舊)</option>
+              <option value="hidden">不顯示</option>
+            </select>
+            <div style="font-size: 12px; color: #a0a0a0; margin-top: 8px;">
+              💡 控制進度條下方顯示哪些捐款記錄
+            </div>
+          </div>
+          
           <button type="submit" class="btn btn-primary" id="overlaySubmitBtn">💾 更新 Overlay 設定</button>
           <div class="form-feedback" id="overlayFeedback"></div>
         </form>
@@ -809,6 +821,7 @@
     const positionInput = document.getElementById('positionInput');
     const widthInput = document.getElementById('widthInput');
     const alertDurationInput = document.getElementById('alertDurationInput');
+    const donationDisplayModeInput = document.getElementById('donationDisplayModeInput');
 
     // Form inputs
     const goalTitleInput = document.getElementById('goalTitleInput');
@@ -1105,6 +1118,7 @@
         positionInput.value = settings.position || 'top-center';
         widthInput.value = settings.width || 900;
         alertDurationInput.value = settings.alertDuration || 5000;
+        donationDisplayModeInput.value = settings.donationDisplayMode || 'top3';
       } catch (error) {
         console.error('Failed to load overlay settings:', error);
       }
@@ -1177,7 +1191,8 @@
         progressBarCornerRadius: parseInt(progressBarCornerRadiusInput.value),
         position: positionInput.value,
         width: parseInt(widthInput.value),
-        alertDuration: parseInt(alertDurationInput.value)
+        alertDuration: parseInt(alertDurationInput.value),
+        donationDisplayMode: donationDisplayModeInput.value
       };
       
       try {

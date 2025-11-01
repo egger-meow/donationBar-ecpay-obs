@@ -34,7 +34,7 @@
       color: var(--fg);
       text-shadow: 0 0 8px rgba(0,0,0,0.5);
       text-align: center;
-      opacity: 0;
+      opacity: 1;
       animation: fadeInUp 1s ease forwards;
     }
 
@@ -197,7 +197,7 @@
       }
       100% {
         transform: translateY(100vh) rotate(720deg);
-        opacity: 0;
+        opacity: 1;
       }
     }
 
@@ -646,7 +646,7 @@
       console.log('Showing donation alert for:', donor, amount);
 
       // Use configured duration or calculate dynamic duration
-      const duration = overlaySettings.alertDuration || calculateAlertDuration(amount);
+      const duration =  calculateAlertDuration(amount) || overlaySettings.alertDuration;
       
       // Hide after calculated duration
       setTimeout(() => {
@@ -689,7 +689,7 @@
       }, 6000);
     }
 
-    function celebrateGoalComplete() {
+    function celebrateGoalComplete(goalTitle) {
       if (celebrationPlayed) return;
       
       celebrationPlayed = true;
@@ -705,8 +705,8 @@
       progressContainerEl.classList.add('goal-completed');
       titleEl.classList.add('celebration-text');
       
-      // Change title text
-      titleEl.textContent = '🎉 目標達成！感謝大家支持！ 🎉';
+      // Change title text using the actual goal title
+      titleEl.textContent = '🎉 ' + (goalTitle || '我愛jjmow') + ' 🎉';
       
       // Optional: Remove celebration effects after some time
       setTimeout(() => {
@@ -743,7 +743,7 @@
       const isGoalComplete = percent >= 100;
       if (isGoalComplete && !goalCompleted) {
         goalCompleted = true;
-        celebrateGoalComplete();
+        celebrateGoalComplete(title);
       } else if (!isGoalComplete && goalCompleted) {
         // Reset if goal is no longer complete (e.g., goal amount increased)
         goalCompleted = false;
@@ -800,11 +800,9 @@
         lastSeenTradeNo = newest.tradeNo || lastSeenTradeNo;
       }
       
-      // Render recent donations (and clear when none)
+      // Render donations (server handles filtering based on donationDisplayMode)
       if (donations && donations.length > 0) {
         const donationHTML = donations
-          .slice(-3) // Show last 3 donations
-          .reverse()
           .map(donation => {
             const amountColor = getDonationAmountColor(donation.amount);
             const messageHTML = donation.message && donation.message.trim() 
@@ -822,7 +820,7 @@
         
         recentDonationsEl.innerHTML = donationHTML;
       } else {
-        // NEW: actively clear UI and internal trackers
+        // Clear UI and internal trackers when no donations to display
         recentDonationsEl.innerHTML = '';
         lastSeenTradeNo = null;     // so next donation will trigger alert
         initialized = true;         // avoids "first-load" alert
