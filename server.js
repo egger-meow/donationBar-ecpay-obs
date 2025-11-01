@@ -379,12 +379,6 @@ app.post('/webhook/ecpay', async (req, res) => {
       return res.status(400).send('0|Invalid merchant');
     }
 
-    // Verify CheckMacValue signature
-    const validMac = await verifyCheckMacValue(payload);
-    if (!validMac) {
-      console.error('❌ Webhook: Invalid CheckMacValue');
-      return res.status(400).send('0|Invalid signature');
-    }
 
     // Check TransCode (1 = data received successfully)
     if (payload.TransCode !== 1) {
