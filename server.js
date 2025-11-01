@@ -213,16 +213,25 @@ async function decryptECPayData(encryptedData) {
   const hashIV = credentials.hashIV;
 
   try {
-    // ECPay sends URL-encoded data, so decode it first
-    const urlDecoded = decodeURIComponent(encryptedData);
+    console.log('🔐 Decryption attempt:');
+    console.log('  - HashKey length:', hashKey?.length, 'bytes');
+    console.log('  - HashIV length:', hashIV?.length, 'bytes');
+    console.log('  - Encrypted data length:', encryptedData?.length, 'bytes');
     
     // ECPay uses AES-128-CBC encryption
     const decipher = crypto.createDecipheriv('aes-128-cbc', hashKey, hashIV);
-    let decrypted = decipher.update(urlDecoded, 'base64', 'utf8');
+    let decrypted = decipher.update(encryptedData, 'base64', 'utf8');
     decrypted += decipher.final('utf8');
+    
+    console.log('✅ Decryption successful');
     return JSON.parse(decrypted);
   } catch (error) {
     console.error('Failed to decrypt ECPay data:', error);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      code: error.code
+    });
     return null;
   }
 }
