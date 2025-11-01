@@ -690,6 +690,28 @@ app.get('/overlay-settings', async (req, res) => {
   res.json(db.overlaySettings || {});
 });
 
+// Database schema endpoint (for debugging and documentation)
+app.get('/api/schema', async (req, res) => {
+  try {
+    const queryActual = req.query.actual === 'true';
+    const schema = await database.getDatabaseSchema(queryActual);
+    res.json({
+      success: true,
+      schema,
+      usage: {
+        description: 'Database schema and relationships',
+        queryActual: 'Add ?actual=true to query actual PostgreSQL schema (only works if connected)',
+        example: '/api/schema?actual=true'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Start server
 const port = process.env.PORT || 3000;
 app.listen(port, () => {

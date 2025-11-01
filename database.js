@@ -422,6 +422,295 @@ class Database {
       }
     };
   }
+
+  /**
+   * Get database schema and relationships information
+   * @param {boolean} queryActual - If true, queries actual PostgreSQL schema (only works if connected)
+   * @returns {Object} Schema information including tables, columns, relationships
+   */
+  async getDatabaseSchema(queryActual = false) {
+    const schema = {
+      storageMode: this.isProduction && this.connected ? 'PostgreSQL' : 'JSON File',
+      connected: this.connected,
+      tables: {},
+      relationships: [],
+      jsonStructure: null
+    };
+
+    // If using PostgreSQL and queryActual is true, get actual schema from database
+    if (this.isProduction && this.connected && queryActual) {
+      try {
+        // Query actual donations table schema
+        const donationsSchema = await pgClient.query(`
+          SELECT 
+            column_name,
+            data_type,
+            character_maximum_length,
+            is_nullable,
+            column_default
+          FROM information_schema.columns
+          WHERE table_name = 'donations'
+          ORDER BY ordinal_position
+        `);
+
+        // Query actual app_data table schema
+        const appDataSchema = await pgClient.query(`
+          SELECT 
+            column_name,
+            data_type,
+            character_maximum_length,
+            is_nullable,
+            column_default
+          FROM information_schema.columns
+          WHERE table_name = 'app_data'
+          ORDER BY ordinal_position
+        `);
+
+        // Query indexes and constraints
+        const donationsIndexes = await pgClient.query(`
+          SELECT indexname, indexdef
+          FROM pg_indexes
+          WHERE tablename = 'donations'
+        `);
+
+        const appDataIndexes = await pgClient.query(`
+          SELECT indexname, indexdef
+          FROM pg_indexes
+          WHERE tablename = 'app_data'
+        `);
+
+        schema.tables.donations = {
+          columns: donationsSchema.rows.map(col => ({
+            name: col.column_name,
+            type: col.data_type,
+            maxLength: col.character_maximum_length,
+            nullable: col.is_nullable === 'YES',
+            default: col.column_default
+          })),
+          indexes: donationsIndexes.rows.map(idx => ({
+            name: idx.indexname,
+            definition: idx.indexdef
+          })),
+          description: 'Stores individual donation records'
+        };
+
+        schema.tables.app_data = {
+          columns: appDataSchema.rows.map(col => ({
+            name: col.column_name,
+            type: col.data_type,
+            maxLength: col.character_maximum_length,
+            nullable: col.is_nullable === 'YES',
+            default: col.column_default
+          })),
+          indexes: appDataIndexes.rows.map(idx => ({
+            name: idx.indexname,
+            definition: idx.indexdef
+          })),
+          description: 'Stores application configuration and settings'
+        };
+
+      } catch (error) {
+        console.error('Error querying actual schema:', error);
+        // Fall back to defined schema
+        queryActual = false;
+      }
+    }
+
+    // If not querying actual or if it failed, return the defined schema
+    if (!queryActual) {
+      schema.tables.donations = {
+        columns: [
+          { name: 'id', type: 'SERIAL', constraint: 'PRIMARY KEY', description: 'Auto-incrementing donation ID' },
+          { name: 'trade_no', type: 'VARCHAR(50)', constraint: 'UNIQUE NOT NULL', description: 'Unique trade number from ECPay' },
+          { name: 'amount', type: 'INTEGER', constraint: 'NOT NULL', description: 'Donation amount in TWD' },
+          { name: 'payer', type: 'VARCHAR(255)', default: 'Anonymous', description: 'Name of the donor' },
+          { name: 'message', type: 'TEXT', default: '', description: 'Message from the donor' },
+          { name: 'created_at', type: 'TIMESTAMP WITH TIME ZONE', default: 'NOW()', description: 'When the donation was created' }
+        ],
+        indexes: [
+          { name: 'donations_pkey', type: 'PRIMARY KEY', column: 'id' },
+          { name: 'donations_trade_no_key', type: 'UNIQUE', column: 'trade_no' }
+        ],
+        description: 'Stores individual donation records from ECPay'
+      };
+
+      schema.tables.app_data = {
+        columns: [
+          { name: 'id', type: 'VARCHAR(20)', constraint: 'PRIMARY KEY', default: 'main', description: 'Single row identifier' },
+          { name: 'goal_title', type: 'VARCHAR(255)', default: '斗內目標', description: 'Title of the donation goal' },
+          { name: 'goal_amount', type: 'INTEGER', default: '1000', description: 'Target donation amount' },
+          { name: 'goal_start_from', type: 'INTEGER', default: '0', description: 'Starting amount for the progress bar' },
+          { name: 'total', type: 'INTEGER', default: '0', description: 'Total donations received' },
+          { name: 'seen_trade_nos', type: 'TEXT[]', default: '{}', description: 'Array of processed trade numbers (for deduplication)' },
+          { name: 'ecpay_merchant_id', type: 'VARCHAR(255)', default: '', description: 'ECPay merchant ID' },
+          { name: 'ecpay_hash_key', type: 'VARCHAR(255)', default: '', description: 'ECPay hash key for encryption' },
+          { name: 'ecpay_hash_iv', type: 'VARCHAR(255)', default: '', description: 'ECPay hash IV for encryption' },
+          { name: 'overlay_settings', type: 'JSONB', default: '{}', description: 'OBS overlay display settings' },
+          { name: 'updated_at', type: 'TIMESTAMP WITH TIME ZONE', default: 'NOW()', description: 'Last update timestamp' }
+        ],
+        indexes: [
+          { name: 'app_data_pkey', type: 'PRIMARY KEY', column: 'id' }
+        ],
+        description: 'Stores application configuration (single row table)'
+      };
+    }
+
+    // Define relationships
+    schema.relationships = [
+      {
+        type: 'Reference Array',
+        from: { table: 'app_data', column: 'seen_trade_nos' },
+        to: { table: 'donations', column: 'trade_no' },
+        description: 'app_data.seen_trade_nos contains an array of trade_no values from donations table to prevent duplicate processing',
+        cardinality: '1:N (one app_data row references many donation trade_nos)'
+      },
+      {
+        type: 'Calculated Field',
+        from: { table: 'app_data', column: 'total' },
+        to: { table: 'donations', column: 'amount' },
+        description: 'app_data.total is the sum of all donations.amount values',
+        cardinality: '1:N (one total aggregates many donation amounts)'
+      }
+    ];
+
+    // JSON file structure (when not using PostgreSQL)
+    schema.jsonStructure = {
+      file: 'db.json',
+      structure: {
+        goal: {
+          title: 'string - Donation goal title',
+          amount: 'number - Target amount',
+          startFrom: 'number - Starting amount for progress'
+        },
+        total: 'number - Total donations received',
+        donations: [
+          {
+            tradeNo: 'string - Unique trade number',
+            amount: 'number - Donation amount',
+            payer: 'string - Donor name',
+            message: 'string - Donor message',
+            at: 'string (ISO date) - Timestamp'
+          }
+        ],
+        seenTradeNos: ['array of strings - Processed trade numbers'],
+        ecpay: {
+          merchantId: 'string - ECPay merchant ID',
+          hashKey: 'string - ECPay hash key',
+          hashIV: 'string - ECPay hash IV'
+        },
+        overlaySettings: {
+          showDonationAlert: 'boolean',
+          fontSize: 'number',
+          fontColor: 'string (hex color)',
+          backgroundColor: 'string (hex color)',
+          progressBarColor: 'string (hex color)',
+          progressBarHeight: 'number',
+          progressBarCornerRadius: 'number',
+          alertDuration: 'number (milliseconds)',
+          position: 'string (position name)',
+          width: 'number',
+          alertEnabled: 'boolean',
+          alertSound: 'boolean'
+        }
+      },
+      description: 'Used when ENVIRONMENT !== production or DATABASE_URL is not set'
+    };
+
+    // Data flow notes
+    schema.dataFlow = {
+      donation_process: [
+        '1. ECPay sends webhook → /webhook/ecpay endpoint',
+        '2. Server validates and decrypts payment data',
+        '3. addDonation() checks for duplicate trade_no in seen_trade_nos',
+        '4. If not duplicate: Insert into donations table',
+        '5. Update app_data.total and add trade_no to seen_trade_nos',
+        '6. Broadcast update via SSE to connected clients'
+      ],
+      storage_modes: {
+        sandbox: 'Uses db.json file (ENVIRONMENT=sandbox)',
+        development: 'Uses db.json file (no DATABASE_URL)',
+        production: 'Uses PostgreSQL (DATABASE_URL is set and ENVIRONMENT=production)'
+      }
+    };
+
+    return schema;
+  }
+
+  /**
+   * Print database schema in a human-readable format
+   * @param {boolean} queryActual - Query actual schema from database
+   */
+  async printDatabaseSchema(queryActual = false) {
+    const schema = await this.getDatabaseSchema(queryActual);
+    
+    console.log('\n╔════════════════════════════════════════════════════════════════╗');
+    console.log('║              DATABASE SCHEMA & RELATIONSHIPS                   ║');
+    console.log('╚════════════════════════════════════════════════════════════════╝\n');
+    
+    console.log(`📊 Storage Mode: ${schema.storageMode}`);
+    console.log(`🔌 Connected: ${schema.connected ? 'Yes' : 'No'}\n`);
+    
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    
+    // Print each table
+    for (const [tableName, tableInfo] of Object.entries(schema.tables)) {
+      console.log(`📋 TABLE: ${tableName}`);
+      console.log(`   Description: ${tableInfo.description}\n`);
+      
+      console.log('   Columns:');
+      tableInfo.columns.forEach(col => {
+        const constraint = col.constraint ? ` [${col.constraint}]` : '';
+        const defaultVal = col.default ? ` DEFAULT ${col.default}` : '';
+        const desc = col.description ? ` - ${col.description}` : '';
+        console.log(`   • ${col.name}: ${col.type}${constraint}${defaultVal}${desc}`);
+      });
+      
+      if (tableInfo.indexes && tableInfo.indexes.length > 0) {
+        console.log('\n   Indexes:');
+        tableInfo.indexes.forEach(idx => {
+          console.log(`   • ${idx.name}${idx.type ? ` (${idx.type})` : ''}`);
+        });
+      }
+      
+      console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    }
+    
+    // Print relationships
+    console.log('🔗 RELATIONSHIPS:\n');
+    schema.relationships.forEach((rel, idx) => {
+      console.log(`${idx + 1}. ${rel.type}`);
+      console.log(`   ${rel.from.table}.${rel.from.column} → ${rel.to.table}.${rel.to.column}`);
+      console.log(`   ${rel.description}`);
+      console.log(`   Cardinality: ${rel.cardinality}\n`);
+    });
+    
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    
+    // Print data flow
+    console.log('🔄 DATA FLOW:\n');
+    console.log('Donation Process:');
+    schema.dataFlow.donation_process.forEach(step => {
+      console.log(`   ${step}`);
+    });
+    
+    console.log('\nStorage Modes:');
+    Object.entries(schema.dataFlow.storage_modes).forEach(([mode, desc]) => {
+      console.log(`   • ${mode}: ${desc}`);
+    });
+    
+    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    
+    // Print JSON structure
+    if (schema.jsonStructure) {
+      console.log('📄 JSON FILE STRUCTURE (db.json):\n');
+      console.log(`   File: ${schema.jsonStructure.file}`);
+      console.log(`   ${schema.jsonStructure.description}\n`);
+      console.log('   ' + JSON.stringify(schema.jsonStructure.structure, null, 2).replace(/\n/g, '\n   '));
+      console.log('\n');
+    }
+    
+    return schema;
+  }
 }
 
 export default new Database();
