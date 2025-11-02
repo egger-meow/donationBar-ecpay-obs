@@ -374,9 +374,9 @@ class Database {
         // Clear donations table
         await pgClient.query('DELETE FROM donations');
         
-        // Reset app_data
+        // Reset app_data (including goal_start_from)
         await pgClient.query(
-          'UPDATE app_data SET total = 0, seen_trade_nos = $1, updated_at = NOW() WHERE id = $2',
+          'UPDATE app_data SET total = 0, goal_start_from = 0, seen_trade_nos = $1, updated_at = NOW() WHERE id = $2',
           [[], 'main']
         );
         
