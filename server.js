@@ -570,15 +570,14 @@ app.post('/admin/goal', requireAdmin, async (req, res) => {
 });
 
 app.post('/admin/reset', requireAdmin, async (req, res) => {
-  const db = await readDB();
-  db.total = 0;
-  db.donations = [];
-  db.seenTradeNos = [];
-  
-  await writeDB(db);
-  await broadcastProgress();
-  
-  res.json({ success: true });
+  try {
+    await database.clearAllDonations();
+    await broadcastProgress();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Reset error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // ECPay credentials management
