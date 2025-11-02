@@ -417,7 +417,8 @@ class Database {
         width: 900,
         alertEnabled: true,
         alertSound: true,
-        donationDisplayMode: "top3" // "top3" | "latest3" | "hidden"
+        donationDisplayMode: "top", // "top" | "latest" | "hidden"
+        donationDisplayCount: 3 // Number of donations to display
       }
     };
   }

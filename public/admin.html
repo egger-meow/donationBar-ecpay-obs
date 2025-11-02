@@ -650,12 +650,20 @@
           <div class="form-group">
             <label for="donationDisplayModeInput">進度條下方捐款顯示模式</label>
             <select id="donationDisplayModeInput" style="width: 100%; padding: 12px 15px; border-radius: 8px; border: 2px solid #2a2f36; background: #0f1216; color: #ffffff; font-size: 14px;">
-              <option value="top3">顯示金額前 3 名 (從高到低)</option>
-              <option value="latest3">顯示最近 3 筆 (從新到舊)</option>
+              <option value="top">顯示金額前 N 名 (從高到低)</option>
+              <option value="latest">顯示最近 N 筆 (從新到舊)</option>
               <option value="hidden">不顯示</option>
             </select>
             <div style="font-size: 12px; color: #a0a0a0; margin-top: 8px;">
               💡 控制進度條下方顯示哪些捐款記錄
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="donationDisplayCountInput">顯示捐款數量 (N)</label>
+            <input type="number" id="donationDisplayCountInput" min="1" max="10" value="3">
+            <div style="font-size: 12px; color: #a0a0a0; margin-top: 8px;">
+              💡 設定要顯示幾筆捐款記錄 (1-10)
             </div>
           </div>
           
@@ -1118,7 +1126,8 @@
         positionInput.value = settings.position || 'top-center';
         widthInput.value = settings.width || 900;
         alertDurationInput.value = settings.alertDuration || 5000;
-        donationDisplayModeInput.value = settings.donationDisplayMode || 'top3';
+        donationDisplayModeInput.value = settings.donationDisplayMode || 'top';
+        donationDisplayCountInput.value = settings.donationDisplayCount || 3;
       } catch (error) {
         console.error('Failed to load overlay settings:', error);
       }
@@ -1192,7 +1201,8 @@
         position: positionInput.value,
         width: parseInt(widthInput.value),
         alertDuration: parseInt(alertDurationInput.value),
-        donationDisplayMode: donationDisplayModeInput.value
+        donationDisplayMode: donationDisplayModeInput.value,
+        donationDisplayCount: parseInt(donationDisplayCountInput.value)
       };
       
       try {
