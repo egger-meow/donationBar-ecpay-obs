@@ -365,6 +365,38 @@ class Database {
     }
   }
 
+  // Clear all donations and reset totals
+  async clearAllDonations() {
+    if (this.isProduction && this.connected) {
+      try {
+        await pgClient.query('BEGIN');
+        
+        // Clear donations table
+        await pgClient.query('DELETE FROM donations');
+        
+        // Reset app_data
+        await pgClient.query(
+          'UPDATE app_data SET total = 0, seen_trade_nos = $1, updated_at = NOW() WHERE id = $2',
+          [[], 'main']
+        );
+        
+        await pgClient.query('COMMIT');
+        console.log('✨ All donations cleared from database');
+        return true;
+      } catch (error) {
+        await pgClient.query('ROLLBACK');
+        console.error('Error clearing donations:', error);
+        throw error;
+      }
+    } else {
+      // Use JSON file method
+      const data = this.getDefaultData();
+      await this.writeDB(data);
+      console.log('✨ All donations cleared from local db.json');
+      return true;
+    }
+  }
+
   getDefaultData() {
     return {
       goal: { title: "斗內目標", amount: 1000, startFrom: 0 },
