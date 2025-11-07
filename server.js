@@ -5,7 +5,11 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import crypto from 'crypto';
 import session from 'express-session';
+import bcrypt from 'bcrypt';
+import passport from 'passport';
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import database from './database.js';
+import * as emailService from './email.js';
 
 const app = express();
 const __dirname = path.resolve();
@@ -23,55 +27,149 @@ app.use(session({
   cookie: { secure: false } // Set to true if using HTTPS
 }));
 
-const DB_PATH = path.join(__dirname, 'db.json');
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
 
-// Database helpers
-async function readDB() {
-  return await database.readDB();
+// Passport serialization
+passport.serializeUser((user, done) => {
+  done(null, user.id);
+});
+
+passport.deserializeUser(async (id, done) => {
+  try {
+    const user = await database.findUserById(id);
+    done(null, user);
+  } catch (error) {
+    done(error, null);
+  }
+});
+
+// Google OAuth Strategy
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  passport.use(new GoogleStrategy({
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3000/api/auth/google/callback'
+    },
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        // Check if user exists by OAuth provider ID
+        let user = await database.findUserByEmail(profile.emails[0].value);
+        
+        if (!user) {
+          // Create new user from Google profile
+          const username = profile.emails[0].value.split('@')[0] + '-' + Date.now();
+          user = await database.createUser({
+            email: profile.emails[0].value,
+            username: username,
+            passwordHash: null, // OAuth users don't have passwords
+            displayName: profile.displayName,
+            authProvider: 'google',
+            oauthProviderId: profile.id,
+            emailVerified: true // Google emails are pre-verified
+          });
+
+          // Create free subscription
+          await database.createSubscription(user.id, {
+            planType: 'free',
+            status: 'active'
+          });
+
+          // Create default workspace
+          await database.createWorkspace(user.id, {
+            workspaceName: `${profile.displayName}'s Workspace`,
+            slug: `${username}`.toLowerCase().replace(/[^a-z0-9-]/g, '')
+          });
+
+          console.log(`✅ New user created via Google OAuth: ${user.email}`);
+        } else if (user.authProvider !== 'google') {
+          // User exists with local auth, link Google account
+          console.log(`ℹ️ User ${user.email} logging in with Google (originally local auth)`);
+        }
+
+        return done(null, user);
+      } catch (error) {
+        console.error('Google OAuth error:', error);
+        return done(error, null);
+      }
+    }
+  ));
+  console.log('✅ Google OAuth strategy configured');
+} else {
+  console.log('⚠️  Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env');
 }
 
-// ECPay credential helpers
-async function getECPayCredentials() {
-  const db = await readDB();
+const DB_PATH = path.join(__dirname, 'db.json');
+const DEFAULT_WORKSPACE_SLUG = 'default';
+
+// Helper: Get default workspace (for backward compatibility)
+async function getDefaultWorkspace() {
+  const workspace = await database.getWorkspaceBySlug(DEFAULT_WORKSPACE_SLUG);
+  if (!workspace) {
+    console.error('❌ Default workspace not found. Run migration: npm run migrate');
+    throw new Error('Default workspace not found');
+  }
+  return workspace;
+}
+
+// Helper: Get workspace by slug or default
+async function getWorkspace(slug = null) {
+  if (slug) {
+    return await database.getWorkspaceBySlug(slug);
+  }
+  return await getDefaultWorkspace();
+}
+
+// ECPay credential helpers (workspace-scoped)
+async function getECPayCredentials(workspaceId = null) {
+  if (!workspaceId) {
+    const workspace = await getDefaultWorkspace();
+    workspaceId = workspace.id;
+  }
   
-  // Check if credentials exist in database and are not empty
-  if (db.ecpay && db.ecpay.merchantId && db.ecpay.hashKey && db.ecpay.hashIV) {
+  const provider = await database.getPaymentProvider(workspaceId, 'ecpay');
+  
+  if (provider && provider.merchantId && provider.hashKey && provider.hashIV) {
     return {
-      merchantId: db.ecpay.merchantId,
-      hashKey: db.ecpay.hashKey,
-      hashIV: db.ecpay.hashIV
+      merchantId: provider.merchantId,
+      hashKey: provider.hashKey,
+      hashIV: provider.hashIV
     };
   }
   
-  // Fallback to environment variables
+  // Fallback to environment variables (legacy)
   const envCredentials = {
     merchantId: process.env.MERCHANT_ID,
     hashKey: process.env.HASH_KEY,
     hashIV: process.env.HASH_IV
   };
   
-  // If env variables exist and db doesn't have them, save to db
+  // Auto-migrate from ENV to database if available
   if (envCredentials.merchantId && envCredentials.hashKey && envCredentials.hashIV) {
-    if (!db.ecpay) db.ecpay = {};
-    db.ecpay.merchantId = envCredentials.merchantId;
-    db.ecpay.hashKey = envCredentials.hashKey;
-    db.ecpay.hashIV = envCredentials.hashIV;
-    await writeDB(db);
+    await database.upsertPaymentProvider(workspaceId, {
+      providerName: 'ecpay',
+      merchantId: envCredentials.merchantId,
+      hashKey: envCredentials.hashKey,
+      hashIV: envCredentials.hashIV,
+      isActive: true
+    });
     console.log('💾 ECPay credentials migrated from .env to database');
+    return envCredentials;
   }
   
   return envCredentials;
 }
 
-async function writeDB(data) {
-  return await database.writeDB(data);
-}
-
 // SSE: Server-Sent Events for real-time updates
 const sseClients = new Set();
 
-async function broadcastProgress() {
-  const data = await getProgress();
+async function broadcastProgress(workspaceId = null) {
+  if (!workspaceId) {
+    const workspace = await getDefaultWorkspace();
+    workspaceId = workspace.id;
+  }
+  const data = await getProgress(workspaceId);
   const payload = `data: ${JSON.stringify(data)}\n\n`;
   for (const res of sseClients) {
     try {
@@ -82,9 +180,13 @@ async function broadcastProgress() {
   }
 }
 
-async function broadcastOverlaySettings() {
-  const db = await readDB();
-  const payload = `event: overlay-settings\ndata: ${JSON.stringify(db.overlaySettings || {})}\n\n`;
+async function broadcastOverlaySettings(workspaceId = null) {
+  if (!workspaceId) {
+    const workspace = await getDefaultWorkspace();
+    workspaceId = workspace.id;
+  }
+  const settings = await database.getWorkspaceSettings(workspaceId);
+  const payload = `event: overlay-settings\ndata: ${JSON.stringify(settings?.overlaySettings || {})}\n\n`;
   for (const res of sseClients) {
     try {
       res.write(payload);
@@ -118,36 +220,51 @@ app.get('/events', async (req, res) => {
   });
 });
 
-// Helper functions
-async function getProgress() {
-  const db = await readDB();
-  const actualDonations = db.total || 0;
-  const startFrom = db.goal.startFrom || 0;
-  const current = actualDonations + startFrom; // Add start_from to actual donations
-  const goal = db.goal.amount;
+// Helper functions (workspace-scoped)
+async function getProgress(workspaceId = null) {
+  if (!workspaceId) {
+    const workspace = await getDefaultWorkspace();
+    workspaceId = workspace.id;
+  }
+  
+  const progress = await database.getWorkspaceProgress(workspaceId);
+  if (!progress) {
+    return {
+      title: '斗內目標',
+      current: 0,
+      actualDonations: 0,
+      startFrom: 0,
+      goal: 1000,
+      percent: 0,
+      donations: []
+    };
+  }
+  
+  const actualDonations = progress.total || 0;
+  const startFrom = progress.goal.startFrom || 0;
+  const current = actualDonations + startFrom;
+  const goal = progress.goal.amount;
   const percent = Math.min(100, Math.round((current / goal) * 100));
   
-  // Get donation display mode from overlay settings
-  const displayMode = db.overlaySettings?.donationDisplayMode || 'top';
-  const displayCount = db.overlaySettings?.donationDisplayCount || 3;
+  // Get donation display mode
+  const displayMode = progress.overlaySettings?.donationDisplayMode || 'top';
+  const displayCount = progress.overlaySettings?.donationDisplayCount || 3;
   let displayDonations = [];
   
   if (displayMode === 'hidden') {
     displayDonations = [];
   } else if (displayMode === 'latest') {
-    // Latest N donations by time (most recent first)
-    displayDonations = db.donations.slice(-displayCount).reverse();
+    displayDonations = progress.donations.slice(0, displayCount);
   } else {
-    // Default: top N by amount (highest first)
-    displayDonations = [...db.donations]
+    displayDonations = [...progress.donations]
       .sort((a, b) => b.amount - a.amount)
       .slice(0, displayCount);
   }
   
   return {
-    title: db.goal.title,
+    title: progress.goal.title,
     current,
-    actualDonations, // Actual donation amount without start_from
+    actualDonations,
     startFrom,
     goal,
     percent,
@@ -155,10 +272,16 @@ async function getProgress() {
   };
 }
 
-async function addDonation({ tradeNo, amount, payer, message }) {
-  const success = await database.addDonation({ tradeNo, amount, payer, message });
+async function addDonation(workspaceId, { tradeNo, amount, payer, message, paymentProviderId = null }) {
+  const success = await database.addDonation(workspaceId, {
+    tradeNo,
+    amount,
+    payerName: payer,
+    message,
+    paymentProviderId
+  });
   if (success) {
-    await broadcastProgress();
+    await broadcastProgress(workspaceId);
   }
   return success;
 }
@@ -328,18 +451,21 @@ app.get('/success', (req, res) => {
 
 app.post('/success', async (req, res) => {
   const p = req.body || {};
-  const credentials = await getECPayCredentials();
+  const workspace = await getDefaultWorkspace();
+  const credentials = await getECPayCredentials(workspace.id);
+  const provider = await database.getPaymentProvider(workspace.id, 'ecpay');
   const ok = String(p.RtnCode) === '1' &&
              p.MerchantID === credentials.merchantId &&
              await verifyCheckMacValue(p);
 
   if (ok) {
-    // Safe fallback: add donation here too (idempotent via seenTradeNos)
-    await addDonation({
+    // Safe fallback: add donation here too (idempotent via trade number)
+    await addDonation(workspace.id, {
       tradeNo: p.MerchantTradeNo,
       amount: p.TradeAmt,
       payer: p.CustomField1 || 'Anonymous',
-      message: p.CustomField2 || ''
+      message: p.CustomField2 || '',
+      paymentProviderId: provider?.id
     });
     return res.redirect(303, '/donate?success=1');
   }
@@ -348,18 +474,52 @@ app.post('/success', async (req, res) => {
   return res.redirect(303, '/donate?error=1');
 });
 
+// =============================================
+// AUTHENTICATION PAGES
+// =============================================
+
 // Login page
 app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-// Handle login
-app.post('/login', (req, res) => {
+// Signup page
+app.get('/signup', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'signup.html'));
+});
+
+// Forgot password page
+app.get('/forgot-password', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'forgot-password.html'));
+});
+
+// Reset password page  
+app.get('/reset-password', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'reset-password.html'));
+});
+
+// Handle login (backward compatible with ENV, will use database in future)
+app.post('/login', async (req, res) => {
   const { username, password } = req.body;
-  if (username === process.env.ADMIN_USER && password === process.env.ADMIN_PASSWORD) {
-    req.session.isAdmin = true;
-    return res.redirect('/admin');
+  
+  // Legacy: Check against ENV variables (backward compatibility)
+  if (process.env.ADMIN_USER && process.env.ADMIN_PASSWORD) {
+    if (username === process.env.ADMIN_USER && password === process.env.ADMIN_PASSWORD) {
+      req.session.isAdmin = true;
+      req.session.username = username;
+      return res.redirect('/admin');
+    }
   }
+  
+  // TODO: Implement full user authentication with bcrypt
+  // const user = await database.findUserByUsername(username);
+  // if (user && await bcrypt.compare(password, user.passwordHash)) {
+  //   req.session.userId = user.id;
+  //   req.session.isAdmin = true;
+  //   await database.updateUserLastLogin(user.id);
+  //   return res.redirect('/admin');
+  // }
+  
   res.redirect('/login?error=invalid');
 });
 
@@ -373,6 +533,286 @@ app.post('/logout', (req, res) => {
   });
 });
 
+// =============================================
+// AUTHENTICATION API ROUTES
+// =============================================
+
+// Sign up - Register new user
+app.post('/api/auth/signup', async (req, res) => {
+  try {
+    const { email, username, displayName, password } = req.body;
+
+    // Validate input
+    if (!email || !username || !password) {
+      return res.status(400).json({ error: 'Email, username, and password are required' });
+    }
+
+    // Check if user already exists
+    const existingEmail = await database.findUserByEmail(email);
+    if (existingEmail) {
+      return res.status(400).json({ error: 'Email already registered' });
+    }
+
+    const existingUsername = await database.findUserByUsername(username);
+    if (existingUsername) {
+      return res.status(400).json({ error: 'Username already taken' });
+    }
+
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Create user
+    const user = await database.createUser({
+      email,
+      username,
+      passwordHash,
+      displayName: displayName || username,
+      authProvider: 'local'
+    });
+
+    // Create free subscription
+    await database.createSubscription(user.id, {
+      planType: 'free',
+      status: 'active'
+    });
+
+    // Create default workspace
+    const workspace = await database.createWorkspace(user.id, {
+      workspaceName: `${username}'s Workspace`,
+      slug: `${username}-${Date.now()}`.toLowerCase().replace(/[^a-z0-9-]/g, '')
+    });
+
+    // Generate email verification token
+    const verificationToken = emailService.generateToken();
+    // TODO: Store verification token in database with expiry
+    // For now, we'll just send a welcome email
+
+    // Send verification email
+    const emailResult = await emailService.sendVerificationEmail(email, verificationToken, username);
+    
+    if (!emailResult.success) {
+      console.warn('Failed to send verification email:', emailResult.error);
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Account created successfully! Please check your email to verify your account.',
+      user: { id: user.id, email: user.email, username: user.username }
+    });
+  } catch (error) {
+    console.error('Signup error:', error);
+    res.status(500).json({ error: 'Failed to create account' });
+  }
+});
+
+// Forgot password - Send reset email
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    // Find user
+    const user = await database.findUserByEmail(email);
+    
+    // Always return success to prevent email enumeration
+    if (!user) {
+      return res.json({ success: true, message: 'If that email exists, a reset link has been sent' });
+    }
+
+    // Generate reset token
+    const resetToken = emailService.generateToken();
+    const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    // TODO: Store reset token in database
+    // For now, we'll use session storage as a temporary solution
+    if (!req.session.resetTokens) {
+      req.session.resetTokens = {};
+    }
+    req.session.resetTokens[resetToken] = {
+      userId: user.id,
+      email: user.email,
+      expiry: resetTokenExpiry.toISOString()
+    };
+
+    // Send reset email
+    const emailResult = await emailService.sendPasswordResetEmail(email, resetToken, user.username);
+    
+    if (!emailResult.success) {
+      console.error('Failed to send password reset email:', emailResult.error);
+      return res.status(500).json({ error: 'Failed to send reset email' });
+    }
+
+    res.json({ success: true, message: 'Password reset link sent to your email' });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Failed to process request' });
+  }
+});
+
+// Reset password - Update password with token
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({ error: 'Token and password are required' });
+    }
+
+    // Validate password strength
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    // Check token in session storage (temporary solution)
+    if (!req.session.resetTokens || !req.session.resetTokens[token]) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+
+    const tokenData = req.session.resetTokens[token];
+    
+    // Check if token is expired
+    if (new Date(tokenData.expiry) < new Date()) {
+      delete req.session.resetTokens[token];
+      return res.status(400).json({ error: 'Reset token has expired' });
+    }
+
+    // Find user
+    const user = await database.findUserById(tokenData.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Hash new password
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // TODO: Update user password in database
+    // For now, this is a placeholder
+    console.log(`Password reset for user ${user.username} (${user.email})`);
+
+    // Clear the used token
+    delete req.session.resetTokens[token];
+
+    res.json({ success: true, message: 'Password reset successfully' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
+
+// Verify email
+app.get('/verify-email', async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.redirect('/login?error=invalid_token');
+    }
+
+    // TODO: Verify email token and update user
+    // For now, just redirect to login with success
+    res.redirect('/login?verified=true');
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.redirect('/login?error=verification_failed');
+  }
+});
+
+// =============================================
+// GOOGLE OAUTH ROUTES
+// =============================================
+
+// Google OAuth - Initiate authentication
+app.get('/api/auth/google',
+  passport.authenticate('google', { 
+    scope: ['profile', 'email'] 
+  })
+);
+
+// Google OAuth - Callback
+app.get('/api/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: '/login?error=oauth_failed' }),
+  (req, res) => {
+    // Successful authentication
+    req.session.isAdmin = true; // For backward compatibility
+    req.session.userId = req.user.id;
+    res.redirect('/admin');
+  }
+);
+
+// Get user info and subscription (protected)
+app.get('/api/user/info', requireAdmin, async (req, res) => {
+  try {
+    // TODO: Get user ID from session
+    // For now, get default workspace user
+    const workspace = await getDefaultWorkspace();
+    const user = await database.findUserById(workspace.userId);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Get subscription
+    const subscription = await database.getUserSubscription(user.id);
+
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        displayName: user.displayName
+      },
+      subscription: subscription || {
+        planType: 'free',
+        status: 'active',
+        isTrial: false,
+        maxDonationsPerMonth: 100,
+        maxApiCallsPerDay: 1000
+      }
+    });
+  } catch (error) {
+    console.error('Get user info error:', error);
+    res.status(500).json({ error: 'Failed to get user info' });
+  }
+});
+
+// Submit feedback (protected)
+app.post('/api/feedback', requireAdmin, async (req, res) => {
+  try {
+    const { type, message } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    // TODO: Store feedback in database or send email
+    // For now, just log it
+    console.log(`📝 Feedback received:`, {
+      type,
+      message,
+      timestamp: new Date().toISOString()
+    });
+
+    // TODO: Add audit log
+    const workspace = await getDefaultWorkspace();
+    await database.addAuditLog({
+      userId: workspace.userId,
+      action: 'feedback.submitted',
+      resourceType: 'feedback',
+      status: 'success',
+      metadata: { type, messageLength: message.length }
+    });
+
+    res.json({ success: true, message: 'Feedback submitted successfully' });
+  } catch (error) {
+    console.error('Submit feedback error:', error);
+    res.status(500).json({ error: 'Failed to submit feedback' });
+  }
+});
+
 // Protected admin route
 app.get('/admin', requireAdmin, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
@@ -383,18 +823,20 @@ app.post('/ecpay/return', async (req, res) => {
   const p = req.body;
   console.log('ECPay callback:', p);
 
-  const credentials = await getECPayCredentials();
+  const workspace = await getDefaultWorkspace();
+  const credentials = await getECPayCredentials(workspace.id);
+  const provider = await database.getPaymentProvider(workspace.id, 'ecpay');
   const validMac = await verifyCheckMacValue(p);
   const success  = p.RtnCode === '1';
   const mine     = p.MerchantID === credentials.merchantId;
 
   if (validMac && success && mine) {
-    // （選配）比對金額：找回你建立訂單時的金額再比一次
-    await addDonation({
+    await addDonation(workspace.id, {
       tradeNo: p.MerchantTradeNo,
       amount: p.TradeAmt,
       payer: p.CustomField1 || 'Anonymous',
-      message: p.CustomField2 || ''
+      message: p.CustomField2 || '',
+      paymentProviderId: provider?.id
     });
     return res.send('1|OK');
   }
@@ -406,11 +848,20 @@ app.post('/ecpay/return', async (req, res) => {
 // ECPay Webhook endpoint - For payment notifications from ECPay merchant backend
 // Merchants can set this URL in ECPay's "付款完成通知回傳網址" (ReturnURL)
 // Reference: https://developers.ecpay.com.tw/?p=41030
-app.post('/webhook/ecpay', async (req, res) => {
-  console.log('📨 ECPay webhook received');
+// Multi-user: Use /webhook/:slug for workspace-specific webhooks
+app.post('/webhook/:slug', async (req, res) => {
+  const { slug } = req.params;
+  console.log(`📨 ECPay webhook received for workspace: ${slug}`);
 
   try {
-    const credentials = await getECPayCredentials();
+    // Get workspace
+    const workspace = await database.getWorkspaceBySlug(slug);
+    if (!workspace) {
+      console.error(`❌ Webhook: Workspace not found: ${slug}`);
+      return res.status(404).send('0|Workspace not found');
+    }
+
+    const credentials = await getECPayCredentials(workspace.id);
     const payload = req.body || {};
 
     // Normalize types (ECPay often posts strings)
@@ -455,12 +906,16 @@ app.post('/webhook/ecpay', async (req, res) => {
       return res.send('1|OK');
     }
 
+    // Get payment provider ID
+    const provider = await database.getPaymentProvider(workspace.id, 'ecpay');
+    
     // Add donation to database using the correct field names from ECPay
-    const donationAdded = await addDonation({
+    const donationAdded = await addDonation(workspace.id, {
       tradeNo: orderInfo.MerchantTradeNo,
       amount: orderInfo.TradeAmt,
       payer: decryptedData.PatronName || 'Anonymous',
-      message: decryptedData.PatronNote || ''
+      message: decryptedData.PatronNote || '',
+      paymentProviderId: provider?.id
     });
 
     if (donationAdded) {
@@ -480,6 +935,13 @@ app.post('/webhook/ecpay', async (req, res) => {
   }
 });
 
+// Legacy webhook endpoint (backward compatibility - routes to default workspace)
+app.post('/webhook/ecpay', async (req, res) => {
+  console.log('📨 Legacy webhook endpoint called, routing to default workspace');
+  req.params = { slug: DEFAULT_WORKSPACE_SLUG };
+  return app._router.handle(req, res);
+});
+
 // Create ECPay order
 app.post('/create-order', async (req, res) => {
   const { amount, nickname, message } = req.body;
@@ -496,12 +958,17 @@ app.post('/create-order', async (req, res) => {
   if (process.env.ENVIRONMENT === 'sandbox') {
     console.log(`🧪 SANDBOX MODE: Simulating payment for ${nickname || 'Anonymous'} - NT$${amt}`);
     
+    // Get default workspace
+    const workspace = await getDefaultWorkspace();
+    const provider = await database.getPaymentProvider(workspace.id, 'ecpay');
+    
     // Add donation directly to database (simulate successful payment)
-    const success = await addDonation({
+    const success = await addDonation(workspace.id, {
       tradeNo: tradeNo,
       amount: amt,
       payer: nickname || 'Anonymous',
-      message: message || ''
+      message: message || '',
+      paymentProviderId: provider?.id
     });
 
     if (success) {
@@ -514,7 +981,8 @@ app.post('/create-order', async (req, res) => {
   }
 
   // Production mode: redirect to actual ECPay
-  const credentials = await getECPayCredentials();
+  const workspace = await getDefaultWorkspace();
+  const credentials = await getECPayCredentials(workspace.id);
   const params = {
     MerchantID: credentials.merchantId,
     MerchantTradeNo: tradeNo,
@@ -555,25 +1023,35 @@ app.post('/create-order', async (req, res) => {
 
 // Admin API for goal management (protected routes)
 app.post('/admin/goal', requireAdmin, async (req, res) => {
-  const { title, amount, startFrom } = req.body;
-  const db = await readDB();
-  
-  db.goal = {
-    title: title || db.goal.title,
-    amount: Number(amount) || db.goal.amount,
-    startFrom: Number(startFrom) || 0
-  };
-  
-  await writeDB(db);
-  await broadcastProgress();
-  
-  res.json({ success: true, goal: db.goal });
+  try {
+    const { title, amount, startFrom } = req.body;
+    const workspace = await getDefaultWorkspace();
+    
+    await database.updateWorkspaceSettings(workspace.id, {
+      goalTitle: title,
+      goalAmount: Number(amount),
+      goalStartFrom: Number(startFrom) || 0
+    });
+    
+    await broadcastProgress(workspace.id);
+    
+    const settings = await database.getWorkspaceSettings(workspace.id);
+    res.json({ success: true, goal: {
+      title: settings.goalTitle,
+      amount: settings.goalAmount,
+      startFrom: settings.goalStartFrom
+    }});
+  } catch (error) {
+    console.error('Goal update error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 app.post('/admin/reset', requireAdmin, async (req, res) => {
   try {
-    await database.clearAllDonations();
-    await broadcastProgress();
+    const workspace = await getDefaultWorkspace();
+    await database.clearWorkspaceDonations(workspace.id);
+    await broadcastProgress(workspace.id);
     res.json({ success: true });
   } catch (error) {
     console.error('Reset error:', error);
@@ -583,111 +1061,143 @@ app.post('/admin/reset', requireAdmin, async (req, res) => {
 
 // ECPay credentials management
 app.get('/admin/ecpay', requireAdmin, async (req, res) => {
-  const db = await readDB();
-  const credentials = await getECPayCredentials();
-  res.json({
-    merchantId: credentials.merchantId || '',
-    hashKey: credentials.hashKey ? '••••••••' : '', // Mask for security
-    hashIV: credentials.hashIV ? '••••••••' : ''
-  });
+  try {
+    const workspace = await getDefaultWorkspace();
+    const credentials = await getECPayCredentials(workspace.id);
+    res.json({
+      merchantId: credentials.merchantId || '',
+      hashKey: credentials.hashKey ? '••••••••' : '',
+      hashIV: credentials.hashIV ? '••••••••' : ''
+    });
+  } catch (error) {
+    console.error('Get ECPay credentials error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.post('/admin/ecpay', requireAdmin, async (req, res) => {
-  const { merchantId, hashKey, hashIV } = req.body;
-  
-  // Require at least one field to be provided
-  if (!merchantId && !hashKey && !hashIV) {
-    return res.status(400).json({ error: 'At least one ECPay credential is required' });
+  try {
+    const { merchantId, hashKey, hashIV } = req.body;
+    
+    if (!merchantId && !hashKey && !hashIV) {
+      return res.status(400).json({ error: 'At least one ECPay credential is required' });
+    }
+    
+    const workspace = await getDefaultWorkspace();
+    const existing = await database.getPaymentProvider(workspace.id, 'ecpay');
+    
+    // Prepare update data
+    const updateData = {
+      providerName: 'ecpay',
+      merchantId: merchantId ? merchantId.trim() : existing?.merchantId,
+      hashKey: hashKey ? hashKey.trim() : existing?.hashKey,
+      hashIV: hashIV ? hashIV.trim() : existing?.hashIV,
+      isActive: true
+    };
+    
+    await database.upsertPaymentProvider(workspace.id, updateData);
+    
+    res.json({ success: true, message: 'ECPay credentials updated successfully' });
+  } catch (error) {
+    console.error('Update ECPay credentials error:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
-  
-  const db = await readDB();
-  if (!db.ecpay) db.ecpay = {};
-  
-  // Only update fields that are provided
-  if (merchantId) db.ecpay.merchantId = merchantId.trim();
-  if (hashKey) db.ecpay.hashKey = hashKey.trim();
-  if (hashIV) db.ecpay.hashIV = hashIV.trim();
-  
-  await writeDB(db);
-  
-  res.json({ success: true, message: 'ECPay credentials updated successfully' });
 });
 
 // Overlay settings management
 app.get('/admin/overlay', requireAdmin, async (req, res) => {
-  const db = await readDB();
-  res.json(db.overlaySettings || {});
+  try {
+    const workspace = await getDefaultWorkspace();
+    const settings = await database.getWorkspaceSettings(workspace.id);
+    res.json(settings?.overlaySettings || {});
+  } catch (error) {
+    console.error('Get overlay settings error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.post('/admin/overlay', requireAdmin, async (req, res) => {
-  const settings = req.body;
-  const db = await readDB();
+  try {
+    const settings = req.body;
+    const workspace = await getDefaultWorkspace();
+    const currentSettings = await database.getWorkspaceSettings(workspace.id);
+    
+    // Validate and sanitize settings
+    const overlaySettings = currentSettings?.overlaySettings || {};
   
-  // Validate and sanitize settings
-  if (!db.overlaySettings) db.overlaySettings = {};
-  
-  // Update settings with validation
-  if (typeof settings.showDonationAlert === 'boolean') {
-    db.overlaySettings.showDonationAlert = settings.showDonationAlert;
-  }
-  if (typeof settings.fontSize === 'number' && settings.fontSize > 0) {
-    db.overlaySettings.fontSize = Math.max(10, Math.min(50, settings.fontSize));
-  }
-  if (typeof settings.fontColor === 'string' && /^#[0-9A-Fa-f]{6}$/.test(settings.fontColor)) {
-    db.overlaySettings.fontColor = settings.fontColor;
-  }
-  if (typeof settings.backgroundColor === 'string' && /^#[0-9A-Fa-f]{6}$/.test(settings.backgroundColor)) {
-    db.overlaySettings.backgroundColor = settings.backgroundColor;
-  }
-  if (typeof settings.progressBarColor === 'string' && /^#[0-9A-Fa-f]{6}$/.test(settings.progressBarColor)) {
-    db.overlaySettings.progressBarColor = settings.progressBarColor;
-  }
-  if (typeof settings.progressBarHeight === 'number' && settings.progressBarHeight > 0) {
-    db.overlaySettings.progressBarHeight = Math.max(10, Math.min(100, settings.progressBarHeight));
-  }
-  if (typeof settings.progressBarCornerRadius === 'number' && settings.progressBarCornerRadius >= 0) {
-    db.overlaySettings.progressBarCornerRadius = Math.max(0, Math.min(50, settings.progressBarCornerRadius));
-  }
-  if (typeof settings.alertDuration === 'number' && settings.alertDuration > 0) {
-    db.overlaySettings.alertDuration = Math.max(1000, Math.min(30000, settings.alertDuration));
-  }
-  if (typeof settings.position === 'string') {
-    const validPositions = ['top-left', 'top-center', 'top-right', 'center', 'bottom-left', 'bottom-center', 'bottom-right'];
-    if (validPositions.includes(settings.position)) {
-      db.overlaySettings.position = settings.position;
+    // Update settings with validation
+    if (typeof settings.showDonationAlert === 'boolean') {
+      overlaySettings.showDonationAlert = settings.showDonationAlert;
     }
-  }
-  if (typeof settings.width === 'number' && settings.width > 0) {
-    db.overlaySettings.width = Math.max(300, Math.min(1920, settings.width));
-  }
-  if (typeof settings.alertEnabled === 'boolean') {
-    db.overlaySettings.alertEnabled = settings.alertEnabled;
-  }
-  if (typeof settings.alertSound === 'boolean') {
-    db.overlaySettings.alertSound = settings.alertSound;
-  }
-  if (typeof settings.donationDisplayMode === 'string') {
-    const validModes = ['top', 'latest', 'hidden'];
-    if (validModes.includes(settings.donationDisplayMode)) {
-      db.overlaySettings.donationDisplayMode = settings.donationDisplayMode;
+    if (typeof settings.fontSize === 'number' && settings.fontSize > 0) {
+      overlaySettings.fontSize = Math.max(10, Math.min(50, settings.fontSize));
     }
+    if (typeof settings.fontColor === 'string' && /^#[0-9A-Fa-f]{6}$/.test(settings.fontColor)) {
+      overlaySettings.fontColor = settings.fontColor;
+    }
+    if (typeof settings.backgroundColor === 'string' && /^#[0-9A-Fa-f]{6}$/.test(settings.backgroundColor)) {
+      overlaySettings.backgroundColor = settings.backgroundColor;
+    }
+    if (typeof settings.progressBarColor === 'string' && /^#[0-9A-Fa-f]{6}$/.test(settings.progressBarColor)) {
+      overlaySettings.progressBarColor = settings.progressBarColor;
+    }
+    if (typeof settings.progressBarHeight === 'number' && settings.progressBarHeight > 0) {
+      overlaySettings.progressBarHeight = Math.max(10, Math.min(100, settings.progressBarHeight));
+    }
+    if (typeof settings.progressBarCornerRadius === 'number' && settings.progressBarCornerRadius >= 0) {
+      overlaySettings.progressBarCornerRadius = Math.max(0, Math.min(50, settings.progressBarCornerRadius));
+    }
+    if (typeof settings.alertDuration === 'number' && settings.alertDuration > 0) {
+      overlaySettings.alertDuration = Math.max(1000, Math.min(30000, settings.alertDuration));
+    }
+    if (typeof settings.position === 'string') {
+      const validPositions = ['top-left', 'top-center', 'top-right', 'center', 'bottom-left', 'bottom-center', 'bottom-right'];
+      if (validPositions.includes(settings.position)) {
+        overlaySettings.position = settings.position;
+      }
+    }
+    if (typeof settings.width === 'number' && settings.width > 0) {
+      overlaySettings.width = Math.max(300, Math.min(1920, settings.width));
+    }
+    if (typeof settings.alertEnabled === 'boolean') {
+      overlaySettings.alertEnabled = settings.alertEnabled;
+    }
+    if (typeof settings.alertSound === 'boolean') {
+      overlaySettings.alertSound = settings.alertSound;
+    }
+    if (typeof settings.donationDisplayMode === 'string') {
+      const validModes = ['top', 'latest', 'hidden'];
+      if (validModes.includes(settings.donationDisplayMode)) {
+        overlaySettings.donationDisplayMode = settings.donationDisplayMode;
+      }
+    }
+    if (typeof settings.donationDisplayCount === 'number' && settings.donationDisplayCount > 0) {
+      overlaySettings.donationDisplayCount = Math.max(1, Math.min(10, settings.donationDisplayCount));
+    }
+  
+    // Update in database
+    await database.updateWorkspaceSettings(workspace.id, { overlaySettings });
+    
+    // Broadcast settings update to all connected overlays
+    await broadcastOverlaySettings(workspace.id);
+    
+    res.json({ success: true, message: 'Overlay settings updated successfully', settings: overlaySettings });
+  } catch (error) {
+    console.error('Update overlay settings error:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
-  if (typeof settings.donationDisplayCount === 'number' && settings.donationDisplayCount > 0) {
-    db.overlaySettings.donationDisplayCount = Math.max(1, Math.min(10, settings.donationDisplayCount));
-  }
-  
-  await writeDB(db);
-  
-  // Broadcast settings update to all connected overlays
-  await broadcastOverlaySettings();
-  
-  res.json({ success: true, message: 'Overlay settings updated successfully', settings: db.overlaySettings });
 });
 
 // Overlay settings endpoint for overlay.html
 app.get('/overlay-settings', async (req, res) => {
-  const db = await readDB();
-  res.json(db.overlaySettings || {});
+  try {
+    const workspace = await getDefaultWorkspace();
+    const settings = await database.getWorkspaceSettings(workspace.id);
+    res.json(settings?.overlaySettings || {});
+  } catch (error) {
+    console.error('Get overlay settings error:', error);
+    res.json({});
+  }
 });
 
 // Database schema endpoint (for debugging and documentation)

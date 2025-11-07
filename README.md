@@ -156,6 +156,19 @@ Content-Type: application/json
 POST /admin/reset
 ```
 
+## 📚 完整文件
+
+本專案包含完整的技術文件，所有文件已整理至 `docs/` 目錄：
+
+- **[📖 完整文件索引](docs/README.md)** - 所有文件的導覽中心
+- **[🚀 完整設定指南](docs/setup/COMPLETE_SETUP_GUIDE.md)** - 詳細安裝步驟
+- **[🔐 Google OAuth 設定](docs/setup/GOOGLE_OAUTH_SETUP.md)** - OAuth 登入配置
+- **[💾 資料庫結構說明](docs/database/SCHEMA_MULTIUSER.md)** - 多用戶資料庫架構
+- **[🔄 系統遷移指南](docs/migration/MIGRATION_GUIDE.md)** - 版本升級說明
+- **[🔌 API 參考文件](docs/api/API_METHODS_REFERENCE.md)** - 完整 API 說明
+
+**查看所有文件** → [docs/README.md](docs/README.md)
+
 ## 📁 專案結構
 
 ```
@@ -164,10 +177,22 @@ DonationBar-ecpay-obs/
 ├── package.json           # 套件設定
 ├── .env.example          # 環境變數範例
 ├── db.json               # 簡易資料庫
+├── docs/                 # 📚 完整文件目錄
+│   ├── README.md         # 文件導覽
+│   ├── setup/            # 設定指南
+│   ├── database/         # 資料庫文件
+│   ├── migration/        # 遷移指南
+│   ├── features/         # 功能說明
+│   ├── api/              # API 文件
+│   └── development/      # 開發文件
 └── public/
     ├── overlay.html      # OBS Overlay 頁面
     ├── donate.html       # 捐款頁面
-    └── admin.html        # 管理後台
+    ├── admin.html        # 管理後台
+    ├── login.html        # 登入頁面
+    ├── signup.html       # 註冊頁面
+    ├── forgot-password.html  # 忘記密碼
+    └── reset-password.html   # 重設密碼
 ```
 
 ## 🔒 安全注意事項

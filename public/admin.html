@@ -342,6 +342,135 @@
       100% { transform: rotate(360deg); }
     }
 
+    /* Subscription Status Styles */
+    .subscription-badge {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .subscription-badge.free {
+      background: rgba(160, 160, 160, 0.2);
+      color: #a0a0a0;
+      border: 1px solid #a0a0a0;
+    }
+
+    .subscription-badge.free_pass {
+      background: rgba(138, 43, 226, 0.2);
+      color: #BA55D3;
+      border: 1px solid #BA55D3;
+    }
+
+    .subscription-badge.trial {
+      background: rgba(52, 152, 219, 0.2);
+      color: #3498db;
+      border: 1px solid #3498db;
+    }
+
+    .subscription-badge.basic,
+    .subscription-badge.pro,
+    .subscription-badge.enterprise {
+      background: rgba(70, 230, 90, 0.2);
+      color: #46e65a;
+      border: 1px solid #46e65a;
+    }
+
+    .subscription-badge.expired,
+    .subscription-badge.canceled {
+      background: rgba(255, 107, 107, 0.2);
+      color: #ff6b6b;
+      border: 1px solid #ff6b6b;
+    }
+
+    .trial-warning {
+      background: rgba(255, 165, 0, 0.1);
+      border-left: 4px solid #FFA500;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 15px 0;
+      color: #FFA500;
+    }
+
+    .trial-warning.urgent {
+      background: rgba(255, 107, 107, 0.1);
+      border-left-color: #ff6b6b;
+      color: #ff6b6b;
+    }
+
+    .plan-features {
+      list-style: none;
+      margin: 15px 0;
+    }
+
+    .plan-features li {
+      padding: 8px 0;
+      display: flex;
+      align-items: center;
+      color: #e0e0e0;
+    }
+
+    .plan-features li::before {
+      content: '✓';
+      color: #46e65a;
+      font-weight: bold;
+      margin-right: 10px;
+      font-size: 16px;
+    }
+
+    .plan-features li.disabled::before {
+      content: '✗';
+      color: #666;
+    }
+
+    .plan-features li.disabled {
+      color: #666;
+      text-decoration: line-through;
+    }
+
+    .feedback-textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 15px;
+      background: rgba(70, 230, 90, 0.1);
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+
+    .user-avatar {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #46e65a, #5ef56d);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: bold;
+      color: #000;
+    }
+
+    .user-details h3 {
+      margin: 0;
+      font-size: 18px;
+      color: #fff;
+    }
+
+    .user-details p {
+      margin: 5px 0 0 0;
+      font-size: 13px;
+      color: #a0a0a0;
+    }
+
     @keyframes pulse-success {
       0% {
         box-shadow: 0 0 0 0 rgba(70, 230, 90, 0.7);
@@ -485,6 +614,24 @@
     </div>
 
     <div id="alertContainer"></div>
+
+    <!-- User Info & Subscription Status -->
+    <div class="card" style="margin-bottom: 30px;">
+      <div class="user-info" id="userInfo">
+        <div class="user-avatar" id="userAvatar">A</div>
+        <div class="user-details">
+          <h3 id="userName">Loading...</h3>
+          <p id="userEmail">Loading...</p>
+        </div>
+        <div style="margin-left: auto;">
+          <span class="subscription-badge" id="subscriptionBadge">Loading...</span>
+        </div>
+      </div>
+
+      <div id="subscriptionStatus">
+        <!-- Subscription details will be loaded here -->
+      </div>
+    </div>
 
     <div class="dashboard">
       <!-- Current Progress -->
@@ -726,6 +873,48 @@
         <p style="color: #666; margin-top: 10px; font-size: 13px;">
           💡 提示：預覽會即時顯示斗內進度和外觀變化。調整 Overlay 設定後會自動更新。
         </p>
+      </div>
+
+      <!-- Subscription Management -->
+      <div class="card">
+        <h2>💎 訂閱方案管理</h2>
+        <div id="subscriptionManagement">
+          <!-- Subscription management content will be loaded here -->
+        </div>
+      </div>
+
+      <!-- Feedback Card -->
+      <div class="card">
+        <h2>💬 意見回饋</h2>
+        <p style="color: #a0a0a0; margin-bottom: 20px;">
+          有任何建議或問題嗎？我們很樂意聽取您的意見！
+        </p>
+        <form id="feedbackForm">
+          <div class="form-group">
+            <label for="feedbackType">回饋類型</label>
+            <select id="feedbackType" style="width: 100%; padding: 12px 15px; border-radius: 8px; border: 2px solid #2a2f36; background: #0f1216; color: #ffffff; font-size: 14px;">
+              <option value="bug">🐛 Bug 回報</option>
+              <option value="feature">✨ 功能建議</option>
+              <option value="improvement">🚀 改善建議</option>
+              <option value="question">❓ 問題詢問</option>
+              <option value="other">💭 其他</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="feedbackMessage">詳細說明</label>
+            <textarea 
+              id="feedbackMessage" 
+              class="feedback-textarea" 
+              placeholder="請詳細描述您的意見或問題..." 
+              required></textarea>
+          </div>
+          
+          <button type="submit" class="btn btn-primary" id="feedbackSubmitBtn">
+            📤 提交回饋
+          </button>
+          <div class="form-feedback" id="feedbackFeedback"></div>
+        </form>
       </div>
     </div>
 
@@ -1262,10 +1451,221 @@
       }
     }
 
+    // Load User and Subscription Info
+    async function loadUserInfo() {
+      try {
+        const response = await fetch('/api/user/info');
+        const data = await response.json();
+        
+        if (data.success) {
+          // Update user info
+          document.getElementById('userName').textContent = data.user.displayName || data.user.username;
+          document.getElementById('userEmail').textContent = data.user.email;
+          document.getElementById('userAvatar').textContent = (data.user.displayName || data.user.username).charAt(0).toUpperCase();
+          
+          // Load subscription info
+          if (data.subscription) {
+            renderSubscriptionStatus(data.subscription);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load user info:', error);
+      }
+    }
+
+    // Render Subscription Status
+    function renderSubscriptionStatus(subscription) {
+      const badge = document.getElementById('subscriptionBadge');
+      const statusContainer = document.getElementById('subscriptionStatus');
+      const managementContainer = document.getElementById('subscriptionManagement');
+      
+      // Update badge
+      badge.textContent = subscription.planType.replace('_', ' ');
+      badge.className = `subscription-badge ${subscription.planType}`;
+      
+      // Calculate trial days remaining
+      const now = new Date();
+      const trialEnd = subscription.trialEndDate ? new Date(subscription.trialEndDate) : null;
+      const daysRemaining = trialEnd ? Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24)) : 0;
+      
+      let statusHTML = '';
+      
+      // Trial Warning
+      if (subscription.isTrial && daysRemaining > 0) {
+        const urgentClass = daysRemaining <= 3 ? 'urgent' : '';
+        statusHTML += `
+          <div class="trial-warning ${urgentClass}">
+            <strong>⏰ 試用期提醒</strong><br>
+            您的試用期還剩 <strong>${daysRemaining} 天</strong>（到期日：${trialEnd.toLocaleDateString('zh-TW')}）<br>
+            ${daysRemaining <= 7 ? '請盡快升級以繼續使用所有功能！' : ''}
+          </div>
+        `;
+      }
+      
+      // Trial Expired
+      if (subscription.isTrial && daysRemaining <= 0) {
+        statusHTML += `
+          <div class="trial-warning urgent">
+            <strong>⚠️ 試用期已結束</strong><br>
+            您的試用期已於 ${trialEnd.toLocaleDateString('zh-TW')} 結束。請升級方案以繼續使用。
+          </div>
+        `;
+      }
+      
+      statusContainer.innerHTML = statusHTML;
+      
+      // Render Subscription Management
+      let managementHTML = '';
+      
+      if (subscription.planType === 'free_pass') {
+        managementHTML = `
+          <div style="background: rgba(138, 43, 226, 0.1); padding: 20px; border-radius: 10px; border: 2px solid #BA55D3;">
+            <div style="text-align: center; margin-bottom: 15px;">
+              <span style="font-size: 48px;">🎁</span>
+            </div>
+            <h3 style="text-align: center; color: #BA55D3; margin-bottom: 10px;">Free Pass 用戶</h3>
+            <p style="text-align: center; color: #e0e0e0; margin-bottom: 20px;">
+              您擁有永久免費使用權限，享有所有功能！
+            </p>
+            <ul class="plan-features">
+              <li>無限制捐款次數</li>
+              <li>無限制 API 呼叫</li>
+              <li>進階 Overlay 自訂</li>
+              <li>優先技術支援</li>
+              <li>永久有效，無需付費</li>
+            </ul>
+          </div>
+        `;
+      } else if (subscription.planType === 'free') {
+        managementHTML = `
+          <div>
+            <h3 style="margin-bottom: 15px; color: #a0a0a0;">目前方案：免費方案</h3>
+            <ul class="plan-features">
+              <li>每月最多 ${subscription.maxDonationsPerMonth} 筆捐款</li>
+              <li>每日 ${subscription.maxApiCallsPerDay} 次 API 呼叫</li>
+              <li>基本 Overlay 功能</li>
+              <li class="disabled">進階 Overlay 自訂</li>
+              <li class="disabled">優先技術支援</li>
+            </ul>
+            <button class="btn btn-primary" style="width: 100%; margin-top: 20px;" onclick="upgradePlan()">
+              ⬆️ 升級至付費方案
+            </button>
+          </div>
+        `;
+      } else if (subscription.isTrial) {
+        managementHTML = `
+          <div>
+            <h3 style="margin-bottom: 15px; color: #3498db;">試用中：${subscription.planType.toUpperCase()} 方案</h3>
+            <p style="color: #e0e0e0; margin-bottom: 15px;">
+              試用期限：${trialEnd.toLocaleDateString('zh-TW')} (剩餘 ${daysRemaining} 天)
+            </p>
+            <ul class="plan-features">
+              <li>無限制捐款次數</li>
+              <li>無限制 API 呼叫</li>
+              <li>進階 Overlay 自訂</li>
+              <li>優先技術支援</li>
+            </ul>
+            <button class="btn btn-primary" style="width: 100%; margin-top: 20px;" onclick="upgradePlan()">
+              💳 訂閱此方案
+            </button>
+          </div>
+        `;
+      } else {
+        managementHTML = `
+          <div>
+            <h3 style="margin-bottom: 15px; color: #46e65a;">目前方案：${subscription.planType.toUpperCase()}</h3>
+            <p style="color: #e0e0e0; margin-bottom: 15px;">
+              狀態：<strong style="color: #46e65a;">已啟用</strong>
+            </p>
+            <ul class="plan-features">
+              <li>無限制捐款次數</li>
+              <li>無限制 API 呼叫</li>
+              <li>進階 Overlay 自訂</li>
+              <li>優先技術支援</li>
+            </ul>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+              <button class="btn btn-secondary" style="flex: 1;" onclick="manageBilling()">
+                💳 管理付款方式
+              </button>
+              <button class="btn btn-secondary" style="flex: 1;" onclick="cancelSubscription()">
+                ❌ 取消訂閱
+              </button>
+            </div>
+          </div>
+        `;
+      }
+      
+      managementContainer.innerHTML = managementHTML;
+    }
+
+    // Subscription Management Functions
+    function upgradePlan() {
+      showAlert('💎 升級功能即將推出！請聯繫管理員了解詳情。', 'info');
+    }
+
+    function manageBilling() {
+      showAlert('💳 付款管理功能即將推出！', 'info');
+    }
+
+    function cancelSubscription() {
+      if (confirm('確定要取消訂閱嗎？您將失去所有付費功能。')) {
+        showAlert('取消訂閱功能即將推出！', 'info');
+      }
+    }
+
+    // Feedback Form
+    const feedbackForm = document.getElementById('feedbackForm');
+    feedbackForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const submitBtn = document.getElementById('feedbackSubmitBtn');
+      const feedbackFeedback = document.getElementById('feedbackFeedback');
+      
+      setButtonLoading('feedbackSubmitBtn', true);
+      showFormFeedback('feedbackFeedback', '');
+      
+      const formData = {
+        type: document.getElementById('feedbackType').value,
+        message: document.getElementById('feedbackMessage').value
+      };
+      
+      try {
+        const response = await fetch('/api/feedback', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json();
+        
+        setButtonLoading('feedbackSubmitBtn', false);
+        
+        if (result.success) {
+          showAlert('✅ 感謝您的回饋！我們會仔細閱讀您的意見。');
+          showFormFeedback('feedbackFeedback', '✅ 回饋已成功提交', 'success');
+          feedbackForm.reset();
+          pulseCard(feedbackForm.closest('.card'), 'success');
+        } else {
+          showAlert('❌ 提交失敗', 'error');
+          showFormFeedback('feedbackFeedback', '❌ 提交失敗，請重試', 'error');
+          pulseCard(feedbackForm.closest('.card'), 'error');
+        }
+      } catch (error) {
+        console.error('Failed to submit feedback:', error);
+        setButtonLoading('feedbackSubmitBtn', false);
+        showAlert('❌ 網路連線錯誤', 'error');
+        showFormFeedback('feedbackFeedback', '❌ 網路連線錯誤，請檢查連線', 'error');
+        pulseCard(feedbackForm.closest('.card'), 'error');
+      }
+    });
+
     // Initialize
     loadData();
     loadECPayCredentials();
     loadOverlaySettings();
+    loadUserInfo();
   </script>
 </body>
 </html>
