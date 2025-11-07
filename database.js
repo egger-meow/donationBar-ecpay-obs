@@ -1,6 +1,7 @@
 import pg from 'pg';
 import fs from 'fs';
 import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 
 const { Client } = pg;
 
@@ -10,9 +11,12 @@ const DB_PATH = path.join(__dirname, 'db.json');
 // PostgreSQL connection
 let pgClient = null;
 
+/**
+ * Multi-User Database Class
+ * Supports both PostgreSQL (production) and JSON file (sandbox/dev)
+ */
 class Database {
   constructor() {
-    // Always use local db.json in sandbox mode, even if DATABASE_URL exists
     const isSandbox = process.env.ENVIRONMENT === 'sandbox';
     this.isProduction = !isSandbox && (process.env.ENVIRONMENT === 'production' || process.env.DATABASE_URL);
     this.connected = false;
@@ -42,13 +46,7 @@ class Database {
 
       await pgClient.connect();
       this.connected = true;
-      console.log('🐘 Connected to PostgreSQL');
-
-      // Create tables if they don't exist
-      await this.createTables();
-      
-      // Migrate data from JSON file if it exists and database is empty
-      await this.migrateFromJSON();
+      console.log('🐘 Connected to PostgreSQL (Multi-User Mode)');
       
     } catch (error) {
       console.error('❌ PostgreSQL connection failed:', error.message);
@@ -58,716 +56,709 @@ class Database {
     }
   }
 
-  async createTables() {
+  // =============================================
+  // JSON FILE HELPERS (SANDBOX MODE)
+  // =============================================
+  
+  async readJSON() {
     try {
-      // Create donations table
-      await pgClient.query(`
-        CREATE TABLE IF NOT EXISTS donations (
-          id SERIAL PRIMARY KEY,
-          trade_no VARCHAR(50) UNIQUE NOT NULL,
-          amount INTEGER NOT NULL,
-          payer VARCHAR(255) DEFAULT 'Anonymous',
-          message TEXT DEFAULT '',
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        )
-      `);
-
-      // Create app_data table for storing configuration
-      await pgClient.query(`
-        CREATE TABLE IF NOT EXISTS app_data (
-          id VARCHAR(20) PRIMARY KEY DEFAULT 'main',
-          goal_title VARCHAR(255) DEFAULT '斗內目標',
-          goal_amount INTEGER DEFAULT 1000,
-          goal_start_from INTEGER DEFAULT 0,
-          total INTEGER DEFAULT 0,
-          seen_trade_nos TEXT[] DEFAULT '{}',
-          ecpay_merchant_id VARCHAR(255) DEFAULT '',
-          ecpay_hash_key VARCHAR(255) DEFAULT '',
-          ecpay_hash_iv VARCHAR(255) DEFAULT '',
-          overlay_settings JSONB DEFAULT '{}',
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        )
-      `);
-
-      // Add goal_start_from column if it doesn't exist (for existing databases)
-      await pgClient.query(`
-        ALTER TABLE app_data 
-        ADD COLUMN IF NOT EXISTS goal_start_from INTEGER DEFAULT 0
-      `);
-
-      // Add message column to donations table if it doesn't exist (for existing databases)
-      await pgClient.query(`
-        ALTER TABLE donations 
-        ADD COLUMN IF NOT EXISTS message TEXT DEFAULT ''
-      `);
-
-      // Insert default record if not exists
-      await pgClient.query(`
-        INSERT INTO app_data (id) VALUES ('main')
-        ON CONFLICT (id) DO NOTHING
-      `);
-
-      console.log('📊 PostgreSQL tables initialized');
-    } catch (error) {
-      console.error('Error creating tables:', error);
-      throw error;
-    }
-  }
-
-  async migrateFromJSON() {
-    try {
-      // Only migrate if SANDMODE is enabled
-      if (process.env.ENVIRONMENT !== 'sandbox') {
-        console.log('📊 Migration skipped: ENVIRONMENT is not sandbox');
-        return;
-      }
-
-      // Check if we already have data in PostgreSQL
-      const existingData = await pgClient.query('SELECT * FROM app_data WHERE id = $1', ['main']);
-      if (existingData.rows[0] && existingData.rows[0].goal_title !== '斗內目標') {
-        console.log('📊 PostgreSQL already contains migrated data, skipping migration');
-        return;
-      }
-
-      // Check if JSON file exists
       if (!fs.existsSync(DB_PATH)) {
-        console.log('📊 No JSON file to migrate');
-        return;
+        const defaultData = this.getDefaultMultiUserData();
+        fs.writeFileSync(DB_PATH, JSON.stringify(defaultData, null, 2));
+        return defaultData;
       }
-
-      // Read JSON file
-      const jsonData = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
-      console.log('🔄 Migrating data from JSON file to PostgreSQL...');
-
-      // Update app data
-      await pgClient.query(`
-        UPDATE app_data SET 
-          goal_title = $1,
-          goal_amount = $2,
-          goal_start_from = $3,
-          total = $4,
-          seen_trade_nos = $5,
-          ecpay_merchant_id = $6,
-          ecpay_hash_key = $7,
-          ecpay_hash_iv = $8,
-          overlay_settings = $9,
-          updated_at = NOW()
-        WHERE id = 'main'
-      `, [
-        jsonData.goal?.title || '斗內目標',
-        jsonData.goal?.amount || 1000,
-        jsonData.goal?.startFrom || 0,
-        jsonData.total || 0,
-        jsonData.seenTradeNos || [],
-        jsonData.ecpay?.merchantId || '',
-        jsonData.ecpay?.hashKey || '',
-        jsonData.ecpay?.hashIV || '',
-        JSON.stringify(jsonData.overlaySettings || {})
-      ]);
-
-      // Migrate donations
-      if (jsonData.donations && jsonData.donations.length > 0) {
-        for (const donation of jsonData.donations) {
-          try {
-            await pgClient.query(`
-              INSERT INTO donations (trade_no, amount, payer, message, created_at)
-              VALUES ($1, $2, $3, $4, $5)
-              ON CONFLICT (trade_no) DO NOTHING
-            `, [
-              donation.tradeNo,
-              donation.amount,
-              donation.payer || 'Anonymous',
-              donation.message || '',
-              new Date(donation.at)
-            ]);
-          } catch (err) {
-            console.error('Error migrating donation:', err);
-          }
-        }
-      }
-
-      console.log('✅ Migration completed successfully');
-      
+      return JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
     } catch (error) {
-      console.error('❌ Migration failed:', error);
+      console.error('Error reading JSON database:', error);
+      return this.getDefaultMultiUserData();
     }
   }
 
-  // Read database
-  async readDB() {
-    if (this.isProduction && this.connected) {
-      try {
-        // Get app data
-        const appDataResult = await pgClient.query('SELECT * FROM app_data WHERE id = $1', ['main']);
-        const appData = appDataResult.rows[0] || {};
+  async writeJSON(data) {
+    fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+  }
 
-        // Get donations
-        const donationsResult = await pgClient.query(
-          'SELECT trade_no, amount, payer, message, created_at FROM donations ORDER BY created_at DESC LIMIT 100'
-        );
-        
-        return {
-          goal: {
-            title: appData.goal_title || '斗內目標',
-            amount: appData.goal_amount || 1000,
-            startFrom: appData.goal_start_from || 0
-          },
-          total: appData.total || 0,
-          donations: donationsResult.rows.map(d => ({
-            tradeNo: d.trade_no,
-            amount: d.amount,
-            payer: d.payer,
-            message: d.message || '',
-            at: d.created_at.toISOString()
-          })),
-          seenTradeNos: appData.seen_trade_nos || [],
-          ecpay: {
-            merchantId: appData.ecpay_merchant_id || '',
-            hashKey: appData.ecpay_hash_key || '',
-            hashIV: appData.ecpay_hash_iv || ''
-          },
-          overlaySettings: appData.overlay_settings || {}
-        };
-      } catch (error) {
-        console.error('PostgreSQL read error:', error);
-        return this.getDefaultData();
-      }
+  getDefaultMultiUserData() {
+    return {
+      users: [],
+      subscriptions: [],
+      workspaces: [],
+      workspaceSettings: [],
+      paymentProviders: [],
+      donations: [],
+      apiKeys: [],
+      auditLogs: []
+    };
+  }
+
+  // =============================================
+  // USER METHODS
+  // =============================================
+  
+  /**
+   * Create a new user
+   * @param {Object} userData - {email, username, passwordHash, displayName, authProvider}
+   * @returns {Object} Created user
+   */
+  async createUser(userData) {
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query(`
+        INSERT INTO users (email, username, password_hash, display_name, auth_provider, oauth_provider_id)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *
+      `, [
+        userData.email,
+        userData.username,
+        userData.passwordHash || null,
+        userData.displayName || userData.username,
+        userData.authProvider || 'local',
+        userData.oauthProviderId || null
+      ]);
+      return this.camelCaseKeys(result.rows[0]);
     } else {
-      // Use JSON file
-      try {
-        if (!fs.existsSync(DB_PATH)) {
-          console.log('📝 db.json not found, creating with default data...');
-          const defaultData = this.getDefaultData();
-          fs.writeFileSync(DB_PATH, JSON.stringify(defaultData, null, 2));
-          return defaultData;
-        }
-        return JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
-      } catch (error) {
-        console.error('Error reading JSON database:', error);
-        return this.getDefaultData();
+      const data = await this.readJSON();
+      const newUser = {
+        id: uuidv4(),
+        email: userData.email,
+        username: userData.username,
+        passwordHash: userData.passwordHash || null,
+        displayName: userData.displayName || userData.username,
+        avatarUrl: null,
+        authProvider: userData.authProvider || 'local',
+        oauthProviderId: userData.oauthProviderId || null,
+        emailVerified: false,
+        isActive: true,
+        isAdmin: false,
+        createdAt: new Date().toISOString(),
+        lastLoginAt: null,
+        updatedAt: new Date().toISOString()
+      };
+      data.users.push(newUser);
+      await this.writeJSON(data);
+      return newUser;
+    }
+  }
+
+  /**
+   * Find user by email
+   */
+  async findUserByEmail(email) {
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query('SELECT * FROM users WHERE email = $1', [email]);
+      return result.rows.length > 0 ? this.camelCaseKeys(result.rows[0]) : null;
+    } else {
+      const data = await this.readJSON();
+      return data.users.find(u => u.email === email) || null;
+    }
+  }
+
+  /**
+   * Find user by username
+   */
+  async findUserByUsername(username) {
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query('SELECT * FROM users WHERE username = $1', [username]);
+      return result.rows.length > 0 ? this.camelCaseKeys(result.rows[0]) : null;
+    } else {
+      const data = await this.readJSON();
+      return data.users.find(u => u.username === username) || null;
+    }
+  }
+
+  /**
+   * Find user by ID
+   */
+  async findUserById(userId) {
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query('SELECT * FROM users WHERE id = $1', [userId]);
+      return result.rows.length > 0 ? this.camelCaseKeys(result.rows[0]) : null;
+    } else {
+      const data = await this.readJSON();
+      return data.users.find(u => u.id === userId) || null;
+    }
+  }
+
+  /**
+   * Update user last login
+   */
+  async updateUserLastLogin(userId) {
+    if (this.isProduction && this.connected) {
+      await pgClient.query(
+        'UPDATE users SET last_login_at = NOW(), updated_at = NOW() WHERE id = $1',
+        [userId]
+      );
+    } else {
+      const data = await this.readJSON();
+      const user = data.users.find(u => u.id === userId);
+      if (user) {
+        user.lastLoginAt = new Date().toISOString();
+        user.updatedAt = new Date().toISOString();
+        await this.writeJSON(data);
       }
     }
   }
 
-  // Write database
-  async writeDB(data) {
+  // =============================================
+  // WORKSPACE METHODS
+  // =============================================
+  
+  /**
+   * Create a new workspace for a user
+   */
+  async createWorkspace(userId, workspaceData) {
     if (this.isProduction && this.connected) {
+      await pgClient.query('BEGIN');
       try {
-        await pgClient.query(`
-          UPDATE app_data SET 
-            goal_title = $1,
-            goal_amount = $2,
-            goal_start_from = $3,
-            total = $4,
-            seen_trade_nos = $5,
-            ecpay_merchant_id = $6,
-            ecpay_hash_key = $7,
-            ecpay_hash_iv = $8,
-            overlay_settings = $9,
-            updated_at = NOW()
-          WHERE id = 'main'
+        // Create workspace
+        const workspaceResult = await pgClient.query(`
+          INSERT INTO user_workspaces (user_id, workspace_name, slug, donation_url, overlay_url, webhook_url)
+          VALUES ($1, $2, $3, $4, $5, $6)
+          RETURNING *
         `, [
-          data.goal?.title || '斗內目標',
-          data.goal?.amount || 1000,
-          data.goal?.startFrom || 0,
-          data.total || 0,
-          data.seenTradeNos || [],
-          data.ecpay?.merchantId || '',
-          data.ecpay?.hashKey || '',
-          data.ecpay?.hashIV || '',
-          JSON.stringify(data.overlaySettings || {})
+          userId,
+          workspaceData.workspaceName,
+          workspaceData.slug,
+          `/donate/${workspaceData.slug}`,
+          `/overlay/${workspaceData.slug}`,
+          `/webhook/${workspaceData.slug}`
         ]);
 
-        console.log('💾 Data saved to PostgreSQL');
+        const workspace = this.camelCaseKeys(workspaceResult.rows[0]);
+
+        // Create default settings
+        await pgClient.query(`
+          INSERT INTO workspace_settings (workspace_id)
+          VALUES ($1)
+        `, [workspace.id]);
+
+        await pgClient.query('COMMIT');
+        return workspace;
       } catch (error) {
-        console.error('PostgreSQL write error:', error);
+        await pgClient.query('ROLLBACK');
         throw error;
       }
     } else {
-      // Use JSON file
-      fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
-      console.log('💾 Data saved to local db.json');
+      const data = await this.readJSON();
+      const newWorkspace = {
+        id: uuidv4(),
+        userId,
+        workspaceName: workspaceData.workspaceName,
+        slug: workspaceData.slug,
+        description: workspaceData.description || null,
+        donationUrl: `/donate/${workspaceData.slug}`,
+        overlayUrl: `/overlay/${workspaceData.slug}`,
+        webhookUrl: `/webhook/${workspaceData.slug}`,
+        isActive: true,
+        isPublic: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      const newSettings = {
+        id: uuidv4(),
+        workspaceId: newWorkspace.id,
+        goalTitle: '斗內目標',
+        goalAmount: 1000,
+        goalStartFrom: 0,
+        totalAmount: 0,
+        totalDonationsCount: 0,
+        overlaySettings: {},
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      data.workspaces.push(newWorkspace);
+      data.workspaceSettings.push(newSettings);
+      await this.writeJSON(data);
+      return newWorkspace;
     }
   }
 
-  // Add donation
-  async addDonation({ tradeNo, amount, payer, message }) {
+  /**
+   * Get all workspaces for a user
+   */
+  async getUserWorkspaces(userId) {
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query(
+        'SELECT * FROM user_workspaces WHERE user_id = $1 ORDER BY created_at DESC',
+        [userId]
+      );
+      return result.rows.map(row => this.camelCaseKeys(row));
+    } else {
+      const data = await this.readJSON();
+      return data.workspaces.filter(w => w.userId === userId);
+    }
+  }
+
+  /**
+   * Get workspace by slug
+   */
+  async getWorkspaceBySlug(slug) {
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query('SELECT * FROM user_workspaces WHERE slug = $1', [slug]);
+      return result.rows.length > 0 ? this.camelCaseKeys(result.rows[0]) : null;
+    } else {
+      const data = await this.readJSON();
+      return data.workspaces.find(w => w.slug === slug) || null;
+    }
+  }
+
+  /**
+   * Get workspace by ID
+   */
+  async getWorkspaceById(workspaceId) {
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query('SELECT * FROM user_workspaces WHERE id = $1', [workspaceId]);
+      return result.rows.length > 0 ? this.camelCaseKeys(result.rows[0]) : null;
+    } else {
+      const data = await this.readJSON();
+      return data.workspaces.find(w => w.id === workspaceId) || null;
+    }
+  }
+
+  // =============================================
+  // WORKSPACE SETTINGS METHODS
+  // =============================================
+  
+  /**
+   * Get workspace settings
+   */
+  async getWorkspaceSettings(workspaceId) {
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query(
+        'SELECT * FROM workspace_settings WHERE workspace_id = $1',
+        [workspaceId]
+      );
+      return result.rows.length > 0 ? this.camelCaseKeys(result.rows[0]) : null;
+    } else {
+      const data = await this.readJSON();
+      return data.workspaceSettings.find(s => s.workspaceId === workspaceId) || null;
+    }
+  }
+
+  /**
+   * Update workspace settings
+   */
+  async updateWorkspaceSettings(workspaceId, settings) {
+    if (this.isProduction && this.connected) {
+      const updates = [];
+      const values = [];
+      let paramCount = 1;
+
+      if (settings.goalTitle !== undefined) {
+        updates.push(`goal_title = $${paramCount++}`);
+        values.push(settings.goalTitle);
+      }
+      if (settings.goalAmount !== undefined) {
+        updates.push(`goal_amount = $${paramCount++}`);
+        values.push(settings.goalAmount);
+      }
+      if (settings.goalStartFrom !== undefined) {
+        updates.push(`goal_start_from = $${paramCount++}`);
+        values.push(settings.goalStartFrom);
+      }
+      if (settings.overlaySettings !== undefined) {
+        updates.push(`overlay_settings = $${paramCount++}`);
+        values.push(JSON.stringify(settings.overlaySettings));
+      }
+
+      updates.push(`updated_at = NOW()`);
+      values.push(workspaceId);
+
+      await pgClient.query(
+        `UPDATE workspace_settings SET ${updates.join(', ')} WHERE workspace_id = $${paramCount}`,
+        values
+      );
+    } else {
+      const data = await this.readJSON();
+      const settingsIdx = data.workspaceSettings.findIndex(s => s.workspaceId === workspaceId);
+      if (settingsIdx !== -1) {
+        if (settings.goalTitle !== undefined) data.workspaceSettings[settingsIdx].goalTitle = settings.goalTitle;
+        if (settings.goalAmount !== undefined) data.workspaceSettings[settingsIdx].goalAmount = settings.goalAmount;
+        if (settings.goalStartFrom !== undefined) data.workspaceSettings[settingsIdx].goalStartFrom = settings.goalStartFrom;
+        if (settings.overlaySettings !== undefined) data.workspaceSettings[settingsIdx].overlaySettings = settings.overlaySettings;
+        data.workspaceSettings[settingsIdx].updatedAt = new Date().toISOString();
+        await this.writeJSON(data);
+      }
+    }
+  }
+
+  // =============================================
+  // PAYMENT PROVIDER METHODS
+  // =============================================
+  
+  /**
+   * Get payment provider for workspace
+   */
+  async getPaymentProvider(workspaceId, providerName = 'ecpay') {
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query(
+        'SELECT * FROM payment_providers WHERE workspace_id = $1 AND provider_name = $2',
+        [workspaceId, providerName]
+      );
+      return result.rows.length > 0 ? this.camelCaseKeys(result.rows[0]) : null;
+    } else {
+      const data = await this.readJSON();
+      return data.paymentProviders.find(
+        p => p.workspaceId === workspaceId && p.providerName === providerName
+      ) || null;
+    }
+  }
+
+  /**
+   * Create or update payment provider
+   */
+  async upsertPaymentProvider(workspaceId, providerData) {
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query(`
+        INSERT INTO payment_providers (workspace_id, provider_name, merchant_id, hash_key, hash_iv, is_active)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (workspace_id, provider_name)
+        DO UPDATE SET merchant_id = $3, hash_key = $4, hash_iv = $5, is_active = $6, updated_at = NOW()
+        RETURNING *
+      `, [
+        workspaceId,
+        providerData.providerName || 'ecpay',
+        providerData.merchantId,
+        providerData.hashKey,
+        providerData.hashIV,
+        providerData.isActive !== false
+      ]);
+      return this.camelCaseKeys(result.rows[0]);
+    } else {
+      const data = await this.readJSON();
+      const existingIdx = data.paymentProviders.findIndex(
+        p => p.workspaceId === workspaceId && p.providerName === (providerData.providerName || 'ecpay')
+      );
+
+      if (existingIdx !== -1) {
+        // Update
+        data.paymentProviders[existingIdx] = {
+          ...data.paymentProviders[existingIdx],
+          merchantId: providerData.merchantId,
+          hashKey: providerData.hashKey,
+          hashIV: providerData.hashIV,
+          isActive: providerData.isActive !== false,
+          updatedAt: new Date().toISOString()
+        };
+      } else {
+        // Create
+        data.paymentProviders.push({
+          id: uuidv4(),
+          workspaceId,
+          providerName: providerData.providerName || 'ecpay',
+          isActive: providerData.isActive !== false,
+          isSandbox: false,
+          merchantId: providerData.merchantId,
+          hashKey: providerData.hashKey,
+          hashIV: providerData.hashIV,
+          credentials: {},
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }
+      await this.writeJSON(data);
+      return data.paymentProviders[existingIdx !== -1 ? existingIdx : data.paymentProviders.length - 1];
+    }
+  }
+
+  // =============================================
+  // DONATION METHODS
+  // =============================================
+  
+  /**
+   * Add a new donation
+   */
+  async addDonation(workspaceId, donationData) {
     if (this.isProduction && this.connected) {
       try {
-        // Begin transaction
         await pgClient.query('BEGIN');
 
         // Check for duplicate
-        const existingDonation = await pgClient.query(
-          'SELECT trade_no FROM donations WHERE trade_no = $1',
-          [tradeNo]
+        const existing = await pgClient.query(
+          'SELECT id FROM donations WHERE workspace_id = $1 AND trade_no = $2',
+          [workspaceId, donationData.tradeNo]
         );
-        
-        if (existingDonation.rows.length > 0) {
+
+        if (existing.rows.length > 0) {
           await pgClient.query('ROLLBACK');
-          console.log(`Duplicate trade number: ${tradeNo}`);
+          console.log(`Duplicate trade number: ${donationData.tradeNo}`);
           return false;
         }
 
         // Insert donation
-        await pgClient.query(
-          'INSERT INTO donations (trade_no, amount, payer, message) VALUES ($1, $2, $3, $4)',
-          [tradeNo, Number(amount), payer || 'Anonymous', message || '']
-        );
+        await pgClient.query(`
+          INSERT INTO donations (
+            workspace_id, payment_provider_id, trade_no, amount, currency,
+            payer_name, message, status, completed_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed', NOW())
+        `, [
+          workspaceId,
+          donationData.paymentProviderId || null,
+          donationData.tradeNo,
+          Number(donationData.amount),
+          donationData.currency || 'TWD',
+          donationData.payerName || 'Anonymous',
+          donationData.message || ''
+        ]);
 
-        // Update app data
-        const appDataResult = await pgClient.query('SELECT * FROM app_data WHERE id = $1', ['main']);
-        const currentData = appDataResult.rows[0] || {};
-        
-        const newSeenTradeNos = [...(currentData.seen_trade_nos || []), tradeNo];
-        const newTotal = (currentData.total || 0) + Number(amount);
-
-        await pgClient.query(
-          'UPDATE app_data SET seen_trade_nos = $1, total = $2, updated_at = NOW() WHERE id = $3',
-          [newSeenTradeNos, newTotal, 'main']
-        );
+        // Update totals
+        await pgClient.query(`
+          UPDATE workspace_settings
+          SET total_amount = total_amount + $1,
+              total_donations_count = total_donations_count + 1,
+              updated_at = NOW()
+          WHERE workspace_id = $2
+        `, [Number(donationData.amount), workspaceId]);
 
         await pgClient.query('COMMIT');
-        console.log(`New donation: ${payer} donated NT$${amount}`);
+        console.log(`New donation: ${donationData.payerName} donated $${donationData.amount}`);
         return true;
 
       } catch (error) {
         await pgClient.query('ROLLBACK');
         if (error.code === '23505') { // Unique violation
-          console.log(`Duplicate trade number: ${tradeNo}`);
+          console.log(`Duplicate trade number: ${donationData.tradeNo}`);
           return false;
         }
-        console.error('PostgreSQL donation error:', error);
         throw error;
       }
     } else {
-      // Use JSON file method
-      const data = await this.readDB();
+      const data = await this.readJSON();
       
-      if (data.seenTradeNos.includes(tradeNo)) {
-        console.log(`Duplicate trade number: ${tradeNo}`);
+      // Check for duplicate
+      const existing = data.donations.find(
+        d => d.workspaceId === workspaceId && d.tradeNo === donationData.tradeNo
+      );
+      if (existing) {
+        console.log(`Duplicate trade number: ${donationData.tradeNo}`);
         return false;
       }
-      
-      data.seenTradeNos.push(tradeNo);
-      data.total = (data.total || 0) + Number(amount);
+
+      // Add donation
       data.donations.push({
-        tradeNo,
-        amount: Number(amount),
-        payer: payer || 'Anonymous',
-        message: message || '',
-        at: new Date().toISOString()
+        id: uuidv4(),
+        workspaceId,
+        paymentProviderId: donationData.paymentProviderId || null,
+        tradeNo: donationData.tradeNo,
+        amount: Number(donationData.amount),
+        currency: donationData.currency || 'TWD',
+        payerName: donationData.payerName || 'Anonymous',
+        message: donationData.message || '',
+        status: 'completed',
+        paymentMethod: null,
+        metadata: {},
+        createdAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+        refundedAt: null
       });
-      
-      await this.writeDB(data);
-      console.log(`New donation: ${payer} donated NT$${amount}`);
+
+      // Update totals
+      const settingsIdx = data.workspaceSettings.findIndex(s => s.workspaceId === workspaceId);
+      if (settingsIdx !== -1) {
+        data.workspaceSettings[settingsIdx].totalAmount += Number(donationData.amount);
+        data.workspaceSettings[settingsIdx].totalDonationsCount += 1;
+        data.workspaceSettings[settingsIdx].updatedAt = new Date().toISOString();
+      }
+
+      await this.writeJSON(data);
+      console.log(`New donation: ${donationData.payerName} donated $${donationData.amount}`);
       return true;
     }
   }
 
-  // Clear all donations and reset totals
-  async clearAllDonations() {
+  /**
+   * Get donations for a workspace
+   */
+  async getWorkspaceDonations(workspaceId, limit = 100) {
     if (this.isProduction && this.connected) {
+      const result = await pgClient.query(
+        'SELECT * FROM donations WHERE workspace_id = $1 ORDER BY created_at DESC LIMIT $2',
+        [workspaceId, limit]
+      );
+      return result.rows.map(row => this.camelCaseKeys(row));
+    } else {
+      const data = await this.readJSON();
+      return data.donations
+        .filter(d => d.workspaceId === workspaceId)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, limit);
+    }
+  }
+
+  /**
+   * Get donation progress for a workspace
+   */
+  async getWorkspaceProgress(workspaceId) {
+    const settings = await this.getWorkspaceSettings(workspaceId);
+    const donations = await this.getWorkspaceDonations(workspaceId, 10);
+
+    if (!settings) {
+      return null;
+    }
+
+    return {
+      goal: {
+        title: settings.goalTitle,
+        amount: settings.goalAmount,
+        startFrom: settings.goalStartFrom
+      },
+      total: settings.totalAmount,
+      donations: donations.map(d => ({
+        tradeNo: d.tradeNo,
+        amount: d.amount,
+        payer: d.payerName,
+        message: d.message,
+        at: d.createdAt
+      })),
+      overlaySettings: settings.overlaySettings || {}
+    };
+  }
+
+  /**
+   * Clear all donations for a workspace
+   */
+  async clearWorkspaceDonations(workspaceId) {
+    if (this.isProduction && this.connected) {
+      await pgClient.query('BEGIN');
       try {
-        await pgClient.query('BEGIN');
-        
-        // Clear donations table
-        await pgClient.query('DELETE FROM donations');
-        
-        // Reset app_data (including goal_start_from)
-        await pgClient.query(
-          'UPDATE app_data SET total = 0, goal_start_from = 0, seen_trade_nos = $1, updated_at = NOW() WHERE id = $2',
-          [[], 'main']
-        );
-        
+        await pgClient.query('DELETE FROM donations WHERE workspace_id = $1', [workspaceId]);
+        await pgClient.query(`
+          UPDATE workspace_settings
+          SET total_amount = 0, total_donations_count = 0, goal_start_from = 0, updated_at = NOW()
+          WHERE workspace_id = $1
+        `, [workspaceId]);
         await pgClient.query('COMMIT');
-        console.log('✨ All donations cleared from database');
+        console.log('✨ All donations cleared');
         return true;
       } catch (error) {
         await pgClient.query('ROLLBACK');
-        console.error('Error clearing donations:', error);
         throw error;
       }
     } else {
-      // Use JSON file method
-      const data = this.getDefaultData();
-      await this.writeDB(data);
-      console.log('✨ All donations cleared from local db.json');
+      const data = await this.readJSON();
+      data.donations = data.donations.filter(d => d.workspaceId !== workspaceId);
+      const settingsIdx = data.workspaceSettings.findIndex(s => s.workspaceId === workspaceId);
+      if (settingsIdx !== -1) {
+        data.workspaceSettings[settingsIdx].totalAmount = 0;
+        data.workspaceSettings[settingsIdx].totalDonationsCount = 0;
+        data.workspaceSettings[settingsIdx].goalStartFrom = 0;
+        data.workspaceSettings[settingsIdx].updatedAt = new Date().toISOString();
+      }
+      await this.writeJSON(data);
+      console.log('✨ All donations cleared');
       return true;
     }
   }
 
-  getDefaultData() {
-    return {
-      goal: { title: "斗內目標", amount: 1000, startFrom: 0 },
-      total: 0,
-      donations: [],
-      seenTradeNos: [],
-      ecpay: { merchantId: "", hashKey: "", hashIV: "" },
-      overlaySettings: {
-        showDonationAlert: true,
-        fontSize: 10,
-        fontColor: "#369bce",
-        backgroundColor: "#1a1a1a",
-        progressBarColor: "#46e65a",
-        progressBarHeight: 30,
-        progressBarCornerRadius: 15,
-        alertDuration: 5000,
-        position: "top-center",
-        width: 900,
-        alertEnabled: true,
-        alertSound: true,
-        donationDisplayMode: "top", // "top" | "latest" | "hidden"
-        donationDisplayCount: 3 // Number of donations to display
-      }
-    };
+  // =============================================
+  // SUBSCRIPTION METHODS
+  // =============================================
+  
+  /**
+   * Get user subscription
+   */
+  async getUserSubscription(userId) {
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query('SELECT * FROM subscriptions WHERE user_id = $1', [userId]);
+      return result.rows.length > 0 ? this.camelCaseKeys(result.rows[0]) : null;
+    } else {
+      const data = await this.readJSON();
+      return data.subscriptions.find(s => s.userId === userId) || null;
+    }
   }
 
   /**
-   * Get database schema and relationships information
-   * @param {boolean} queryActual - If true, queries actual PostgreSQL schema (only works if connected)
-   * @returns {Object} Schema information including tables, columns, relationships
+   * Create subscription for user
    */
-  async getDatabaseSchema(queryActual = false) {
-    const schema = {
-      storageMode: this.isProduction && this.connected ? 'PostgreSQL' : 'JSON File',
-      connected: this.connected,
-      tables: {},
-      relationships: [],
-      jsonStructure: null
-    };
-
-    // If using PostgreSQL and queryActual is true, get actual schema from database
-    if (this.isProduction && this.connected && queryActual) {
-      try {
-        // Query actual donations table schema
-        const donationsSchema = await pgClient.query(`
-          SELECT 
-            column_name,
-            data_type,
-            character_maximum_length,
-            is_nullable,
-            column_default
-          FROM information_schema.columns
-          WHERE table_name = 'donations'
-          ORDER BY ordinal_position
-        `);
-
-        // Query actual app_data table schema
-        const appDataSchema = await pgClient.query(`
-          SELECT 
-            column_name,
-            data_type,
-            character_maximum_length,
-            is_nullable,
-            column_default
-          FROM information_schema.columns
-          WHERE table_name = 'app_data'
-          ORDER BY ordinal_position
-        `);
-
-        // Query indexes and constraints
-        const donationsIndexes = await pgClient.query(`
-          SELECT indexname, indexdef
-          FROM pg_indexes
-          WHERE tablename = 'donations'
-        `);
-
-        const appDataIndexes = await pgClient.query(`
-          SELECT indexname, indexdef
-          FROM pg_indexes
-          WHERE tablename = 'app_data'
-        `);
-
-        schema.tables.donations = {
-          columns: donationsSchema.rows.map(col => ({
-            name: col.column_name,
-            type: col.data_type,
-            maxLength: col.character_maximum_length,
-            nullable: col.is_nullable === 'YES',
-            default: col.column_default
-          })),
-          indexes: donationsIndexes.rows.map(idx => ({
-            name: idx.indexname,
-            definition: idx.indexdef
-          })),
-          description: 'Stores individual donation records'
-        };
-
-        schema.tables.app_data = {
-          columns: appDataSchema.rows.map(col => ({
-            name: col.column_name,
-            type: col.data_type,
-            maxLength: col.character_maximum_length,
-            nullable: col.is_nullable === 'YES',
-            default: col.column_default
-          })),
-          indexes: appDataIndexes.rows.map(idx => ({
-            name: idx.indexname,
-            definition: idx.indexdef
-          })),
-          description: 'Stores application configuration and settings'
-        };
-
-      } catch (error) {
-        console.error('Error querying actual schema:', error);
-        // Fall back to defined schema
-        queryActual = false;
-      }
-    } 
-    // If using JSON file (sandbox mode) and queryActual is true, read actual db.json structure
-    else if (!this.isProduction && queryActual) {
-      try {
-        if (fs.existsSync(DB_PATH)) {
-          const actualData = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
-          
-          // Analyze actual JSON structure
-          schema.jsonStructure = {
-            file: 'db.json',
-            actualContent: actualData,
-            statistics: {
-              totalDonations: actualData.donations?.length || 0,
-              totalAmount: actualData.total || 0,
-              seenTradeNosCount: actualData.seenTradeNos?.length || 0,
-              goalAmount: actualData.goal?.amount || 0,
-              goalTitle: actualData.goal?.title || '',
-              goalStartFrom: actualData.goal?.startFrom || 0,
-              hasEcpayConfig: !!(actualData.ecpay?.merchantId && actualData.ecpay?.hashKey && actualData.ecpay?.hashIV),
-              overlaySettingsKeys: actualData.overlaySettings ? Object.keys(actualData.overlaySettings) : []
-            },
-            structure: {
-              goal: {
-                title: typeof actualData.goal?.title + ' - Donation goal title',
-                amount: typeof actualData.goal?.amount + ' - Target amount',
-                startFrom: typeof actualData.goal?.startFrom + ' - Starting amount for progress'
-              },
-              total: typeof actualData.total + ' - Total donations received',
-              donations: actualData.donations?.length > 0 ? [
-                {
-                  tradeNo: typeof actualData.donations[0].tradeNo + ' - Unique trade number',
-                  amount: typeof actualData.donations[0].amount + ' - Donation amount',
-                  payer: typeof actualData.donations[0].payer + ' - Donor name',
-                  message: typeof actualData.donations[0].message + ' - Donor message',
-                  at: typeof actualData.donations[0].at + ' (ISO date) - Timestamp'
-                }
-              ] : ['array of donation objects'],
-              seenTradeNos: ['array of ' + typeof (actualData.seenTradeNos?.[0] || 'string') + ' - Processed trade numbers'],
-              ecpay: {
-                merchantId: typeof actualData.ecpay?.merchantId + ' - ECPay merchant ID',
-                hashKey: typeof actualData.ecpay?.hashKey + ' - ECPay hash key',
-                hashIV: typeof actualData.ecpay?.hashIV + ' - ECPay hash IV'
-              },
-              overlaySettings: actualData.overlaySettings || {}
-            },
-            description: 'Actual content from db.json file in sandbox mode'
-          };
-          
-          console.log('📄 Read actual db.json structure in sandbox mode');
-        } else {
-          console.log('📄 db.json does not exist yet in sandbox mode');
-          queryActual = false;
-        }
-      } catch (error) {
-        console.error('Error reading actual db.json:', error);
-        // Fall back to defined schema
-        queryActual = false;
-      }
-    }
-
-    // If not querying actual or if it failed, return the defined schema
-    if (!queryActual) {
-      schema.tables.donations = {
-        columns: [
-          { name: 'id', type: 'SERIAL', constraint: 'PRIMARY KEY', description: 'Auto-incrementing donation ID' },
-          { name: 'trade_no', type: 'VARCHAR(50)', constraint: 'UNIQUE NOT NULL', description: 'Unique trade number from ECPay' },
-          { name: 'amount', type: 'INTEGER', constraint: 'NOT NULL', description: 'Donation amount in TWD' },
-          { name: 'payer', type: 'VARCHAR(255)', default: 'Anonymous', description: 'Name of the donor' },
-          { name: 'message', type: 'TEXT', default: '', description: 'Message from the donor' },
-          { name: 'created_at', type: 'TIMESTAMP WITH TIME ZONE', default: 'NOW()', description: 'When the donation was created' }
-        ],
-        indexes: [
-          { name: 'donations_pkey', type: 'PRIMARY KEY', column: 'id' },
-          { name: 'donations_trade_no_key', type: 'UNIQUE', column: 'trade_no' }
-        ],
-        description: 'Stores individual donation records from ECPay'
+  async createSubscription(userId, subscriptionData) {
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query(`
+        INSERT INTO subscriptions (user_id, plan_type, status, is_trial, trial_end_date)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING *
+      `, [
+        userId,
+        subscriptionData.planType || 'free',
+        subscriptionData.status || 'active',
+        subscriptionData.isTrial || false,
+        subscriptionData.trialEndDate || null
+      ]);
+      return this.camelCaseKeys(result.rows[0]);
+    } else {
+      const data = await this.readJSON();
+      const newSubscription = {
+        id: uuidv4(),
+        userId,
+        planType: subscriptionData.planType || 'free',
+        status: subscriptionData.status || 'active',
+        pricePerMonth: 0,
+        currency: 'TWD',
+        isTrial: subscriptionData.isTrial || false,
+        trialEndDate: subscriptionData.trialEndDate || null,
+        features: {},
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
-
-      schema.tables.app_data = {
-        columns: [
-          { name: 'id', type: 'VARCHAR(20)', constraint: 'PRIMARY KEY', default: 'main', description: 'Single row identifier' },
-          { name: 'goal_title', type: 'VARCHAR(255)', default: '斗內目標', description: 'Title of the donation goal' },
-          { name: 'goal_amount', type: 'INTEGER', default: '1000', description: 'Target donation amount' },
-          { name: 'goal_start_from', type: 'INTEGER', default: '0', description: 'Starting amount for the progress bar' },
-          { name: 'total', type: 'INTEGER', default: '0', description: 'Total donations received' },
-          { name: 'seen_trade_nos', type: 'TEXT[]', default: '{}', description: 'Array of processed trade numbers (for deduplication)' },
-          { name: 'ecpay_merchant_id', type: 'VARCHAR(255)', default: '', description: 'ECPay merchant ID' },
-          { name: 'ecpay_hash_key', type: 'VARCHAR(255)', default: '', description: 'ECPay hash key for encryption' },
-          { name: 'ecpay_hash_iv', type: 'VARCHAR(255)', default: '', description: 'ECPay hash IV for encryption' },
-          { name: 'overlay_settings', type: 'JSONB', default: '{}', description: 'OBS overlay display settings' },
-          { name: 'updated_at', type: 'TIMESTAMP WITH TIME ZONE', default: 'NOW()', description: 'Last update timestamp' }
-        ],
-        indexes: [
-          { name: 'app_data_pkey', type: 'PRIMARY KEY', column: 'id' }
-        ],
-        description: 'Stores application configuration (single row table)'
-      };
+      data.subscriptions.push(newSubscription);
+      await this.writeJSON(data);
+      return newSubscription;
     }
+  }
 
-    // Define relationships
-    schema.relationships = [
-      {
-        type: 'Reference Array',
-        from: { table: 'app_data', column: 'seen_trade_nos' },
-        to: { table: 'donations', column: 'trade_no' },
-        description: 'app_data.seen_trade_nos contains an array of trade_no values from donations table to prevent duplicate processing',
-        cardinality: '1:N (one app_data row references many donation trade_nos)'
-      },
-      {
-        type: 'Calculated Field',
-        from: { table: 'app_data', column: 'total' },
-        to: { table: 'donations', column: 'amount' },
-        description: 'app_data.total is the sum of all donations.amount values',
-        cardinality: '1:N (one total aggregates many donation amounts)'
-      }
-    ];
-
-    // JSON file structure (when not using PostgreSQL)
-    schema.jsonStructure = {
-      file: 'db.json',
-      structure: {
-        goal: {
-          title: 'string - Donation goal title',
-          amount: 'number - Target amount',
-          startFrom: 'number - Starting amount for progress'
-        },
-        total: 'number - Total donations received',
-        donations: [
-          {
-            tradeNo: 'string - Unique trade number',
-            amount: 'number - Donation amount',
-            payer: 'string - Donor name',
-            message: 'string - Donor message',
-            at: 'string (ISO date) - Timestamp'
-          }
-        ],
-        seenTradeNos: ['array of strings - Processed trade numbers'],
-        ecpay: {
-          merchantId: 'string - ECPay merchant ID',
-          hashKey: 'string - ECPay hash key',
-          hashIV: 'string - ECPay hash IV'
-        },
-        overlaySettings: {
-          showDonationAlert: 'boolean',
-          fontSize: 'number',
-          fontColor: 'string (hex color)',
-          backgroundColor: 'string (hex color)',
-          progressBarColor: 'string (hex color)',
-          progressBarHeight: 'number',
-          progressBarCornerRadius: 'number',
-          alertDuration: 'number (milliseconds)',
-          position: 'string (position name)',
-          width: 'number',
-          alertEnabled: 'boolean',
-          alertSound: 'boolean'
-        }
-      },
-      description: 'Used when ENVIRONMENT !== production or DATABASE_URL is not set'
-    };
-
-    // Data flow notes
-    schema.dataFlow = {
-      donation_process: [
-        '1. ECPay sends webhook → /webhook/ecpay endpoint',
-        '2. Server validates and decrypts payment data',
-        '3. addDonation() checks for duplicate trade_no in seen_trade_nos',
-        '4. If not duplicate: Insert into donations table',
-        '5. Update app_data.total and add trade_no to seen_trade_nos',
-        '6. Broadcast update via SSE to connected clients'
-      ],
-      storage_modes: {
-        sandbox: 'Uses db.json file (ENVIRONMENT=sandbox)',
-        development: 'Uses db.json file (no DATABASE_URL)',
-        production: 'Uses PostgreSQL (DATABASE_URL is set and ENVIRONMENT=production)'
-      }
-    };
-
-    return schema;
+  // =============================================
+  // UTILITY METHODS
+  // =============================================
+  
+  /**
+   * Convert snake_case keys to camelCase
+   */
+  camelCaseKeys(obj) {
+    const result = {};
+    for (const key in obj) {
+      const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+      result[camelKey] = obj[key];
+    }
+    return result;
   }
 
   /**
-   * Print database schema in a human-readable format
-   * @param {boolean} queryActual - Query actual schema from database
+   * Add audit log
    */
-  async printDatabaseSchema(queryActual = false) {
-    const schema = await this.getDatabaseSchema(queryActual);
-    
-    console.log('\n╔════════════════════════════════════════════════════════════════╗');
-    console.log('║              DATABASE SCHEMA & RELATIONSHIPS                   ║');
-    console.log('╚════════════════════════════════════════════════════════════════╝\n');
-    
-    console.log(`📊 Storage Mode: ${schema.storageMode}`);
-    console.log(`🔌 Connected: ${schema.connected ? 'Yes' : 'No'}\n`);
-    
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    
-    // Print each table
-    for (const [tableName, tableInfo] of Object.entries(schema.tables)) {
-      console.log(`📋 TABLE: ${tableName}`);
-      console.log(`   Description: ${tableInfo.description}\n`);
-      
-      console.log('   Columns:');
-      tableInfo.columns.forEach(col => {
-        const constraint = col.constraint ? ` [${col.constraint}]` : '';
-        const defaultVal = col.default ? ` DEFAULT ${col.default}` : '';
-        const desc = col.description ? ` - ${col.description}` : '';
-        console.log(`   • ${col.name}: ${col.type}${constraint}${defaultVal}${desc}`);
+  async addAuditLog(logData) {
+    if (this.isProduction && this.connected) {
+      await pgClient.query(`
+        INSERT INTO audit_logs (user_id, workspace_id, action, resource_type, resource_id, status, metadata)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `, [
+        logData.userId || null,
+        logData.workspaceId || null,
+        logData.action,
+        logData.resourceType || null,
+        logData.resourceId || null,
+        logData.status || 'success',
+        JSON.stringify(logData.metadata || {})
+      ]);
+    } else {
+      const data = await this.readJSON();
+      data.auditLogs.push({
+        id: uuidv4(),
+        userId: logData.userId || null,
+        workspaceId: logData.workspaceId || null,
+        action: logData.action,
+        resourceType: logData.resourceType || null,
+        resourceId: logData.resourceId || null,
+        status: logData.status || 'success',
+        metadata: logData.metadata || {},
+        createdAt: new Date().toISOString()
       });
-      
-      if (tableInfo.indexes && tableInfo.indexes.length > 0) {
-        console.log('\n   Indexes:');
-        tableInfo.indexes.forEach(idx => {
-          console.log(`   • ${idx.name}${idx.type ? ` (${idx.type})` : ''}`);
-        });
+      // Keep only last 1000 logs in JSON
+      if (data.auditLogs.length > 1000) {
+        data.auditLogs = data.auditLogs.slice(-1000);
       }
-      
-      console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      await this.writeJSON(data);
     }
-    
-    // Print relationships
-    console.log('🔗 RELATIONSHIPS:\n');
-    schema.relationships.forEach((rel, idx) => {
-      console.log(`${idx + 1}. ${rel.type}`);
-      console.log(`   ${rel.from.table}.${rel.from.column} → ${rel.to.table}.${rel.to.column}`);
-      console.log(`   ${rel.description}`);
-      console.log(`   Cardinality: ${rel.cardinality}\n`);
-    });
-    
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    
-    // Print data flow
-    console.log('🔄 DATA FLOW:\n');
-    console.log('Donation Process:');
-    schema.dataFlow.donation_process.forEach(step => {
-      console.log(`   ${step}`);
-    });
-    
-    console.log('\nStorage Modes:');
-    Object.entries(schema.dataFlow.storage_modes).forEach(([mode, desc]) => {
-      console.log(`   • ${mode}: ${desc}`);
-    });
-    
-    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    
-    // Print JSON structure
-    if (schema.jsonStructure) {
-      console.log('📄 JSON FILE STRUCTURE (db.json):\n');
-      console.log(`   File: ${schema.jsonStructure.file}`);
-      console.log(`   ${schema.jsonStructure.description}\n`);
-      console.log('   ' + JSON.stringify(schema.jsonStructure.structure, null, 2).replace(/\n/g, '\n   '));
-      console.log('\n');
-    }
-    
-    return schema;
   }
 }
 
