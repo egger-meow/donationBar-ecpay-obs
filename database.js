@@ -514,6 +514,64 @@ class Database {
         // Fall back to defined schema
         queryActual = false;
       }
+    } 
+    // If using JSON file (sandbox mode) and queryActual is true, read actual db.json structure
+    else if (!this.isProduction && queryActual) {
+      try {
+        if (fs.existsSync(DB_PATH)) {
+          const actualData = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
+          
+          // Analyze actual JSON structure
+          schema.jsonStructure = {
+            file: 'db.json',
+            actualContent: actualData,
+            statistics: {
+              totalDonations: actualData.donations?.length || 0,
+              totalAmount: actualData.total || 0,
+              seenTradeNosCount: actualData.seenTradeNos?.length || 0,
+              goalAmount: actualData.goal?.amount || 0,
+              goalTitle: actualData.goal?.title || '',
+              goalStartFrom: actualData.goal?.startFrom || 0,
+              hasEcpayConfig: !!(actualData.ecpay?.merchantId && actualData.ecpay?.hashKey && actualData.ecpay?.hashIV),
+              overlaySettingsKeys: actualData.overlaySettings ? Object.keys(actualData.overlaySettings) : []
+            },
+            structure: {
+              goal: {
+                title: typeof actualData.goal?.title + ' - Donation goal title',
+                amount: typeof actualData.goal?.amount + ' - Target amount',
+                startFrom: typeof actualData.goal?.startFrom + ' - Starting amount for progress'
+              },
+              total: typeof actualData.total + ' - Total donations received',
+              donations: actualData.donations?.length > 0 ? [
+                {
+                  tradeNo: typeof actualData.donations[0].tradeNo + ' - Unique trade number',
+                  amount: typeof actualData.donations[0].amount + ' - Donation amount',
+                  payer: typeof actualData.donations[0].payer + ' - Donor name',
+                  message: typeof actualData.donations[0].message + ' - Donor message',
+                  at: typeof actualData.donations[0].at + ' (ISO date) - Timestamp'
+                }
+              ] : ['array of donation objects'],
+              seenTradeNos: ['array of ' + typeof (actualData.seenTradeNos?.[0] || 'string') + ' - Processed trade numbers'],
+              ecpay: {
+                merchantId: typeof actualData.ecpay?.merchantId + ' - ECPay merchant ID',
+                hashKey: typeof actualData.ecpay?.hashKey + ' - ECPay hash key',
+                hashIV: typeof actualData.ecpay?.hashIV + ' - ECPay hash IV'
+              },
+              overlaySettings: actualData.overlaySettings || {}
+            },
+            description: 'Actual content from db.json file in sandbox mode'
+          };
+          
+          console.log('📄 Read actual db.json structure in sandbox mode');
+        } else {
+          console.log('📄 db.json does not exist yet in sandbox mode');
+          queryActual = false;
+        }
+      } catch (error) {
+        console.error('Error reading actual db.json:', error);
+        // Fall back to defined schema
+        queryActual = false;
+      }
     }
 
     // If not querying actual or if it failed, return the defined schema
