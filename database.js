@@ -714,17 +714,51 @@ class Database {
    * Create subscription for user
    */
   async createSubscription(userId, subscriptionData) {
+    // Calculate trial end date if this is a trial
+    let trialEndDate = subscriptionData.trialEndDate || null;
+    const isTrial = subscriptionData.isTrial !== undefined ? subscriptionData.isTrial : true; // Default to trial
+    
+    if (isTrial && !trialEndDate) {
+      // Calculate trial end date based on SUBSCRIPTION_TRIAL_DAYS (default 30 days)
+      const trialDays = parseInt(process.env.SUBSCRIPTION_TRIAL_DAYS) || 30;
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + trialDays);
+      trialEndDate = endDate.toISOString();
+    }
+    
+    // Calculate billing cycle start date (for paid subscriptions)
+    const billingCycleStart = subscriptionData.billingCycleStart || new Date().toISOString();
+    
+    // Calculate next billing date (for paid subscriptions)
+    let nextBillingDate = subscriptionData.nextBillingDate || null;
+    if (subscriptionData.planType === 'paid' || subscriptionData.planType === 'pro') {
+      const nextDate = new Date(billingCycleStart);
+      nextDate.setMonth(nextDate.getMonth() + 1); // Add 1 month
+      nextBillingDate = nextDate.toISOString();
+    }
+    
+    const pricePerMonth = subscriptionData.pricePerMonth !== undefined 
+      ? subscriptionData.pricePerMonth 
+      : (subscriptionData.planType === 'free' ? 0 : parseInt(process.env.SUBSCRIPTION_MONTHLY_PRICE) || 70);
+    
     if (this.isProduction && this.connected) {
       const result = await pgClient.query(`
-        INSERT INTO subscriptions (user_id, plan_type, status, is_trial, trial_end_date)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO subscriptions (
+          user_id, plan_type, status, is_trial, trial_end_date,
+          price_per_month, currency, billing_cycle_start, next_billing_date
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *
       `, [
         userId,
         subscriptionData.planType || 'free',
         subscriptionData.status || 'active',
-        subscriptionData.isTrial || false,
-        subscriptionData.trialEndDate || null
+        isTrial,
+        trialEndDate,
+        pricePerMonth,
+        subscriptionData.currency || 'TWD',
+        billingCycleStart,
+        nextBillingDate
       ]);
       return this.camelCaseKeys(result.rows[0]);
     } else {
@@ -734,17 +768,85 @@ class Database {
         userId,
         planType: subscriptionData.planType || 'free',
         status: subscriptionData.status || 'active',
-        pricePerMonth: 0,
-        currency: 'TWD',
-        isTrial: subscriptionData.isTrial || false,
-        trialEndDate: subscriptionData.trialEndDate || null,
-        features: {},
+        pricePerMonth,
+        currency: subscriptionData.currency || 'TWD',
+        isTrial,
+        trialEndDate,
+        billingCycleStart,
+        nextBillingDate,
+        features: subscriptionData.features || {},
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
       data.subscriptions.push(newSubscription);
       await this.writeJSON(data);
       return newSubscription;
+    }
+  }
+
+  /**
+   * Update subscription for user
+   */
+  async updateSubscription(userId, updateData) {
+    if (this.isProduction && this.connected) {
+      const fields = [];
+      const values = [];
+      let paramIndex = 1;
+
+      // Build dynamic UPDATE query
+      if (updateData.planType !== undefined) {
+        fields.push(`plan_type = $${paramIndex++}`);
+        values.push(updateData.planType);
+      }
+      if (updateData.status !== undefined) {
+        fields.push(`status = $${paramIndex++}`);
+        values.push(updateData.status);
+      }
+      if (updateData.isTrial !== undefined) {
+        fields.push(`is_trial = $${paramIndex++}`);
+        values.push(updateData.isTrial);
+      }
+      if (updateData.trialEndDate !== undefined) {
+        fields.push(`trial_end_date = $${paramIndex++}`);
+        values.push(updateData.trialEndDate);
+      }
+      if (updateData.pricePerMonth !== undefined) {
+        fields.push(`price_per_month = $${paramIndex++}`);
+        values.push(updateData.pricePerMonth);
+      }
+      if (updateData.nextBillingDate !== undefined) {
+        fields.push(`next_billing_date = $${paramIndex++}`);
+        values.push(updateData.nextBillingDate);
+      }
+
+      fields.push(`updated_at = NOW()`);
+      values.push(userId); // Last parameter for WHERE clause
+
+      const query = `
+        UPDATE subscriptions 
+        SET ${fields.join(', ')}
+        WHERE user_id = $${paramIndex}
+        RETURNING *
+      `;
+
+      const result = await pgClient.query(query, values);
+      return result.rows.length > 0 ? this.camelCaseKeys(result.rows[0]) : null;
+    } else {
+      const data = await this.readJSON();
+      const subscription = data.subscriptions.find(s => s.userId === userId);
+      
+      if (!subscription) {
+        throw new Error('Subscription not found');
+      }
+
+      // Update fields
+      Object.assign(subscription, {
+        ...updateData,
+        updatedAt: new Date().toISOString()
+      });
+
+      await this.writeJSON(data);
+      return subscription;
     }
   }
 

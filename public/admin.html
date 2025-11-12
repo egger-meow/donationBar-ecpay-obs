@@ -712,7 +712,7 @@
           <p id="userEmail">Loading...</p>
         </div>
         <div style="margin-left: auto;">
-          <span class="subscription-badge" id="subscriptionBadge">Loading...</span>
+          <span class="subscription-badge" id="subscriptionBadge" style="color: white;">Loading...</span>
         </div>
       </div>
 
@@ -1694,7 +1694,10 @@
       const managementContainer = document.getElementById('subscriptionManagement');
       
       // Update badge
-      badge.textContent = subscription.planType.replace('_', ' ');
+      const badgeText = subscription.planType === 'trial' ? '試用中' : 
+                       subscription.planType === 'paid' || subscription.planType === 'pro' ? '付費方案' :
+                       subscription.planType === 'free_pass' ? 'FREE PASS' : '免費方案';
+      badge.textContent = badgeText;
       badge.className = `subscription-badge ${subscription.planType}`;
       
       // Calculate trial days remaining
@@ -1734,10 +1737,14 @@
       if (subscription.planType === 'free_pass') {
         managementHTML = `
           <div style="background: rgba(138, 43, 226, 0.1); padding: 25px; border-radius: 12px; border: 2px solid #BA55D3; margin-top: 15px;">
-            <div style="text-align: center; margin-bottom: 15px;">
+            <div style="text-align: center; margin-bottom: 20px;">
               <span style="font-size: 60px;">🎁</span>
             </div>
-            <h3 style="text-align: center; color: #BA55D3; margin-bottom: 10px; font-size: 24px;">Free Pass 用戶</h3>
+            
+            <!-- Plan Title Card -->
+            <div style="background: rgba(138, 43, 226, 0.15); padding: 16px 20px; border-radius: 10px; border: 1px solid rgba(186, 85, 211, 0.3); margin-bottom: 20px;">
+              <h3 style="text-align: center; margin: 0; color: #BA55D3; font-size: 22px; font-weight: 700;">🎉 Free Pass 用戶</h3>
+            </div>
             <p style="text-align: center; color: #e0e0e0; margin-bottom: 20px; font-size: 15px;">
               您擁有永久免費使用權限，享有所有功能！
             </p>
@@ -1750,32 +1757,49 @@
             </ul>
           </div>
         `;
-      } else if (subscription.planType === 'free') {
+      } else if (subscription.planType === 'free' || (subscription.isTrial && daysRemaining <= 0)) {
+        // Expired trial or free plan - URLs disabled
+        const isExpired = subscription.isTrial && daysRemaining <= 0;
         managementHTML = `
           <div style="margin-top: 15px;">
-            <div style="background: rgba(160, 160, 160, 0.1); padding: 25px; border-radius: 12px; border: 2px solid #666;">
-              <h3 style="margin-bottom: 15px; color: #a0a0a0; font-size: 22px;">目前方案：免費方案</h3>
-              <div style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                <div style="font-size: 14px; color: #a0a0a0; margin-bottom: 10px;">📊 本月使用狀況</div>
+            <div style="background: rgba(255, 107, 107, 0.1); padding: 25px; border-radius: 12px; border: 2px solid #ff6b6b;">
+              <div style="text-align: center; margin-bottom: 20px;">
+                <span style="font-size: 60px;">🚫</span>
+              </div>
+              
+              <!-- Plan Title Card -->
+              <div style="background: rgba(255, 107, 107, 0.15); padding: 16px 20px; border-radius: 10px; border: 1px solid rgba(255, 107, 107, 0.3); margin-bottom: 20px;">
+                <h3 style="text-align: center; margin: 0; color: #ff6b6b; font-size: 22px; font-weight: 700;">⚠️ ${isExpired ? '試用期已結束' : '目前方案：免費方案'}</h3>
+              </div>
+              <div style="background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center;">
+                <div style="font-size: 16px; color: #ff6b6b; line-height: 1.8;">
+                  <div style="margin-bottom: 10px;"><strong>⚠️ 斗內條和捐款頁面已停用</strong></div>
+                  <div style="font-size: 14px; color: #e0e0e0;">
+                    ${isExpired ? '您的試用期已結束，' : ''}請訂閱付費方案以繼續使用服務
+                  </div>
+                </div>
+              </div>
+              <div style="background: rgba(0, 0, 0, 0.2); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <div style="font-size: 14px; color: #a0a0a0; margin-bottom: 10px;">💰 付費方案</div>
                 <div style="color: #e0e0e0; font-size: 15px;">
-                  <div style="margin-bottom: 5px;">捐款次數：<strong>${subscription.donationsThisMonth || 0}</strong> / ${subscription.maxDonationsPerMonth || 'undefined'}</div>
-                  <div>API 呼叫：<strong>${subscription.apiCallsToday || 0}</strong> / ${subscription.maxApiCallsPerDay || 'undefined'} (今日)</div>
+                  <div style="margin-bottom: 5px;">每月僅需 <strong style="color: #46e65a;">NT$ 70</strong></div>
+                  <div style="font-size: 13px; color: #a0a0a0;">無使用限制，完整功能</div>
                 </div>
               </div>
               <ul class="plan-features">
-                <li>每月最多 ${subscription.maxDonationsPerMonth || 'undefined'} 筆捐款</li>
-                <li>每日 ${subscription.maxApiCallsPerDay || 'undefined'} 次 API 呼叫</li>
-                <li>基本斗內條功能</li>
-                <li class="disabled">進階斗內條自訂</li>
-                <li class="disabled">優先技術支援</li>
+                <li>無限制捐款次數</li>
+                <li>無限制 API 呼叫</li>
+                <li>完整斗內條功能</li>
+                <li>進階斗內條自訂</li>
+                <li>優先技術支援</li>
               </ul>
               <button class="btn btn-primary" style="width: 100%; margin-top: 20px; font-size: 16px; padding: 14px;" onclick="upgradePlan()">
-                ⬆️ 升級至付費方案
+                💳 訂閱付費方案 (NT$ 70/月)
               </button>
             </div>
           </div>
         `;
-      } else if (subscription.isTrial) {
+      } else if (subscription.isTrial && daysRemaining > 0) {
         const urgentClass = daysRemaining <= 3 ? 'urgent' : '';
         const bgColor = daysRemaining <= 3 ? 'rgba(255, 107, 107, 0.1)' : 'rgba(52, 152, 219, 0.1)';
         const borderColor = daysRemaining <= 3 ? '#ff6b6b' : '#3498db';
@@ -1784,10 +1808,14 @@
         managementHTML = `
           <div style="margin-top: 15px;">
             <div style="background: ${bgColor}; padding: 25px; border-radius: 12px; border: 2px solid ${borderColor};">
-              <div style="text-align: center; margin-bottom: 15px;">
+              <div style="text-align: center; margin-bottom: 20px;">
                 <span style="font-size: 60px;">⏰</span>
               </div>
-              <h3 style="text-align: center; margin-bottom: 15px; color: ${textColor}; font-size: 24px;">試用中：${subscription.planType.toUpperCase()} 方案</h3>
+              
+              <!-- Plan Title Card -->
+              <div style="background: rgba(52, 152, 219, 0.15); padding: 16px 20px; border-radius: 10px; border: 1px solid rgba(52, 152, 219, 0.3); margin-bottom: 20px;">
+                <h3 style="text-align: center; margin: 0; color: ${textColor}; font-size: 22px; font-weight: 700;">🎆 試用期間</h3>
+              </div>
               
               <div style="background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center;">
                 <div style="font-size: 16px; color: #e0e0e0; margin-bottom: 10px;">試用期限</div>
@@ -1796,42 +1824,130 @@
                 <div style="font-size: 14px; color: #a0a0a0; margin-top: 10px;">到期日：${trialEnd.toLocaleDateString('zh-TW')}</div>
               </div>
               
+              <div style="background: rgba(0, 0, 0, 0.2); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <div style="font-size: 14px; color: #a0a0a0; margin-bottom: 10px;">💰 訂閱後價格</div>
+                <div style="color: #e0e0e0; font-size: 15px;">
+                  <div>每月僅需 <strong style="color: #46e65a;">NT$ 70</strong></div>
+                </div>
+              </div>
               <ul class="plan-features">
                 <li>無限制捐款次數</li>
                 <li>無限制 API 呼叫</li>
+                <li>完整斗內條功能</li>
                 <li>進階斗內條自訂</li>
                 <li>優先技術支援</li>
               </ul>
               <button class="btn btn-primary" style="width: 100%; margin-top: 20px; font-size: 16px; padding: 14px;" onclick="upgradePlan()">
-                💳 訂閱此方案
+                💳 訂閱付費方案 (NT$ 70/月)
               </button>
             </div>
           </div>
         `;
       } else {
+        // Paid subscription - full management interface
+        // Calculate next billing date if not present
+        let nextBillingDate = subscription.nextBillingDate;
+        if (!nextBillingDate && subscription.billingCycleStart) {
+          const nextDate = new Date(subscription.billingCycleStart);
+          nextDate.setMonth(nextDate.getMonth() + 1); // Add 1 month
+          nextBillingDate = nextDate.toISOString();
+        }
+        
+        const nextBillingFormatted = nextBillingDate
+          ? new Date(nextBillingDate).toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' })
+          : '-';
+        
         managementHTML = `
           <div style="margin-top: 15px;">
             <div style="background: rgba(70, 230, 90, 0.1); padding: 25px; border-radius: 12px; border: 2px solid #46e65a;">
-              <div style="text-align: center; margin-bottom: 15px;">
+              <div style="text-align: center; margin-bottom: 20px;">
                 <span style="font-size: 60px;">✅</span>
               </div>
-              <h3 style="text-align: center; margin-bottom: 15px; color: #46e65a; font-size: 24px;">目前方案：${subscription.planType.toUpperCase()}</h3>
-              <div style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
-                <div style="font-size: 16px; color: #e0e0e0;">狀態：<strong style="color: #46e65a; font-size: 18px;">已啟用</strong></div>
+              
+              <!-- Plan Title Card -->
+              <div style="background: rgba(70, 230, 90, 0.15); padding: 16px 20px; border-radius: 10px; border: 1px solid rgba(70, 230, 90, 0.3); margin-bottom: 20px;">
+                <h3 style="text-align: center; margin: 0; color: #46e65a; font-size: 22px; font-weight: 700;">💎 付費方案</h3>
               </div>
+              
+              <!-- Subscription Details -->
+              <div style="background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                  <div>
+                    <div style="font-size: 12px; color: #a0a0a0; margin-bottom: 5px;">訂閱狀態</div>
+                    <div style="font-size: 16px; color: #46e65a; font-weight: bold;">● 啟用中</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 12px; color: #a0a0a0; margin-bottom: 5px;">月費</div>
+                    <div style="font-size: 16px; color: #e0e0e0; font-weight: bold;">NT$ 70</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 12px; color: #a0a0a0; margin-bottom: 5px;">開始日期</div>
+                    <div style="font-size: 14px; color: #e0e0e0;">
+                      ${subscription.billingCycleStart ? new Date(subscription.billingCycleStart).toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' }) : '-'}
+                    </div>
+                  </div>
+                  <div>
+                    <div style="font-size: 12px; color: #a0a0a0; margin-bottom: 5px;">下次扣款</div>
+                    <div style="font-size: 14px; color: #e0e0e0;">${nextBillingFormatted}</div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Features -->
               <ul class="plan-features">
                 <li>無限制捐款次數</li>
                 <li>無限制 API 呼叫</li>
+                <li>完整斗內條功能</li>
                 <li>進階斗內條自訂</li>
                 <li>優先技術支援</li>
               </ul>
-              <div style="display: flex; gap: 10px; margin-top: 20px;">
-                <button class="btn btn-secondary" style="flex: 1; font-size: 14px; padding: 12px;" onclick="manageBilling()">
+              
+              <!-- Payment History Section (Placeholder) -->
+              <div style="background: rgba(0, 0, 0, 0.2); padding: 15px; border-radius: 8px; margin-top: 20px; margin-bottom: 20px;">
+                <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                  <span><strong>📜 付款紀錄</strong></span>
+                  <button class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px;" onclick="viewPaymentHistory()">
+                    查看全部
+                  </button>
+                </div>
+                <div id="paymentHistoryPreview" style="font-size: 13px; color: #a0a0a0;">
+                  <div style="padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <div style="display: flex; justify-content: space-between;">
+                      <span>最近一次付款</span>
+                      <span style="color: #46e65a;">待串接</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Invoice Section (Placeholder) -->
+              <div style="background: rgba(0, 0, 0, 0.2); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 10px;">
+                  <strong>🧾 電子發票</strong>
+                </div>
+                <div style="font-size: 13px; color: #a0a0a0;">
+                  <div style="padding: 8px 0;">
+                    啟用後每次扣款將自動開立電子發票
+                  </div>
+                  <button class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px; margin-top: 8px;" onclick="manageInvoice()">
+                    設定發票資訊
+                  </button>
+                </div>
+              </div>
+              
+              <!-- Management Actions -->
+              <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+                <button class="btn btn-secondary" style="font-size: 14px; padding: 12px;" onclick="manageBilling()">
                   💳 管理付款方式
                 </button>
-                <button class="btn btn-secondary" style="flex: 1; font-size: 14px; padding: 12px;" onclick="cancelSubscription()">
-                  ❌ 取消訂閱
-                </button>
+                <div style="display: flex; gap: 10px;">
+                  <button class="btn btn-secondary" style="flex: 1; font-size: 13px; padding: 10px;" onclick="pauseSubscription()">
+                    ⏸️ 暫停訂閱
+                  </button>
+                  <button class="btn btn-secondary" style="flex: 1; font-size: 13px; padding: 10px; background: rgba(255,107,107,0.2); border: 1px solid #ff6b6b; color: #ff6b6b;" onclick="cancelSubscription()">
+                    ❌ 取消訂閱
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1843,17 +1959,63 @@
 
     // Subscription Management Functions
     function upgradePlan() {
-      showAlert('💎 升級功能即將推出！請聯繫管理員了解詳情。', 'info');
+      // TODO: Redirect to ECPay subscription payment page
+      showAlert('💎 即將前往 ECPay 付款頁面（待串接）', 'info');
+      // Future: window.location.href = '/subscription/checkout';
     }
 
     function manageBilling() {
-      showAlert('💳 付款管理功能即將推出！', 'info');
+      // TODO: Show payment method management modal
+      // Should allow:
+      // - View current payment method (last 4 digits of card)
+      // - Update payment method
+      // - Change billing address
+      showAlert('💳 付款方式管理功能（待串接 ECPay）', 'info');
     }
 
     function cancelSubscription() {
-      if (confirm('確定要取消訂閱嗎？您將失去所有付費功能。')) {
-        showAlert('取消訂閱功能即將推出！', 'info');
+      if (confirm('確定要取消訂閱嗎？\n\n取消後：\n- 本期結束後將無法使用付費功能\n- 斗內條和捐款頁面將被停用\n- 可隨時重新訂閱')) {
+        // TODO: Call API to cancel subscription
+        // POST /api/subscription/cancel
+        // Should update subscription status to 'canceled'
+        // Should set canceledAt timestamp
+        // Should still allow access until nextBillingDate
+        showAlert('⚠️ 取消訂閱功能（待串接）', 'info');
       }
+    }
+
+    function pauseSubscription() {
+      if (confirm('確定要暫停訂閱嗎？\n\n暫停期間：\n- 不會扣款\n- 無法使用付費功能\n- 可隨時恢復訂閱')) {
+        // TODO: Call API to pause subscription
+        // POST /api/subscription/pause
+        // Should update subscription status to 'paused'
+        // Should set pausedAt timestamp
+        showAlert('⏸️ 暫停訂閱功能（待串接）', 'info');
+      }
+    }
+
+    function viewPaymentHistory() {
+      // TODO: Show payment history modal
+      // Should display:
+      // - Date of payment
+      // - Amount paid
+      // - Payment method (last 4 digits)
+      // - Status (success/failed/pending)
+      // - Invoice download link
+      // - Receipt download link
+      showAlert('📜 付款紀錄查看功能（待串接）', 'info');
+      // Future: Display modal with payment history from ECPay query API
+    }
+
+    function manageInvoice() {
+      // TODO: Show invoice settings modal
+      // Should allow:
+      // - Set buyer tax ID (統編)
+      // - Set invoice type (個人/公司)
+      // - Set company name
+      // - Set invoice email
+      // - Enable/disable automatic invoice
+      showAlert('🧾 電子發票設定功能（待串接 ECPay 發票 API）', 'info');
     }
 
     // Feedback Form
@@ -1886,13 +2048,40 @@
         setButtonLoading('feedbackSubmitBtn', false);
         
         if (result.success) {
-          showAlert('✅ 感謝您的回饋！我們會仔細閱讀您的意見。');
-          showFormFeedback('feedbackFeedback', '✅ 回饋已成功提交', 'success');
-          feedbackForm.reset();
-          // Close modal after successful submission
-          setTimeout(() => {
-            toggleFeedbackModal();
-          }, 1500);
+          // Check if Easter egg was activated
+          if (result.specialReward) {
+            // 🎉 SPECIAL CELEBRATION FOR FREE PASS! 🎉
+            showAlert('🎊🎉 ' + result.message + ' 🎁🎊', 'success');
+            showFormFeedback('feedbackFeedback', '🎉 ' + result.message, 'success');
+            
+            // Reload subscription status to show free_pass
+            setTimeout(async () => {
+              try {
+                const userResponse = await fetch('/api/user/info');
+                const userData = await userResponse.json();
+                if (userData.success && userData.subscription) {
+                  renderSubscriptionStatus(userData.subscription);
+                }
+              } catch (e) {
+                console.error('Failed to reload subscription:', e);
+              }
+            }, 1000);
+            
+            // Close modal after celebration
+            setTimeout(() => {
+              toggleFeedbackModal();
+              feedbackForm.reset();
+            }, 3000);
+          } else {
+            // Normal feedback submission
+            showAlert('✅ 感謝您的回饋！我們會仔細閱讀您的意見。');
+            showFormFeedback('feedbackFeedback', '✅ 回饋已成功提交', 'success');
+            feedbackForm.reset();
+            // Close modal after successful submission
+            setTimeout(() => {
+              toggleFeedbackModal();
+            }, 1500);
+          }
         } else {
           showAlert('❌ 提交失敗', 'error');
           showFormFeedback('feedbackFeedback', '❌ 提交失敗，請重試', 'error');
