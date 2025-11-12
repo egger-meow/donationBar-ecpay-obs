@@ -332,7 +332,9 @@
     // Load current progress
     async function loadProgress() {
       try {
-        const response = await fetch('/progress');
+        // Use workspace-specific progress endpoint if slug is present
+        const url = workspaceSlug ? `/progress?slug=${workspaceSlug}` : '/progress';
+        const response = await fetch(url);
         const data = await response.json();
         
         goalTitle.textContent = data.title || 'Donation Goal';
@@ -422,13 +424,15 @@
     // Initialize
     loadProgress();
 
-    // Real-time updates via SSE
-    const eventSource = new EventSource('/events');
+    // Real-time updates via SSE - use workspace-specific endpoint if slug is present
+    const eventsUrl = workspaceSlug ? `/events?slug=${workspaceSlug}` : '/events';
+    const eventSource = new EventSource(eventsUrl);
     eventSource.onmessage = function(event) {
       try {
         const data = JSON.parse(event.data);
         currentAmount.textContent = formatNumber(data.current);
         goalAmount.textContent = formatNumber(data.goal);
+        goalTitle.textContent = data.title || 'Donation Goal';
         progressPercent.textContent = data.percent || 0;
         progressFill.style.width = `${Math.min(100, data.percent || 0)}%`;
       } catch (error) {

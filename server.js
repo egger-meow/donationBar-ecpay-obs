@@ -231,7 +231,7 @@ async function broadcastOverlaySettings(workspaceId = null) {
   }
 }
 
-// SSE endpoint
+// SSE endpoint - supports slug query parameter for workspace-specific updates
 app.get('/events', async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -239,8 +239,15 @@ app.get('/events', async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.flushHeaders();
 
-  // Send initial data
-  res.write(`data: ${JSON.stringify(await getProgress())}\n\n`);
+  // Get workspace from slug if provided
+  const { slug } = req.query;
+  let workspace = null;
+  if (slug) {
+    workspace = await getWorkspaceFromSlug(slug);
+  }
+  
+  // Send initial data for the specified workspace
+  res.write(`data: ${JSON.stringify(await getProgress(workspace?.id))}\n\n`);
 
   // Keep connection alive
   const keepAlive = setInterval(() => {
