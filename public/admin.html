@@ -1171,11 +1171,11 @@
             quickLinkOverlay.href = workspaceUrls.overlay;
           }
           
-          // Update donate page link
-          const donateLinkBtn = document.querySelector('a[href="/donate"]');
-          if (donateLinkBtn) {
-            donateLinkBtn.href = workspaceUrls.donate;
-          }
+          // Update all donate page links
+          const donateLinks = document.querySelectorAll('a[href="/donate"]');
+          donateLinks.forEach(link => {
+            link.href = workspaceUrls.donate;
+          });
           
           console.log('✅ Workspace URLs loaded:', data.urls);
         }
