@@ -5,7 +5,6 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import crypto from 'crypto';
 import session from 'express-session';
-import bcrypt from 'bcrypt';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import database from './database.js';
@@ -76,10 +75,14 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             status: 'active'
           });
 
-          // Create default workspace
+          // Check if any workspaces exist
+          const allWorkspaces = await database.getAllWorkspaces();
+          const isFirstWorkspace = allWorkspaces.length === 0;
+          
+          // Create workspace - use 'default' slug for first workspace
           await database.createWorkspace(user.id, {
-            workspaceName: `${profile.displayName}'s Workspace`,
-            slug: `${username}`.toLowerCase().replace(/[^a-z0-9-]/g, '')
+            workspaceName: isFirstWorkspace ? 'Default Workspace' : `${profile.displayName}'s Workspace`,
+            slug: isFirstWorkspace ? 'default' : `${username}`.toLowerCase().replace(/[^a-z0-9-]/g, '')
           });
 
           console.log(`✅ New user created via Google OAuth: ${user.email}`);
@@ -107,24 +110,54 @@ const DEFAULT_WORKSPACE_SLUG = 'default';
 async function getDefaultWorkspace() {
   const workspace = await database.getWorkspaceBySlug(DEFAULT_WORKSPACE_SLUG);
   if (!workspace) {
-    console.error('❌ Default workspace not found. Run migration: npm run migrate');
-    throw new Error('Default workspace not found');
+    console.warn('⚠️  No default workspace found. Will be created when first user signs up.');
+    return null;
   }
   return workspace;
 }
 
-// Helper: Get workspace by slug or default
-async function getWorkspace(slug = null) {
+// Helper: Get workspace by slug or default (for multi-user URLs)
+async function getWorkspaceFromSlug(slug = null) {
   if (slug) {
     return await database.getWorkspaceBySlug(slug);
   }
   return await getDefaultWorkspace();
 }
 
+// Helper: Get logged-in user's workspace from session
+async function getUserWorkspaceFromSession(req) {
+  if (!req.session || !req.session.userId) {
+    console.error('❌ No user session found');
+    return null;
+  }
+  
+  console.log('🔍 Getting workspace for user:', req.session.userId);
+  
+  const workspaces = await database.getUserWorkspaces(req.session.userId);
+  
+  if (!workspaces || workspaces.length === 0) {
+    console.error('❌ No workspace found for user:', req.session.userId);
+    return null;
+  }
+  
+  console.log('✅ Found workspace:', workspaces[0].id, workspaces[0].slug);
+  
+  // Return the first workspace (users typically have one)
+  return workspaces[0];
+}
+
 // ECPay credential helpers (workspace-scoped)
 async function getECPayCredentials(workspaceId = null) {
   if (!workspaceId) {
     const workspace = await getDefaultWorkspace();
+    if (!workspace) {
+      // Return default env credentials if no workspace
+      return {
+        merchantId: process.env.MERCHANT_ID || '',
+        hashKey: process.env.HASH_KEY || '',
+        hashIV: process.env.HASH_IV || ''
+      };
+    }
     workspaceId = workspace.id;
   }
   
@@ -167,6 +200,7 @@ const sseClients = new Set();
 async function broadcastProgress(workspaceId = null) {
   if (!workspaceId) {
     const workspace = await getDefaultWorkspace();
+    if (!workspace) return; // Skip broadcast if no workspace
     workspaceId = workspace.id;
   }
   const data = await getProgress(workspaceId);
@@ -183,6 +217,7 @@ async function broadcastProgress(workspaceId = null) {
 async function broadcastOverlaySettings(workspaceId = null) {
   if (!workspaceId) {
     const workspace = await getDefaultWorkspace();
+    if (!workspace) return; // Skip broadcast if no workspace
     workspaceId = workspace.id;
   }
   const settings = await database.getWorkspaceSettings(workspaceId);
@@ -224,6 +259,18 @@ app.get('/events', async (req, res) => {
 async function getProgress(workspaceId = null) {
   if (!workspaceId) {
     const workspace = await getDefaultWorkspace();
+    if (!workspace) {
+      // No workspace yet - return empty progress
+      return {
+        title: '斗內目標',
+        current: 0,
+        actualDonations: 0,
+        startFrom: 0,
+        goal: 1000,
+        percent: 0,
+        donations: []
+      };
+    }
     workspaceId = workspace.id;
   }
   
@@ -387,9 +434,12 @@ async function decryptECPayData(encryptedData) {
   }
 }
 
-// Authentication middleware
+// Authentication middleware - Check if user is logged in
 function requireAdmin(req, res, next) {
-  if (req.session.isAdmin) return next();
+  // Check if user is authenticated (has session with userId)
+  if (req.session && req.session.userId) {
+    return next();
+  }
   
   // Return JSON error for API requests (AJAX)
   if (req.xhr || req.headers.accept?.includes('application/json')) {
@@ -399,10 +449,16 @@ function requireAdmin(req, res, next) {
   return res.redirect('/login');
 }
 
-// API Routes
+// =============================================
+// API ROUTES (Multi-User Support)
+// =============================================
+
+// Progress endpoint - supports slug query parameter for multi-user
 app.get('/progress', async (req, res) => {
   try {
-    const progress = await getProgress();
+    const { slug } = req.query;
+    const workspace = await getWorkspaceFromSlug(slug);
+    const progress = await getProgress(workspace?.id);
     res.json(progress);
   } catch (error) {
     console.error('Error in /progress:', error);
@@ -418,7 +474,19 @@ app.get('/progress', async (req, res) => {
   }
 });
 
-// Page routes
+// =============================================
+// PAGE ROUTES (Multi-User Support)
+// =============================================
+
+// Multi-user overlay routes
+app.get('/overlay/:slug', (req, res) => {
+  res.setHeader('Cache-Control','no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma','no-cache');
+  res.setHeader('Expires','0');
+  res.sendFile(path.join(__dirname, 'public', 'overlay.html'));
+});
+
+// Legacy overlay route (backward compatibility - uses default workspace)
 app.get('/overlay', (req, res) => {
   res.setHeader('Cache-Control','no-cache, no-store, must-revalidate');
   res.setHeader('Pragma','no-cache');
@@ -426,8 +494,16 @@ app.get('/overlay', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'overlay.html'));
 });
 
+// Multi-user donate routes
+app.get('/donate/:slug', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(__dirname, 'public', 'donate.html'));
+});
+
+// Legacy donate route (backward compatibility - uses default workspace)
 app.get('/donate', (req, res) => {
-  // Set proper headers to prevent caching issues
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
@@ -478,247 +554,33 @@ app.post('/success', async (req, res) => {
 // AUTHENTICATION PAGES
 // =============================================
 
-// Login page
+// Login page (OAuth only)
 app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-// Signup page
-app.get('/signup', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'signup.html'));
-});
-
-// Forgot password page
-app.get('/forgot-password', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'forgot-password.html'));
-});
-
-// Reset password page  
-app.get('/reset-password', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'reset-password.html'));
-});
-
-// Handle login (backward compatible with ENV, will use database in future)
-app.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-  
-  // Legacy: Check against ENV variables (backward compatibility)
-  if (process.env.ADMIN_USER && process.env.ADMIN_PASSWORD) {
-    if (username === process.env.ADMIN_USER && password === process.env.ADMIN_PASSWORD) {
-      req.session.isAdmin = true;
-      req.session.username = username;
-      return res.redirect('/admin');
-    }
-  }
-  
-  // TODO: Implement full user authentication with bcrypt
-  // const user = await database.findUserByUsername(username);
-  // if (user && await bcrypt.compare(password, user.passwordHash)) {
-  //   req.session.userId = user.id;
-  //   req.session.isAdmin = true;
-  //   await database.updateUserLastLogin(user.id);
-  //   return res.redirect('/admin');
-  // }
-  
-  res.redirect('/login?error=invalid');
-});
-
 // Logout
 app.post('/logout', (req, res) => {
+  const userId = req.session?.userId;
+  const userEmail = req.session?.passport?.user?.email;
+  
+  console.log('🚪 User logging out:', userEmail || userId || 'unknown');
+  
   req.session.destroy((err) => {
     if (err) {
-      console.error('Session destroy error:', err);
+      console.error('❌ Session destroy error:', err);
+    } else {
+      console.log('✅ Session destroyed successfully');
     }
     res.redirect('/login');
   });
 });
 
 // =============================================
-// AUTHENTICATION API ROUTES
+// AUTHENTICATION API ROUTES (OAuth only)
 // =============================================
-
-// Sign up - Register new user
-app.post('/api/auth/signup', async (req, res) => {
-  try {
-    const { email, username, displayName, password } = req.body;
-
-    // Validate input
-    if (!email || !username || !password) {
-      return res.status(400).json({ error: 'Email, username, and password are required' });
-    }
-
-    // Check if user already exists
-    const existingEmail = await database.findUserByEmail(email);
-    if (existingEmail) {
-      return res.status(400).json({ error: 'Email already registered' });
-    }
-
-    const existingUsername = await database.findUserByUsername(username);
-    if (existingUsername) {
-      return res.status(400).json({ error: 'Username already taken' });
-    }
-
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    // Create user
-    const user = await database.createUser({
-      email,
-      username,
-      passwordHash,
-      displayName: displayName || username,
-      authProvider: 'local'
-    });
-
-    // Create free subscription
-    await database.createSubscription(user.id, {
-      planType: 'free',
-      status: 'active'
-    });
-
-    // Create default workspace
-    const workspace = await database.createWorkspace(user.id, {
-      workspaceName: `${username}'s Workspace`,
-      slug: `${username}-${Date.now()}`.toLowerCase().replace(/[^a-z0-9-]/g, '')
-    });
-
-    // Generate email verification token
-    const verificationToken = emailService.generateToken();
-    // TODO: Store verification token in database with expiry
-    // For now, we'll just send a welcome email
-
-    // Send verification email
-    const emailResult = await emailService.sendVerificationEmail(email, verificationToken, username);
-    
-    if (!emailResult.success) {
-      console.warn('Failed to send verification email:', emailResult.error);
-    }
-
-    res.json({ 
-      success: true, 
-      message: 'Account created successfully! Please check your email to verify your account.',
-      user: { id: user.id, email: user.email, username: user.username }
-    });
-  } catch (error) {
-    console.error('Signup error:', error);
-    res.status(500).json({ error: 'Failed to create account' });
-  }
-});
-
-// Forgot password - Send reset email
-app.post('/api/auth/forgot-password', async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
-    }
-
-    // Find user
-    const user = await database.findUserByEmail(email);
-    
-    // Always return success to prevent email enumeration
-    if (!user) {
-      return res.json({ success: true, message: 'If that email exists, a reset link has been sent' });
-    }
-
-    // Generate reset token
-    const resetToken = emailService.generateToken();
-    const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-    // TODO: Store reset token in database
-    // For now, we'll use session storage as a temporary solution
-    if (!req.session.resetTokens) {
-      req.session.resetTokens = {};
-    }
-    req.session.resetTokens[resetToken] = {
-      userId: user.id,
-      email: user.email,
-      expiry: resetTokenExpiry.toISOString()
-    };
-
-    // Send reset email
-    const emailResult = await emailService.sendPasswordResetEmail(email, resetToken, user.username);
-    
-    if (!emailResult.success) {
-      console.error('Failed to send password reset email:', emailResult.error);
-      return res.status(500).json({ error: 'Failed to send reset email' });
-    }
-
-    res.json({ success: true, message: 'Password reset link sent to your email' });
-  } catch (error) {
-    console.error('Forgot password error:', error);
-    res.status(500).json({ error: 'Failed to process request' });
-  }
-});
-
-// Reset password - Update password with token
-app.post('/api/auth/reset-password', async (req, res) => {
-  try {
-    const { token, password } = req.body;
-
-    if (!token || !password) {
-      return res.status(400).json({ error: 'Token and password are required' });
-    }
-
-    // Validate password strength
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' });
-    }
-
-    // Check token in session storage (temporary solution)
-    if (!req.session.resetTokens || !req.session.resetTokens[token]) {
-      return res.status(400).json({ error: 'Invalid or expired reset token' });
-    }
-
-    const tokenData = req.session.resetTokens[token];
-    
-    // Check if token is expired
-    if (new Date(tokenData.expiry) < new Date()) {
-      delete req.session.resetTokens[token];
-      return res.status(400).json({ error: 'Reset token has expired' });
-    }
-
-    // Find user
-    const user = await database.findUserById(tokenData.userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // Hash new password
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    // TODO: Update user password in database
-    // For now, this is a placeholder
-    console.log(`Password reset for user ${user.username} (${user.email})`);
-
-    // Clear the used token
-    delete req.session.resetTokens[token];
-
-    res.json({ success: true, message: 'Password reset successfully' });
-  } catch (error) {
-    console.error('Reset password error:', error);
-    res.status(500).json({ error: 'Failed to reset password' });
-  }
-});
-
-// Verify email
-app.get('/verify-email', async (req, res) => {
-  try {
-    const { token } = req.query;
-
-    if (!token) {
-      return res.redirect('/login?error=invalid_token');
-    }
-
-    // TODO: Verify email token and update user
-    // For now, just redirect to login with success
-    res.redirect('/login?verified=true');
-  } catch (error) {
-    console.error('Email verification error:', error);
-    res.redirect('/login?error=verification_failed');
-  }
-});
+// All password-based authentication has been removed.
+// Users can only login via OAuth providers (Google, Twitch, GitHub, etc.)
 
 // =============================================
 // GOOGLE OAUTH ROUTES
@@ -734,10 +596,24 @@ app.get('/api/auth/google',
 // Google OAuth - Callback
 app.get('/api/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/login?error=oauth_failed' }),
-  (req, res) => {
-    // Successful authentication
-    req.session.isAdmin = true; // For backward compatibility
+  async (req, res) => {
+    // Successful authentication - properly set session with user data
     req.session.userId = req.user.id;
+    req.session.username = req.user.username;
+    req.session.email = req.user.email;
+    req.session.isAdmin = req.user.isAdmin || false;
+    
+    // Update last login time
+    await database.updateUserLastLogin(req.user.id);
+    
+    console.log('✅ OAuth login successful:', req.user.email);
+    console.log('🔑 Session created:', {
+      userId: req.session.userId,
+      email: req.session.email,
+      username: req.session.username,
+      sessionID: req.sessionID
+    });
+    
     res.redirect('/admin');
   }
 );
@@ -745,10 +621,12 @@ app.get('/api/auth/google/callback',
 // Get user info and subscription (protected)
 app.get('/api/user/info', requireAdmin, async (req, res) => {
   try {
-    // TODO: Get user ID from session
-    // For now, get default workspace user
-    const workspace = await getDefaultWorkspace();
-    const user = await database.findUserById(workspace.userId);
+    // Get user ID from session (fixed session management bug)
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Unauthorized', message: 'No user session found' });
+    }
+    
+    const user = await database.findUserById(req.session.userId);
     
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -779,34 +657,122 @@ app.get('/api/user/info', requireAdmin, async (req, res) => {
   }
 });
 
+// Get workspace URLs (protected) - returns user-specific URLs
+app.get('/api/workspace/urls', requireAdmin, async (req, res) => {
+  try {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    // Get user's workspaces (returns array)
+    const workspaces = await database.getUserWorkspaces(req.session.userId);
+    
+    if (!workspaces || workspaces.length === 0) {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
+    
+    // Use the first workspace (users typically have one workspace)
+    const workspace = workspaces[0];
+    
+    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+    
+    res.json({
+      success: true,
+      urls: {
+        overlay: `${baseUrl}${workspace.overlayUrl}`,
+        donate: `${baseUrl}${workspace.donationUrl}`,
+        webhook: `${baseUrl}${workspace.webhookUrl}`,
+        slug: workspace.slug
+      }
+    });
+  } catch (error) {
+    console.error('Get workspace URLs error:', error);
+    res.status(500).json({ error: 'Failed to get workspace URLs' });
+  }
+});
+
+// Get feedback (admin only)
+app.get('/api/feedback', requireAdmin, async (req, res) => {
+  try {
+    const { status, limit = 100 } = req.query;
+    const feedback = await database.getFeedback({ 
+      status: status || null, 
+      limit: parseInt(limit) 
+    });
+    res.json({ success: true, feedback });
+  } catch (error) {
+    console.error('Get feedback error:', error);
+    res.status(500).json({ error: 'Failed to retrieve feedback' });
+  }
+});
+
+// Update feedback status (admin only)
+app.patch('/api/feedback/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!['new', 'reviewing', 'resolved', 'closed'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const feedback = await database.updateFeedbackStatus(id, status);
+    if (!feedback) {
+      return res.status(404).json({ error: 'Feedback not found' });
+    }
+
+    console.log(`✅ Feedback ${id} status updated to: ${status}`);
+    res.json({ success: true, feedback });
+  } catch (error) {
+    console.error('Update feedback status error:', error);
+    res.status(500).json({ error: 'Failed to update feedback status' });
+  }
+});
+
 // Submit feedback (protected)
 app.post('/api/feedback', requireAdmin, async (req, res) => {
   try {
-    const { type, message } = req.body;
+    const { type, message, email } = req.body;
 
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    // TODO: Store feedback in database or send email
-    // For now, just log it
-    console.log(`📝 Feedback received:`, {
-      type,
-      message,
-      timestamp: new Date().toISOString()
+    // Store feedback in database
+    const workspace = await getDefaultWorkspace();
+    const feedback = await database.createFeedback({
+      userId: workspace.userId,
+      type: type || 'general',
+      message: message,
+      email: email || null,
+      metadata: {
+        userAgent: req.headers['user-agent'],
+        ip: req.ip
+      }
     });
 
-    // TODO: Add audit log
-    const workspace = await getDefaultWorkspace();
+    console.log(`📝 Feedback received and stored:`, {
+      id: feedback.id,
+      type: feedback.type,
+      messageLength: message.length,
+      timestamp: feedback.createdAt
+    });
+
+    // Add audit log
     await database.addAuditLog({
       userId: workspace.userId,
       action: 'feedback.submitted',
       resourceType: 'feedback',
+      resourceId: feedback.id,
       status: 'success',
-      metadata: { type, messageLength: message.length }
+      metadata: { type: feedback.type, messageLength: message.length }
     });
 
-    res.json({ success: true, message: 'Feedback submitted successfully' });
+    res.json({ 
+      success: true, 
+      message: 'Feedback submitted successfully',
+      feedbackId: feedback.id 
+    });
   } catch (error) {
     console.error('Submit feedback error:', error);
     res.status(500).json({ error: 'Failed to submit feedback' });
@@ -942,9 +908,9 @@ app.post('/webhook/ecpay', async (req, res) => {
   return app._router.handle(req, res);
 });
 
-// Create ECPay order
+// Create ECPay order - supports slug in request body for multi-user
 app.post('/create-order', async (req, res) => {
-  const { amount, nickname, message } = req.body;
+  const { amount, nickname, message, slug } = req.body;
 
   const amt = parseInt(amount, 10);
   if (!amt || amt < 1) {
@@ -958,8 +924,8 @@ app.post('/create-order', async (req, res) => {
   if (process.env.ENVIRONMENT === 'sandbox') {
     console.log(`🧪 SANDBOX MODE: Simulating payment for ${nickname || 'Anonymous'} - NT$${amt}`);
     
-    // Get default workspace
-    const workspace = await getDefaultWorkspace();
+    // Get workspace from slug or use default
+    const workspace = await getWorkspaceFromSlug(slug);
     const provider = await database.getPaymentProvider(workspace.id, 'ecpay');
     
     // Add donation directly to database (simulate successful payment)
@@ -981,7 +947,7 @@ app.post('/create-order', async (req, res) => {
   }
 
   // Production mode: redirect to actual ECPay
-  const workspace = await getDefaultWorkspace();
+  const workspace = await getWorkspaceFromSlug(slug);
   const credentials = await getECPayCredentials(workspace.id);
   const params = {
     MerchantID: credentials.merchantId,
@@ -1021,11 +987,42 @@ app.post('/create-order', async (req, res) => {
   `);
 });
 
+// Admin API - Get progress for logged-in user's workspace
+app.get('/admin/progress', requireAdmin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    
+    if (!workspace) {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
+    
+    console.log('📊 Loading progress for workspace:', workspace.id, workspace.slug);
+    
+    const progress = await getProgress(workspace.id);
+    res.json(progress);
+  } catch (error) {
+    console.error('Admin progress error:', error);
+    res.status(500).json({ 
+      error: 'Failed to load progress', 
+      message: error.message,
+      title: '斗內目標',
+      current: 0,
+      goal: 1000,
+      percent: 0,
+      donations: []
+    });
+  }
+});
+
 // Admin API for goal management (protected routes)
 app.post('/admin/goal', requireAdmin, async (req, res) => {
   try {
     const { title, amount, startFrom } = req.body;
-    const workspace = await getDefaultWorkspace();
+    const workspace = await getUserWorkspaceFromSession(req);
+    
+    if (!workspace) {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
     
     await database.updateWorkspaceSettings(workspace.id, {
       goalTitle: title,
@@ -1049,7 +1046,11 @@ app.post('/admin/goal', requireAdmin, async (req, res) => {
 
 app.post('/admin/reset', requireAdmin, async (req, res) => {
   try {
-    const workspace = await getDefaultWorkspace();
+    const workspace = await getUserWorkspaceFromSession(req);
+    
+    if (!workspace) {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
     await database.clearWorkspaceDonations(workspace.id);
     await broadcastProgress(workspace.id);
     res.json({ success: true });
@@ -1062,7 +1063,11 @@ app.post('/admin/reset', requireAdmin, async (req, res) => {
 // ECPay credentials management
 app.get('/admin/ecpay', requireAdmin, async (req, res) => {
   try {
-    const workspace = await getDefaultWorkspace();
+    const workspace = await getUserWorkspaceFromSession(req);
+    
+    if (!workspace) {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
     const credentials = await getECPayCredentials(workspace.id);
     res.json({
       merchantId: credentials.merchantId || '',
@@ -1083,7 +1088,12 @@ app.post('/admin/ecpay', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'At least one ECPay credential is required' });
     }
     
-    const workspace = await getDefaultWorkspace();
+    const workspace = await getUserWorkspaceFromSession(req);
+    
+    if (!workspace) {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
+    
     const existing = await database.getPaymentProvider(workspace.id, 'ecpay');
     
     // Prepare update data
@@ -1107,7 +1117,11 @@ app.post('/admin/ecpay', requireAdmin, async (req, res) => {
 // Overlay settings management
 app.get('/admin/overlay', requireAdmin, async (req, res) => {
   try {
-    const workspace = await getDefaultWorkspace();
+    const workspace = await getUserWorkspaceFromSession(req);
+    
+    if (!workspace) {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
     const settings = await database.getWorkspaceSettings(workspace.id);
     res.json(settings?.overlaySettings || {});
   } catch (error) {
@@ -1119,7 +1133,11 @@ app.get('/admin/overlay', requireAdmin, async (req, res) => {
 app.post('/admin/overlay', requireAdmin, async (req, res) => {
   try {
     const settings = req.body;
-    const workspace = await getDefaultWorkspace();
+    const workspace = await getUserWorkspaceFromSession(req);
+    
+    if (!workspace) {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
     const currentSettings = await database.getWorkspaceSettings(workspace.id);
     
     // Validate and sanitize settings
@@ -1188,11 +1206,12 @@ app.post('/admin/overlay', requireAdmin, async (req, res) => {
   }
 });
 
-// Overlay settings endpoint for overlay.html
+// Overlay settings endpoint for overlay.html - supports slug query parameter
 app.get('/overlay-settings', async (req, res) => {
   try {
-    const workspace = await getDefaultWorkspace();
-    const settings = await database.getWorkspaceSettings(workspace.id);
+    const { slug } = req.query;
+    const workspace = await getWorkspaceFromSlug(slug);
+    const settings = await database.getWorkspaceSettings(workspace?.id);
     res.json(settings?.overlaySettings || {});
   } catch (error) {
     console.error('Get overlay settings error:', error);

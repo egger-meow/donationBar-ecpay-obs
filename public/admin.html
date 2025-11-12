@@ -12,16 +12,41 @@
     }
 
     body {
-      font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-      background: linear-gradient(135deg, #0f1216 0%, #1a1f26 100%);
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: #ffffff;
       min-height: 100vh;
       padding: 20px;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Animated background */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: 
+        radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.08) 0%, transparent 50%);
+      animation: pulse 8s ease-in-out infinite alternate;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.5; transform: scale(1); }
+      100% { opacity: 1; transform: scale(1.1); }
     }
 
     .container {
       max-width: 1200px;
       margin: 0 auto;
+      position: relative;
+      z-index: 1;
     }
 
     .header {
@@ -30,18 +55,16 @@
     }
 
     .header h1 {
-      font-size: 36px;
-      font-weight: 700;
-      background: linear-gradient(135deg, #46e65a, #5ef56d);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      font-size: 42px;
+      font-weight: 800;
+      color: #ffffff;
       margin-bottom: 10px;
     }
 
     .header p {
-      color: #a0a0a0;
-      font-size: 16px;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 18px;
+      font-weight: 500;
     }
 
     .dashboard {
@@ -56,8 +79,21 @@
       backdrop-filter: blur(20px);
       border-radius: 20px;
       padding: 30px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      animation: slideIn 0.6s ease-out;
+      color: #1f2937;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .card.full-width {
@@ -66,7 +102,7 @@
 
     .card h2 {
       font-size: 24px;
-      font-weight: 600;
+      font-weight: 700;
       margin-bottom: 20px;
       color: #46e65a;
     }
@@ -78,8 +114,8 @@
     .form-group label {
       display: block;
       margin-bottom: 8px;
-      font-weight: 500;
-      color: #e0e0e0;
+      font-weight: 600;
+      color: #4b5563;
     }
 
     .form-group input,
@@ -91,7 +127,7 @@
       background: #0f1216;
       color: #ffffff;
       font-size: 14px;
-      transition: border-color 0.3s ease;
+      transition: all 0.3s ease;
     }
 
     .form-group input:focus,
@@ -226,19 +262,55 @@
 
     .quick-links {
       display: flex;
-      gap: 15px;
+      gap: 0;
       flex-wrap: wrap;
       margin-bottom: 30px;
+      background: rgba(27, 31, 38, 0.95);
+      backdrop-filter: blur(20px);
+      border-radius: 12px;
+      padding: 10px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      align-items: center;
+    }
+
+    .quick-links .btn {
+      border-radius: 8px;
+      margin: 0 5px;
+      transition: all 0.3s ease;
+      font-size: 14px;
+      padding: 10px 20px;
+    }
+
+    .quick-links .btn:hover {
+      transform: translateY(-2px);
+    }
+
+    .quick-links .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .quick-links .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .quick-links .btn-danger {
+      margin-left: auto;
     }
 
     .alert {
-      padding: 15px;
-      border-radius: 8px;
+      padding: 15px 20px;
+      border-radius: 10px;
       margin-bottom: 20px;
-      font-weight: 500;
+      font-weight: 600;
       animation: slideInDown 0.3s ease-out;
       position: relative;
       overflow: hidden;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
     }
 
     .alert::before {
@@ -253,21 +325,24 @@
     }
 
     .alert-success {
-      background: rgba(70, 230, 90, 0.1);
+      background: rgba(27, 31, 38, 0.98);
       border: 2px solid #46e65a;
       color: #46e65a;
+      border-left: 5px solid #46e65a;
     }
 
     .alert-error {
-      background: rgba(255, 107, 107, 0.1);
+      background: rgba(27, 31, 38, 0.98);
       border: 2px solid #ff6b6b;
       color: #ff6b6b;
+      border-left: 5px solid #ff6b6b;
     }
 
     .alert-info {
-      background: rgba(52, 152, 219, 0.1);
+      background: rgba(27, 31, 38, 0.98);
       border: 2px solid #3498db;
       color: #3498db;
+      border-left: 5px solid #3498db;
     }
 
     .btn:disabled {
@@ -586,6 +661,17 @@
       
       .quick-links {
         flex-direction: column;
+        gap: 5px;
+        padding: 8px;
+      }
+
+      .quick-links .btn {
+        width: 100%;
+        margin: 3px 0;
+      }
+
+      .quick-links .btn-danger {
+        margin-left: 0;
       }
       
       .btn {
@@ -607,8 +693,10 @@
     </div>
 
     <div class="quick-links">
-      <a href="/overlay" class="btn btn-secondary" target="_blank">📊 查看 Overlay</a>
+      <a href="/overlay" class="btn btn-secondary" target="_blank">📊 查看斗內條</a>
       <button class="btn btn-secondary" onclick="toggleDonationMethodsModal()">💰 捐款方式</button>
+      <button class="btn btn-secondary" onclick="toggleSubscriptionModal()">💎 訂閱方案</button>
+      <button class="btn btn-secondary" onclick="toggleFeedbackModal()">💬 意見回饋</button>
       <button class="btn btn-secondary" onclick="window.location.reload()">🔄 重新整理</button>
       <button class="btn btn-danger" onclick="logout()">🚪 登出</button>
     </div>
@@ -727,7 +815,7 @@
 
       <!-- Overlay Settings -->
       <div class="card">
-        <h2>Overlay 外觀設定</h2>
+        <h2>斗內條外觀設定</h2>
         <form id="overlaySettingsForm">
           <div class="form-group">
             <label>
@@ -814,7 +902,7 @@
             </div>
           </div>
           
-          <button type="submit" class="btn btn-primary" id="overlaySubmitBtn">💾 更新 Overlay 設定</button>
+          <button type="submit" class="btn btn-primary" id="overlaySubmitBtn">💾 更新斗內條設定</button>
           <div class="form-feedback" id="overlayFeedback"></div>
         </form>
       </div>
@@ -844,9 +932,9 @@
 
       <!-- Overlay Preview -->
       <div class="card full-width">
-        <h2>🎥 Overlay 即時預覽</h2>
+        <h2>🎥 斗內條即時預覽</h2>
         <p style="color: #a0a0a0; margin-bottom: 15px;">
-          以下是您的 Overlay 即時預覽。調整設定後會自動反映在此預覽中。
+          以下是您的斗內條即時預覽。調整設定後會自動反映在此預覽中。
         </p>
         <div style="background: #000; border-radius: 8px; overflow: hidden; border: 2px solid #2a2f36; position: relative;">
           <div style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 5px; font-size: 12px; color: #4CAF50; z-index: 10;">
@@ -866,26 +954,35 @@
           <button class="btn" onclick="togglePreviewSize()" style="background: #9C27B0;">
             📏 切換預覽大小
           </button>
-          <button class="btn" onclick="window.open('/overlay', '_blank')" style="background: #4CAF50;">
+          <button class="btn" onclick="window.open(workspaceUrls.overlay, '_blank')" style="background: #4CAF50;">
             🚀 在新分頁開啟
           </button>
         </div>
         <p style="color: #666; margin-top: 10px; font-size: 13px;">
-          💡 提示：預覽會即時顯示斗內進度和外觀變化。調整 Overlay 設定後會自動更新。
+          💡 提示：預覽會即時顯示斗內進度和外觀變化。調整斗內條設定後會自動更新。
         </p>
       </div>
 
-      <!-- Subscription Management -->
-      <div class="card">
-        <h2>💎 訂閱方案管理</h2>
+    </div>
+
+    <!-- Subscription Management Modal -->
+    <div id="subscriptionModal" class="modal-overlay">
+      <div class="modal-content">
+        <button class="modal-close" onclick="toggleSubscriptionModal()">×</button>
+        
+        <h2 style="margin-bottom: 10px;">💎 訂閱方案管理</h2>
         <div id="subscriptionManagement">
           <!-- Subscription management content will be loaded here -->
         </div>
       </div>
+    </div>
 
-      <!-- Feedback Card -->
-      <div class="card">
-        <h2>💬 意見回饋</h2>
+    <!-- Feedback Modal -->
+    <div id="feedbackModal" class="modal-overlay">
+      <div class="modal-content">
+        <button class="modal-close" onclick="toggleFeedbackModal()">×</button>
+        
+        <h2 style="margin-bottom: 10px;">💬 意見回饋</h2>
         <p style="color: #a0a0a0; margin-bottom: 20px;">
           有任何建議或問題嗎？我們很樂意聽取您的意見！
         </p>
@@ -1025,18 +1122,80 @@
     const goalAmountInput = document.getElementById('goalAmountInput');
     const goalStartFromInput = document.getElementById('goalStartFromInput');
 
-    // Set OBS URL
-    obsUrl.textContent = `${window.location.origin}/overlay`;
+    // Global variables to store workspace data
+    let workspaceSlug = 'default';
+    let workspaceUrls = {
+      overlay: '/overlay',
+      donate: '/donate',
+      webhook: '/webhook/ecpay'
+    };
 
-    // Set donation methods URLs
-    const donatePageUrl = document.getElementById('donatePageUrl');
-    const webhookUrl = document.getElementById('webhookUrl');
-    if (donatePageUrl) {
-      donatePageUrl.textContent = `${window.location.origin}/donate`;
+    // Load workspace URLs from API
+    async function loadWorkspaceUrls() {
+      try {
+        const response = await fetch('/api/workspace/urls');
+        const data = await response.json();
+        
+        if (data.success && data.urls) {
+          workspaceSlug = data.urls.slug || 'default';
+          
+          // Store workspace URLs globally
+          workspaceUrls = {
+            overlay: data.urls.overlay,
+            donate: data.urls.donate,
+            webhook: data.urls.webhook
+          };
+          
+          // Set OBS overlay URL
+          obsUrl.textContent = workspaceUrls.overlay;
+          
+          // Set donation methods URLs
+          const donatePageUrl = document.getElementById('donatePageUrl');
+          const webhookUrl = document.getElementById('webhookUrl');
+          if (donatePageUrl) {
+            donatePageUrl.textContent = workspaceUrls.donate;
+          }
+          if (webhookUrl) {
+            webhookUrl.textContent = workspaceUrls.webhook;
+          }
+          
+          // Update overlay preview iframe
+          const overlayPreview = document.getElementById('overlayPreview');
+          if (overlayPreview) {
+            overlayPreview.src = workspaceUrls.overlay;
+          }
+          
+          // Update quick links
+          const quickLinkOverlay = document.querySelector('a[href="/overlay"]');
+          if (quickLinkOverlay) {
+            quickLinkOverlay.href = workspaceUrls.overlay;
+          }
+          
+          // Update donate page link
+          const donateLinkBtn = document.querySelector('a[href="/donate"]');
+          if (donateLinkBtn) {
+            donateLinkBtn.href = workspaceUrls.donate;
+          }
+          
+          console.log('✅ Workspace URLs loaded:', data.urls);
+        }
+      } catch (error) {
+        console.error('Failed to load workspace URLs:', error);
+        // Fallback to legacy URLs
+        obsUrl.textContent = `${window.location.origin}/overlay`;
+        const donatePageUrl = document.getElementById('donatePageUrl');
+        const webhookUrl = document.getElementById('webhookUrl');
+        if (donatePageUrl) {
+          donatePageUrl.textContent = `${window.location.origin}/donate`;
+        }
+        if (webhookUrl) {
+          webhookUrl.textContent = `${window.location.origin}/webhook/ecpay`;
+        }
+      }
     }
-    if (webhookUrl) {
-      webhookUrl.textContent = `${window.location.origin}/webhook/ecpay`;
-    }
+
+    // Load workspace URLs on page load
+    loadWorkspaceUrls();
 
     // Copy to clipboard utility function
     function copyToClipboard(text, successMessage = '已複製到剪貼簿') {
@@ -1061,6 +1220,32 @@
       }
     }
 
+    // Toggle subscription modal
+    function toggleSubscriptionModal() {
+      const modal = document.getElementById('subscriptionModal');
+      modal.classList.toggle('active');
+      
+      // Prevent body scroll when modal is open
+      if (modal.classList.contains('active')) {
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = '';
+      }
+    }
+
+    // Toggle feedback modal
+    function toggleFeedbackModal() {
+      const modal = document.getElementById('feedbackModal');
+      modal.classList.toggle('active');
+      
+      // Prevent body scroll when modal is open
+      if (modal.classList.contains('active')) {
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = '';
+      }
+    }
+
     // Close modal when clicking outside the content
     document.getElementById('donationMethodsModal')?.addEventListener('click', function(e) {
       if (e.target === this) {
@@ -1068,12 +1253,33 @@
       }
     });
 
+    document.getElementById('subscriptionModal')?.addEventListener('click', function(e) {
+      if (e.target === this) {
+        toggleSubscriptionModal();
+      }
+    });
+
+    document.getElementById('feedbackModal')?.addEventListener('click', function(e) {
+      if (e.target === this) {
+        toggleFeedbackModal();
+      }
+    });
+
     // Close modal with ESC key
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape') {
-        const modal = document.getElementById('donationMethodsModal');
-        if (modal?.classList.contains('active')) {
+        const donationModal = document.getElementById('donationMethodsModal');
+        const subscriptionModal = document.getElementById('subscriptionModal');
+        const feedbackModal = document.getElementById('feedbackModal');
+        
+        if (donationModal?.classList.contains('active')) {
           toggleDonationMethodsModal();
+        }
+        if (subscriptionModal?.classList.contains('active')) {
+          toggleSubscriptionModal();
+        }
+        if (feedbackModal?.classList.contains('active')) {
+          toggleFeedbackModal();
         }
       }
     });
@@ -1177,11 +1383,13 @@
       }
     }
 
-    // Load initial data
+    // Load initial data - uses logged-in user's workspace
     async function loadData() {
       try {
-        const response = await fetch('/progress');
+        console.log('📊 Loading user-specific progress data...');
+        const response = await fetch('/admin/progress');
         const data = await response.json();
+        console.log('✅ Progress data loaded:', data);
         renderProgress(data);
       } catch (error) {
         console.error('Failed to load data:', error);
@@ -1203,6 +1411,8 @@
       };
       
       try {
+        console.log('🚀 Sending goal update:', formData);
+        
         const response = await fetch('/admin/goal', {
           method: 'POST',
           headers: {
@@ -1211,18 +1421,22 @@
           body: JSON.stringify(formData)
         });
         
+        console.log('📡 Response status:', response.status, response.statusText);
+        
         const result = await response.json();
+        console.log('📦 Response data:', result);
         
         setButtonLoading('goalSubmitBtn', false);
         
-        if (result.success) {
+        if (response.ok && result.success) {
           showAlert('✅ 目標設定已更新！');
           showFormFeedback('goalFeedback', '✅ 目標設定成功更新', 'success');
           pulseCard(goalForm.closest('.card'), 'success');
           loadData(); // Refresh data
         } else {
-          showAlert('❌ 更新失敗', 'error');
-          showFormFeedback('goalFeedback', '❌ 更新失敗，請重試', 'error');
+          const errorMsg = result.error || '更新失敗，請重試';
+          showAlert(`❌ ${errorMsg}`, 'error');
+          showFormFeedback('goalFeedback', `❌ ${errorMsg}`, 'error');
           pulseCard(goalForm.closest('.card'), 'error');
         }
       } catch (error) {
@@ -1376,7 +1590,7 @@
       e.preventDefault();
       
       setButtonLoading('overlaySubmitBtn', true);
-      showFormFeedback('overlayFeedback', '正在更新 Overlay 設定...', 'info');
+      showFormFeedback('overlayFeedback', '正在更新斗內條設定...', 'info');
       
       const settings = {
         alertEnabled: alertEnabledInput.checked,
@@ -1408,8 +1622,8 @@
         setButtonLoading('overlaySubmitBtn', false);
         
         if (result.success) {
-          showAlert('✅ Overlay 外觀設定已更新！');
-          showFormFeedback('overlayFeedback', '✅ Overlay 設定成功更新', 'success');
+          showAlert('✅ 斗內條外觀設定已更新！');
+          showFormFeedback('overlayFeedback', '✅ 斗內條設定成功更新', 'success');
           pulseCard(overlaySettingsForm.closest('.card'), 'success');
           // Auto-refresh preview to show updated settings
           setTimeout(() => {
@@ -1519,18 +1733,18 @@
       
       if (subscription.planType === 'free_pass') {
         managementHTML = `
-          <div style="background: rgba(138, 43, 226, 0.1); padding: 20px; border-radius: 10px; border: 2px solid #BA55D3;">
+          <div style="background: rgba(138, 43, 226, 0.1); padding: 25px; border-radius: 12px; border: 2px solid #BA55D3; margin-top: 15px;">
             <div style="text-align: center; margin-bottom: 15px;">
-              <span style="font-size: 48px;">🎁</span>
+              <span style="font-size: 60px;">🎁</span>
             </div>
-            <h3 style="text-align: center; color: #BA55D3; margin-bottom: 10px;">Free Pass 用戶</h3>
-            <p style="text-align: center; color: #e0e0e0; margin-bottom: 20px;">
+            <h3 style="text-align: center; color: #BA55D3; margin-bottom: 10px; font-size: 24px;">Free Pass 用戶</h3>
+            <p style="text-align: center; color: #e0e0e0; margin-bottom: 20px; font-size: 15px;">
               您擁有永久免費使用權限，享有所有功能！
             </p>
-            <ul class="plan-features">
+            <ul class="plan-features" style="margin-top: 20px;">
               <li>無限制捐款次數</li>
               <li>無限制 API 呼叫</li>
-              <li>進階 Overlay 自訂</li>
+              <li>進階斗內條自訂</li>
               <li>優先技術支援</li>
               <li>永久有效，無需付費</li>
             </ul>
@@ -1538,58 +1752,87 @@
         `;
       } else if (subscription.planType === 'free') {
         managementHTML = `
-          <div>
-            <h3 style="margin-bottom: 15px; color: #a0a0a0;">目前方案：免費方案</h3>
-            <ul class="plan-features">
-              <li>每月最多 ${subscription.maxDonationsPerMonth} 筆捐款</li>
-              <li>每日 ${subscription.maxApiCallsPerDay} 次 API 呼叫</li>
-              <li>基本 Overlay 功能</li>
-              <li class="disabled">進階 Overlay 自訂</li>
-              <li class="disabled">優先技術支援</li>
-            </ul>
-            <button class="btn btn-primary" style="width: 100%; margin-top: 20px;" onclick="upgradePlan()">
-              ⬆️ 升級至付費方案
-            </button>
+          <div style="margin-top: 15px;">
+            <div style="background: rgba(160, 160, 160, 0.1); padding: 25px; border-radius: 12px; border: 2px solid #666;">
+              <h3 style="margin-bottom: 15px; color: #a0a0a0; font-size: 22px;">目前方案：免費方案</h3>
+              <div style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <div style="font-size: 14px; color: #a0a0a0; margin-bottom: 10px;">📊 本月使用狀況</div>
+                <div style="color: #e0e0e0; font-size: 15px;">
+                  <div style="margin-bottom: 5px;">捐款次數：<strong>${subscription.donationsThisMonth || 0}</strong> / ${subscription.maxDonationsPerMonth || 'undefined'}</div>
+                  <div>API 呼叫：<strong>${subscription.apiCallsToday || 0}</strong> / ${subscription.maxApiCallsPerDay || 'undefined'} (今日)</div>
+                </div>
+              </div>
+              <ul class="plan-features">
+                <li>每月最多 ${subscription.maxDonationsPerMonth || 'undefined'} 筆捐款</li>
+                <li>每日 ${subscription.maxApiCallsPerDay || 'undefined'} 次 API 呼叫</li>
+                <li>基本斗內條功能</li>
+                <li class="disabled">進階斗內條自訂</li>
+                <li class="disabled">優先技術支援</li>
+              </ul>
+              <button class="btn btn-primary" style="width: 100%; margin-top: 20px; font-size: 16px; padding: 14px;" onclick="upgradePlan()">
+                ⬆️ 升級至付費方案
+              </button>
+            </div>
           </div>
         `;
       } else if (subscription.isTrial) {
+        const urgentClass = daysRemaining <= 3 ? 'urgent' : '';
+        const bgColor = daysRemaining <= 3 ? 'rgba(255, 107, 107, 0.1)' : 'rgba(52, 152, 219, 0.1)';
+        const borderColor = daysRemaining <= 3 ? '#ff6b6b' : '#3498db';
+        const textColor = daysRemaining <= 3 ? '#ff6b6b' : '#3498db';
+        
         managementHTML = `
-          <div>
-            <h3 style="margin-bottom: 15px; color: #3498db;">試用中：${subscription.planType.toUpperCase()} 方案</h3>
-            <p style="color: #e0e0e0; margin-bottom: 15px;">
-              試用期限：${trialEnd.toLocaleDateString('zh-TW')} (剩餘 ${daysRemaining} 天)
-            </p>
-            <ul class="plan-features">
-              <li>無限制捐款次數</li>
-              <li>無限制 API 呼叫</li>
-              <li>進階 Overlay 自訂</li>
-              <li>優先技術支援</li>
-            </ul>
-            <button class="btn btn-primary" style="width: 100%; margin-top: 20px;" onclick="upgradePlan()">
-              💳 訂閱此方案
-            </button>
+          <div style="margin-top: 15px;">
+            <div style="background: ${bgColor}; padding: 25px; border-radius: 12px; border: 2px solid ${borderColor};">
+              <div style="text-align: center; margin-bottom: 15px;">
+                <span style="font-size: 60px;">⏰</span>
+              </div>
+              <h3 style="text-align: center; margin-bottom: 15px; color: ${textColor}; font-size: 24px;">試用中：${subscription.planType.toUpperCase()} 方案</h3>
+              
+              <div style="background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center;">
+                <div style="font-size: 16px; color: #e0e0e0; margin-bottom: 10px;">試用期限</div>
+                <div style="font-size: 32px; font-weight: bold; color: ${textColor}; margin-bottom: 5px;">${daysRemaining}</div>
+                <div style="font-size: 18px; color: ${textColor};">天剩餘</div>
+                <div style="font-size: 14px; color: #a0a0a0; margin-top: 10px;">到期日：${trialEnd.toLocaleDateString('zh-TW')}</div>
+              </div>
+              
+              <ul class="plan-features">
+                <li>無限制捐款次數</li>
+                <li>無限制 API 呼叫</li>
+                <li>進階斗內條自訂</li>
+                <li>優先技術支援</li>
+              </ul>
+              <button class="btn btn-primary" style="width: 100%; margin-top: 20px; font-size: 16px; padding: 14px;" onclick="upgradePlan()">
+                💳 訂閱此方案
+              </button>
+            </div>
           </div>
         `;
       } else {
         managementHTML = `
-          <div>
-            <h3 style="margin-bottom: 15px; color: #46e65a;">目前方案：${subscription.planType.toUpperCase()}</h3>
-            <p style="color: #e0e0e0; margin-bottom: 15px;">
-              狀態：<strong style="color: #46e65a;">已啟用</strong>
-            </p>
-            <ul class="plan-features">
-              <li>無限制捐款次數</li>
-              <li>無限制 API 呼叫</li>
-              <li>進階 Overlay 自訂</li>
-              <li>優先技術支援</li>
-            </ul>
-            <div style="display: flex; gap: 10px; margin-top: 20px;">
-              <button class="btn btn-secondary" style="flex: 1;" onclick="manageBilling()">
-                💳 管理付款方式
-              </button>
-              <button class="btn btn-secondary" style="flex: 1;" onclick="cancelSubscription()">
-                ❌ 取消訂閱
-              </button>
+          <div style="margin-top: 15px;">
+            <div style="background: rgba(70, 230, 90, 0.1); padding: 25px; border-radius: 12px; border: 2px solid #46e65a;">
+              <div style="text-align: center; margin-bottom: 15px;">
+                <span style="font-size: 60px;">✅</span>
+              </div>
+              <h3 style="text-align: center; margin-bottom: 15px; color: #46e65a; font-size: 24px;">目前方案：${subscription.planType.toUpperCase()}</h3>
+              <div style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                <div style="font-size: 16px; color: #e0e0e0;">狀態：<strong style="color: #46e65a; font-size: 18px;">已啟用</strong></div>
+              </div>
+              <ul class="plan-features">
+                <li>無限制捐款次數</li>
+                <li>無限制 API 呼叫</li>
+                <li>進階斗內條自訂</li>
+                <li>優先技術支援</li>
+              </ul>
+              <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn btn-secondary" style="flex: 1; font-size: 14px; padding: 12px;" onclick="manageBilling()">
+                  💳 管理付款方式
+                </button>
+                <button class="btn btn-secondary" style="flex: 1; font-size: 14px; padding: 12px;" onclick="cancelSubscription()">
+                  ❌ 取消訂閱
+                </button>
+              </div>
             </div>
           </div>
         `;
@@ -1646,26 +1889,86 @@
           showAlert('✅ 感謝您的回饋！我們會仔細閱讀您的意見。');
           showFormFeedback('feedbackFeedback', '✅ 回饋已成功提交', 'success');
           feedbackForm.reset();
-          pulseCard(feedbackForm.closest('.card'), 'success');
+          // Close modal after successful submission
+          setTimeout(() => {
+            toggleFeedbackModal();
+          }, 1500);
         } else {
           showAlert('❌ 提交失敗', 'error');
           showFormFeedback('feedbackFeedback', '❌ 提交失敗，請重試', 'error');
-          pulseCard(feedbackForm.closest('.card'), 'error');
         }
       } catch (error) {
         console.error('Failed to submit feedback:', error);
         setButtonLoading('feedbackSubmitBtn', false);
         showAlert('❌ 網路連線錯誤', 'error');
         showFormFeedback('feedbackFeedback', '❌ 網路連線錯誤，請檢查連線', 'error');
-        pulseCard(feedbackForm.closest('.card'), 'error');
       }
     });
 
-    // Initialize
-    loadData();
-    loadECPayCredentials();
-    loadOverlaySettings();
-    loadUserInfo();
+    // Helper: Add timeout to promises
+    function withTimeout(promise, ms, name) {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error(`${name} timed out after ${ms}ms`)), ms)
+        )
+      ]);
+    }
+    
+    // Initialize with error handling
+    async function initializeAdminPanel() {
+      console.log('🚀 Initializing admin panel...');
+      
+      try {
+        console.log('1️⃣ Loading user info...');
+        await withTimeout(loadUserInfo(), 10000, 'loadUserInfo');
+        console.log('✅ User info loaded');
+      } catch (error) {
+        console.error('❌ Failed to load user info:', error);
+        showAlert('⚠️ 無法載入使用者資訊', 'error');
+      }
+      
+      try {
+        console.log('2️⃣ Loading workspace URLs...');
+        await withTimeout(loadWorkspaceUrls(), 10000, 'loadWorkspaceUrls');
+        console.log('✅ Workspace URLs loaded');
+      } catch (error) {
+        console.error('❌ Failed to load workspace URLs:', error);
+        showAlert('⚠️ 無法載入工作區網址', 'error');
+      }
+      
+      try {
+        console.log('3️⃣ Loading progress data...');
+        await withTimeout(loadData(), 10000, 'loadData');
+        console.log('✅ Progress data loaded');
+      } catch (error) {
+        console.error('❌ Failed to load progress data:', error);
+        showAlert('⚠️ 無法載入進度資料', 'error');
+      }
+      
+      try {
+        console.log('4️⃣ Loading ECPay credentials...');
+        await withTimeout(loadECPayCredentials(), 10000, 'loadECPayCredentials');
+        console.log('✅ ECPay credentials loaded');
+      } catch (error) {
+        console.error('❌ Failed to load ECPay credentials:', error);
+        // Don't show alert for credentials, it's not critical
+      }
+      
+      try {
+        console.log('5️⃣ Loading overlay settings...');
+        await withTimeout(loadOverlaySettings(), 10000, 'loadOverlaySettings');
+        console.log('✅ Overlay settings loaded');
+      } catch (error) {
+        console.error('❌ Failed to load overlay settings:', error);
+        // Don't show alert for overlay settings, it's not critical
+      }
+      
+      console.log('🎉 Admin panel initialized!');
+    }
+    
+    // Start initialization
+    initializeAdminPanel();
   </script>
 </body>
 </html>

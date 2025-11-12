@@ -544,10 +544,23 @@
       alertSound: true
     };
 
+    // Extract workspace slug from URL path (/overlay/:slug)
+    function getWorkspaceSlug() {
+      const path = window.location.pathname;
+      const match = path.match(/^\/overlay\/([^\/]+)$/);
+      return match ? match[1] : null; // null means use default workspace
+    }
+
+    const workspaceSlug = getWorkspaceSlug();
+    console.log('🎯 Workspace slug:', workspaceSlug || 'default');
+
     // Load overlay settings from server
     async function loadOverlaySettings() {
       try {
-        const response = await fetch('/overlay-settings');
+        const url = workspaceSlug 
+          ? `/overlay-settings?slug=${workspaceSlug}` 
+          : '/overlay-settings';
+        const response = await fetch(url);
         const settings = await response.json();
         overlaySettings = { ...overlaySettings, ...settings };
         applySettings();
@@ -943,7 +956,10 @@
     // Initial load
     async function loadInitialData() {
       try {
-        const response = await fetch('/progress');
+        const url = workspaceSlug 
+          ? `/progress?slug=${workspaceSlug}` 
+          : '/progress';
+        const response = await fetch(url);
         const data = await response.json();
         renderProgress(data);
       } catch (error) {

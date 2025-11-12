@@ -87,6 +87,7 @@ class Database {
       paymentProviders: [],
       donations: [],
       apiKeys: [],
+      feedback: [],
       auditLogs: []
     };
   }
@@ -102,37 +103,64 @@ class Database {
    */
   async createUser(userData) {
     if (this.isProduction && this.connected) {
+      // Check if any admin exists
+      const adminCheck = await pgClient.query('SELECT COUNT(*) FROM users WHERE is_admin = TRUE');
+      const hasAdmin = parseInt(adminCheck.rows[0].count) > 0;
+      
+      // Auto-promote specific user to admin if no admin exists
+      const isAdmin = !hasAdmin && userData.email === 'inpire.mg09@nycu.edu.tw';
+      const displayName = userData.email === 'inpire.mg09@nycu.edu.tw' ? 'jjmow' : (userData.displayName || userData.username);
+      
       const result = await pgClient.query(`
-        INSERT INTO users (email, username, password_hash, display_name, auth_provider, oauth_provider_id)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO users (email, username, password_hash, display_name, auth_provider, oauth_provider_id, is_admin)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *
       `, [
         userData.email,
         userData.username,
         userData.passwordHash || null,
-        userData.displayName || userData.username,
+        displayName,
         userData.authProvider || 'local',
-        userData.oauthProviderId || null
+        userData.oauthProviderId || null,
+        isAdmin
       ]);
+      
+      if (isAdmin) {
+        console.log('👑 Auto-promoted user to admin:', userData.email);
+      }
+      
       return this.camelCaseKeys(result.rows[0]);
     } else {
       const data = await this.readJSON();
+      
+      // Check if any admin exists
+      const hasAdmin = data.users.some(u => u.isAdmin === true);
+      
+      // Auto-promote specific user to admin if no admin exists
+      const isAdmin = !hasAdmin && userData.email === 'inpire.mg09@nycu.edu.tw';
+      const displayName = userData.email === 'inpire.mg09@nycu.edu.tw' ? 'jjmow' : (userData.displayName || userData.username);
+      
       const newUser = {
         id: uuidv4(),
         email: userData.email,
         username: userData.username,
         passwordHash: userData.passwordHash || null,
-        displayName: userData.displayName || userData.username,
+        displayName: displayName,
         avatarUrl: null,
         authProvider: userData.authProvider || 'local',
         oauthProviderId: userData.oauthProviderId || null,
         emailVerified: false,
         isActive: true,
-        isAdmin: false,
+        isAdmin: isAdmin,
         createdAt: new Date().toISOString(),
         lastLoginAt: null,
         updatedAt: new Date().toISOString()
       };
+      
+      if (isAdmin) {
+        console.log('👑 Auto-promoted user to admin:', userData.email);
+      }
+      
       data.users.push(newUser);
       await this.writeJSON(data);
       return newUser;
@@ -313,6 +341,19 @@ class Database {
     } else {
       const data = await this.readJSON();
       return data.workspaces.find(w => w.id === workspaceId) || null;
+    }
+  }
+
+  /**
+   * Get all workspaces
+   */
+  async getAllWorkspaces() {
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query('SELECT * FROM user_workspaces');
+      return result.rows.map(row => this.camelCaseKeys(row));
+    } else {
+      const data = await this.readJSON();
+      return data.workspaces || [];
     }
   }
 
@@ -704,6 +745,117 @@ class Database {
       data.subscriptions.push(newSubscription);
       await this.writeJSON(data);
       return newSubscription;
+    }
+  }
+
+  // =============================================
+  // FEEDBACK METHODS
+  // =============================================
+  
+  /**
+   * Create feedback
+   * @param {Object} feedbackData - {userId, type, message, email, metadata}
+   */
+  async createFeedback(feedbackData) {
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query(`
+        INSERT INTO feedback (user_id, type, message, email, metadata)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING *
+      `, [
+        feedbackData.userId || null,
+        feedbackData.type,
+        feedbackData.message,
+        feedbackData.email || null,
+        JSON.stringify(feedbackData.metadata || {})
+      ]);
+      return this.camelCaseKeys(result.rows[0]);
+    } else {
+      const data = await this.readJSON();
+      
+      // Ensure feedback array exists (backward compatibility)
+      if (!data.feedback) {
+        data.feedback = [];
+      }
+      
+      const newFeedback = {
+        id: uuidv4(),
+        userId: feedbackData.userId || null,
+        type: feedbackData.type,
+        message: feedbackData.message,
+        email: feedbackData.email || null,
+        status: feedbackData.status || 'new',
+        metadata: feedbackData.metadata || {},
+        createdAt: new Date().toISOString(),
+        resolvedAt: null
+      };
+      data.feedback.push(newFeedback);
+      await this.writeJSON(data);
+      return newFeedback;
+    }
+  }
+
+  /**
+   * Get all feedback
+   * @param {Object} options - {limit, status}
+   */
+  async getFeedback(options = {}) {
+    const { limit = 100, status = null } = options;
+    
+    if (this.isProduction && this.connected) {
+      let query = 'SELECT * FROM feedback';
+      const params = [];
+      
+      if (status) {
+        query += ' WHERE status = $1';
+        params.push(status);
+      }
+      
+      query += ' ORDER BY created_at DESC LIMIT $' + (params.length + 1);
+      params.push(limit);
+      
+      const result = await pgClient.query(query, params);
+      return result.rows.map(row => this.camelCaseKeys(row));
+    } else {
+      const data = await this.readJSON();
+      let feedback = data.feedback || [];
+      
+      if (status) {
+        feedback = feedback.filter(f => f.status === status);
+      }
+      
+      return feedback
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, limit);
+    }
+  }
+
+  /**
+   * Update feedback status
+   * @param {string} feedbackId
+   * @param {string} status - 'new', 'reviewing', 'resolved', 'closed'
+   */
+  async updateFeedbackStatus(feedbackId, status) {
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query(`
+        UPDATE feedback
+        SET status = $1, resolved_at = $2
+        WHERE id = $3
+        RETURNING *
+      `, [status, status === 'resolved' ? new Date() : null, feedbackId]);
+      return result.rows[0] ? this.camelCaseKeys(result.rows[0]) : null;
+    } else {
+      const data = await this.readJSON();
+      const feedback = data.feedback.find(f => f.id === feedbackId);
+      if (feedback) {
+        feedback.status = status;
+        if (status === 'resolved') {
+          feedback.resolvedAt = new Date().toISOString();
+        }
+        await this.writeJSON(data);
+        return feedback;
+      }
+      return null;
     }
   }
 

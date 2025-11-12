@@ -348,7 +348,40 @@ async function migratePostgreSQL() {
       CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at DESC)
     `);
 
-    console.log('✅ Created table: audit_logs\n');
+    console.log('✅ Created table: audit_logs');
+
+    // ==================== TABLE: feedback ====================
+    await client.query(`
+      CREATE TABLE feedback (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        
+        type VARCHAR(50) DEFAULT 'general',
+        message TEXT NOT NULL,
+        email VARCHAR(255),
+        
+        status VARCHAR(20) DEFAULT 'new',
+        
+        metadata JSONB DEFAULT '{}',
+        
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        resolved_at TIMESTAMP WITH TIME ZONE,
+        
+        CHECK (status IN ('new', 'reviewing', 'resolved', 'closed'))
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX idx_feedback_user ON feedback(user_id)
+    `);
+    await client.query(`
+      CREATE INDEX idx_feedback_status ON feedback(status)
+    `);
+    await client.query(`
+      CREATE INDEX idx_feedback_created_at ON feedback(created_at DESC)
+    `);
+
+    console.log('✅ Created table: feedback\n');
 
     // ==================== MIGRATE DATA ====================
     console.log('📦 Migrating existing data...\n');
@@ -627,6 +660,7 @@ async function migrateSandbox() {
           refundedAt: null
         })),
         apiKeys: [],
+        feedback: [],
         auditLogs: []
       };
 
@@ -691,6 +725,7 @@ async function migrateSandbox() {
         paymentProviders: [],
         donations: [],
         apiKeys: [],
+        feedback: [],
         auditLogs: []
       };
 
