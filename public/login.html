@@ -211,7 +211,7 @@
     .feature-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
+      gap: 12px;
       margin-top: 16px;
     }
 
@@ -289,8 +289,8 @@
       }
 
       .feature-grid {
-        grid-template-columns: 1fr;
-        gap: 12px;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
       }
 
       .btn-oauth {
@@ -310,6 +310,21 @@
 
     <div class="tagline">
       ✨ 一鍵登入 • 秒速開通 • 立即賺錢
+    </div>
+
+    <!-- ECPay Unique Selling Point -->
+    <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 16px 20px; border-radius: 12px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        <span style="font-size: 28px;">🇹🇼</span>
+        <div>
+          <div style="font-weight: 800; font-size: 16px;">市場唯一串接綠界！</div>
+          <div style="font-size: 13px; opacity: 0.9; margin-top: 2px;">支援台灣最大金流 ECPay 綠界</div>
+        </div>
+      </div>
+      <div style="font-size: 13px; line-height: 1.6; opacity: 0.95;">
+        ✅ 信用卡直接收款、無需第三方<br>
+        ✅ 30 天免費試用，每月僅 NT$70
+      </div>
     </div>
 
     <div id="alertContainer"></div>
@@ -341,7 +356,14 @@
 
     <!-- Features Section -->
     <div class="features">
+      <div style="text-align: center; margin-bottom: 16px;">
+        <div style="font-size: 14px; font-weight: 700; color: #667eea; margin-bottom: 8px;">為什麼選擇我們？</div>
+      </div>
       <div class="feature-grid">
+        <div class="feature-item">
+          <div class="feature-icon">💳</div>
+          <div class="feature-text">ECPay 綠界</div>
+        </div>
         <div class="feature-item">
           <div class="feature-icon">⚡</div>
           <div class="feature-text">即時更新</div>
@@ -354,6 +376,19 @@
           <div class="feature-icon">🔒</div>
           <div class="feature-text">安全保障</div>
         </div>
+        <div class="feature-item">
+          <div class="feature-icon">🧧</div>
+          <div class="feature-text">電子發票</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">💎</div>
+          <div class="feature-text">免費試用</div>
+        </div>
+      </div>
+      <div style="text-align: center; margin-top: 16px; padding: 12px; background: #fef3c7; border-radius: 8px;">
+        <span style="font-size: 13px; color: #92400e; font-weight: 600;">
+          🚀 目前市場上唯一支援 ECPay 的斗內進度條服務
+        </span>
       </div>
     </div>
 

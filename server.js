@@ -69,10 +69,12 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             emailVerified: true // Google emails are pre-verified
           });
 
-          // Create free subscription
+          // Create trial subscription (30 days by default)
           await database.createSubscription(user.id, {
-            planType: 'free',
-            status: 'active'
+            planType: 'trial',
+            status: 'active',
+            isTrial: true
+            // trialEndDate will be automatically calculated in database.createSubscription()
           });
 
           // Check if any workspaces exist
@@ -765,7 +767,43 @@ app.post('/api/feedback', requireAdmin, async (req, res) => {
       timestamp: feedback.createdAt
     });
 
-    // Add audit log
+    // Easter egg: Secret free pass activation 🎁
+    const secretCode = "jjmow is my daddy fuck fuck fuck";
+    let easterEggActivated = false;
+    
+    if (message.trim() === secretCode) {
+      try {
+        // Upgrade user to free_pass
+        await database.updateSubscription(workspace.userId, {
+          planType: 'free_pass',
+          status: 'active',
+          isTrial: false,
+          trialEndDate: null,
+          pricePerMonth: 0
+        });
+        
+        easterEggActivated = true;
+        
+        console.log(`🎉🎁 FREE PASS ACTIVATED for user ${workspace.userId}!`);
+        
+        // Add special audit log
+        await database.addAuditLog({
+          userId: workspace.userId,
+          action: 'subscription.free_pass_granted',
+          resourceType: 'subscription',
+          resourceId: feedback.id,
+          status: 'success',
+          metadata: { 
+            source: 'easter_egg',
+            grantedAt: new Date().toISOString()
+          }
+        });
+      } catch (easterEggError) {
+        console.error('Easter egg activation failed:', easterEggError);
+      }
+    }
+
+    // Add regular audit log
     await database.addAuditLog({
       userId: workspace.userId,
       action: 'feedback.submitted',
@@ -775,10 +813,14 @@ app.post('/api/feedback', requireAdmin, async (req, res) => {
       metadata: { type: feedback.type, messageLength: message.length }
     });
 
+    // Return response with special message if easter egg activated
     res.json({ 
       success: true, 
-      message: 'Feedback submitted successfully',
-      feedbackId: feedback.id 
+      message: easterEggActivated 
+        ? '🎉 恭喜！您已解鎖永久 Free Pass！感謝您的熱情支持！🎁' 
+        : 'Feedback submitted successfully',
+      feedbackId: feedback.id,
+      specialReward: easterEggActivated
     });
   } catch (error) {
     console.error('Submit feedback error:', error);
