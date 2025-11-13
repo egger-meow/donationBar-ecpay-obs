@@ -1178,6 +1178,9 @@
           });
           
           console.log('✅ Workspace URLs loaded:', data.urls);
+          
+          // Setup SSE connection after workspace slug is loaded
+          setupSSE();
         }
       } catch (error) {
         console.error('Failed to load workspace URLs:', error);
@@ -1191,6 +1194,9 @@
         if (webhookUrl) {
           webhookUrl.textContent = `${window.location.origin}/webhook/ecpay`;
         }
+        
+        // Setup SSE with fallback
+        setupSSE();
       }
     }
 
@@ -1474,15 +1480,31 @@
     }
 
     // Real-time updates via SSE
-    const eventSource = new EventSource('/events');
-    eventSource.onmessage = function(event) {
-      try {
-        const data = JSON.parse(event.data);
-        renderProgress(data);
-      } catch (error) {
-        console.error('Error parsing SSE data:', error);
+    let eventSource = null;
+    
+    function setupSSE() {
+      // Close existing connection if any
+      if (eventSource) {
+        eventSource.close();
       }
-    };
+      
+      const eventsUrl = workspaceSlug ? `/events?slug=${workspaceSlug}` : '/events';
+      console.log('🔌 Admin SSE connecting to:', eventsUrl);
+      eventSource = new EventSource(eventsUrl);
+      
+      eventSource.onmessage = function(event) {
+        try {
+          const data = JSON.parse(event.data);
+          renderProgress(data);
+        } catch (error) {
+          console.error('Error parsing SSE data:', error);
+        }
+      };
+      
+      eventSource.onerror = function(error) {
+        console.error('SSE connection error:', error);
+      };
+    }
 
     // Logout function
     function logout() {
