@@ -942,8 +942,8 @@
           </div>
           <iframe 
             id="overlayPreview" 
-            src="/overlay" 
-            style="width: 100%; height: 400px; border: none; display: block;"
+            src="about:blank" 
+            style="width: 100%; height: 400px; border: none; display: block; background: #1a1a1a;"
             title="Overlay Preview">
           </iframe>
         </div>
@@ -1130,10 +1130,21 @@
       webhook: '/webhook/ecpay'
     };
 
+    // Track if workspace URLs are already loaded
+    let workspaceUrlsLoaded = false;
+    
     // Load workspace URLs from API
     async function loadWorkspaceUrls() {
+      if (workspaceUrlsLoaded) {
+        console.log('⏭️ Workspace URLs already loaded, skipping');
+        return;
+      }
+      
       try {
         const response = await fetch('/api/workspace/urls');
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
         const data = await response.json();
         
         if (data.success && data.urls) {
@@ -1179,11 +1190,13 @@
           
           console.log('✅ Workspace URLs loaded:', data.urls);
           
+          workspaceUrlsLoaded = true;
+          
           // Setup SSE connection after workspace slug is loaded
           setupSSE();
         }
       } catch (error) {
-        console.error('Failed to load workspace URLs:', error);
+        console.error('❌ Failed to load workspace URLs:', error);
         // Fallback to legacy URLs
         obsUrl.textContent = `${window.location.origin}/overlay`;
         const donatePageUrl = document.getElementById('donatePageUrl');
@@ -1200,8 +1213,7 @@
       }
     }
 
-    // Load workspace URLs on page load
-    loadWorkspaceUrls();
+    // Note: loadWorkspaceUrls is now called in initializeAdminPanel()
 
     // Copy to clipboard utility function
     function copyToClipboard(text, successMessage = '已複製到剪貼簿') {
@@ -1429,6 +1441,12 @@
         
         console.log('📡 Response status:', response.status, response.statusText);
         
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          throw new Error(`Server returned ${contentType || 'non-JSON'} response (status ${response.status})`);
+        }
+        
         const result = await response.json();
         console.log('📦 Response data:', result);
         
@@ -1446,10 +1464,12 @@
           pulseCard(goalForm.closest('.card'), 'error');
         }
       } catch (error) {
-        console.error('Failed to update goal:', error);
+        console.error('❌ Failed to update goal:', error);
         setButtonLoading('goalSubmitBtn', false);
-        showAlert('❌ 網路連線錯誤', 'error');
-        showFormFeedback('goalFeedback', '❌ 網路連線錯誤，請檢查連線', 'error');
+        
+        const errorMessage = error.message || '網路連線錯誤';
+        showAlert(`❌ ${errorMessage}`, 'error');
+        showFormFeedback('goalFeedback', `❌ ${errorMessage}`, 'error');
         pulseCard(goalForm.closest('.card'), 'error');
       }
     });
@@ -1481,6 +1501,8 @@
 
     // Real-time updates via SSE
     let eventSource = null;
+    let adminSseReconnectAttempts = 0;
+    const ADMIN_MAX_RECONNECT_DELAY = 30000;
     
     function setupSSE() {
       // Close existing connection if any
@@ -1492,6 +1514,11 @@
       console.log('🔌 Admin SSE connecting to:', eventsUrl);
       eventSource = new EventSource(eventsUrl);
       
+      eventSource.onopen = function() {
+        console.log('✅ Admin SSE connection established');
+        adminSseReconnectAttempts = 0;
+      };
+      
       eventSource.onmessage = function(event) {
         try {
           const data = JSON.parse(event.data);
@@ -1502,7 +1529,17 @@
       };
       
       eventSource.onerror = function(error) {
-        console.error('SSE connection error:', error);
+        console.error('❌ Admin SSE connection error:', error);
+        
+        if (eventSource.readyState === EventSource.CLOSED) {
+          adminSseReconnectAttempts++;
+          const delay = Math.min(1000 * Math.pow(2, adminSseReconnectAttempts), ADMIN_MAX_RECONNECT_DELAY);
+          console.log(`🔁 Admin SSE reconnecting in ${delay/1000}s (attempt ${adminSseReconnectAttempts})...`);
+          
+          setTimeout(() => {
+            setupSSE();
+          }, delay);
+        }
       };
     }
 
@@ -1522,8 +1559,16 @@
     // Load ECPay credentials
     async function loadECPayCredentials() {
       try {
+        console.log('🔑 Fetching ECPay credentials...');
         const response = await fetch('/admin/ecpay');
+        console.log('🔑 ECPay response received:', response.status);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const data = await response.json();
+        console.log('🔑 ECPay data parsed');
         merchantIdInput.placeholder = data.merchantId || '請輸入 ECPay 商店代號';
         hashKeyInput.placeholder = data.hashKey || '請輸入 ECPay HashKey';
         hashIVInput.placeholder = data.hashIV || '請輸入 ECPay HashIV';
@@ -1537,8 +1582,16 @@
     // Load overlay settings
     async function loadOverlaySettings() {
       try {
+        console.log('🎨 Fetching overlay settings...');
         const response = await fetch('/admin/overlay');
+        console.log('🎨 Overlay settings response received:', response.status);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const settings = await response.json();
+        console.log('🎨 Overlay settings parsed');
         
         alertEnabledInput.checked = settings.alertEnabled !== false;
         alertSoundInput.checked = settings.alertSound !== false;
@@ -2159,20 +2212,20 @@
       
       try {
         console.log('4️⃣ Loading ECPay credentials...');
-        await withTimeout(loadECPayCredentials(), 10000, 'loadECPayCredentials');
+        await withTimeout(loadECPayCredentials(), 15000, 'loadECPayCredentials');
         console.log('✅ ECPay credentials loaded');
       } catch (error) {
         console.error('❌ Failed to load ECPay credentials:', error);
-        // Don't show alert for credentials, it's not critical
+        console.warn('⚠️ This is not critical - you can still configure ECPay later');
       }
       
       try {
         console.log('5️⃣ Loading overlay settings...');
-        await withTimeout(loadOverlaySettings(), 10000, 'loadOverlaySettings');
+        await withTimeout(loadOverlaySettings(), 15000, 'loadOverlaySettings');
         console.log('✅ Overlay settings loaded');
       } catch (error) {
         console.error('❌ Failed to load overlay settings:', error);
-        // Don't show alert for overlay settings, it's not critical
+        console.warn('⚠️ This is not critical - you can still configure overlay later');
       }
       
       console.log('🎉 Admin panel initialized!');
