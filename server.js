@@ -201,46 +201,89 @@ async function getECPayCredentials(workspaceId = null) {
 const sseClients = new Map();
 
 async function broadcastProgress(workspaceId = null) {
-  if (!workspaceId) {
-    const workspace = await getDefaultWorkspace();
-    if (!workspace) return; // Skip broadcast if no workspace
-    workspaceId = workspace.id;
-  }
-  const data = await getProgress(workspaceId);
-  const payload = `data: ${JSON.stringify(data)}\n\n`;
-  
-  // Only broadcast to clients watching this specific workspace
-  for (const [res, clientWorkspaceId] of sseClients.entries()) {
-    if (clientWorkspaceId === workspaceId) {
-      try {
-        res.write(payload);
-      } catch (error) {
-        sseClients.delete(res);
+  try {
+    if (!workspaceId) {
+      const workspace = await getDefaultWorkspace();
+      if (!workspace) {
+        console.warn('⚠️ No workspace provided and no default workspace found');
+        return;
+      }
+      workspaceId = workspace.id;
+    }
+    
+    const data = await getProgress(workspaceId);
+    if (!data) {
+      console.error('❌ Failed to get progress data for workspace:', workspaceId);
+      return;
+    }
+    
+    const payload = `data: ${JSON.stringify(data)}\n\n`;
+    
+    // Only broadcast to clients watching this specific workspace
+    let successCount = 0;
+    let errorCount = 0;
+    
+    for (const [res, clientWorkspaceId] of sseClients.entries()) {
+      if (clientWorkspaceId === workspaceId) {
+        try {
+          if (!res.writableEnded && !res.destroyed) {
+            res.write(payload);
+            successCount++;
+          } else {
+            sseClients.delete(res);
+            errorCount++;
+          }
+        } catch (error) {
+          console.error('❌ Failed to write to SSE client:', error.message);
+          sseClients.delete(res);
+          errorCount++;
+        }
       }
     }
+    
+    console.log(`📡 Broadcast complete: ${successCount} success, ${errorCount} failed for workspace ${workspaceId}`, {
+      current: data.current,
+      goal: data.goal,
+      donationCount: data.donations?.length || 0
+    });
+  } catch (error) {
+    console.error('❌ Critical error in broadcastProgress:', error);
   }
-  
-  console.log(`📡 Broadcasted progress to ${Array.from(sseClients.values()).filter(id => id === workspaceId).length} clients watching workspace ${workspaceId}`);
 }
 
 async function broadcastOverlaySettings(workspaceId = null) {
-  if (!workspaceId) {
-    const workspace = await getDefaultWorkspace();
-    if (!workspace) return; // Skip broadcast if no workspace
-    workspaceId = workspace.id;
-  }
-  const settings = await database.getWorkspaceSettings(workspaceId);
-  const payload = `event: overlay-settings\ndata: ${JSON.stringify(settings?.overlaySettings || {})}\n\n`;
-  
-  // Only broadcast to clients watching this specific workspace
-  for (const [res, clientWorkspaceId] of sseClients.entries()) {
-    if (clientWorkspaceId === workspaceId) {
-      try {
-        res.write(payload);
-      } catch (error) {
-        sseClients.delete(res);
+  try {
+    if (!workspaceId) {
+      const workspace = await getDefaultWorkspace();
+      if (!workspace) {
+        console.warn('⚠️ No workspace provided and no default workspace found');
+        return;
+      }
+      workspaceId = workspace.id;
+    }
+    
+    const settings = await database.getWorkspaceSettings(workspaceId);
+    const payload = `event: overlay-settings\ndata: ${JSON.stringify(settings?.overlaySettings || {})}\n\n`;
+    
+    // Only broadcast to clients watching this specific workspace
+    for (const [res, clientWorkspaceId] of sseClients.entries()) {
+      if (clientWorkspaceId === workspaceId) {
+        try {
+          if (!res.writableEnded && !res.destroyed) {
+            res.write(payload);
+          } else {
+            sseClients.delete(res);
+          }
+        } catch (error) {
+          console.error('❌ Failed to write overlay settings to SSE client:', error.message);
+          sseClients.delete(res);
+        }
       }
     }
+    
+    console.log(`🎨 Broadcast overlay settings to workspace ${workspaceId}`);
+  } catch (error) {
+    console.error('❌ Critical error in broadcastOverlaySettings:', error);
   }
 }
 
@@ -1152,13 +1195,17 @@ app.get('/admin/progress', requireAdmin, async (req, res) => {
 
 // Admin API for goal management (protected routes)
 app.post('/admin/goal', requireAdmin, async (req, res) => {
+  console.log('🎯 POST /admin/goal called with:', req.body);
   try {
     const { title, amount, startFrom } = req.body;
     const workspace = await getUserWorkspaceFromSession(req);
     
     if (!workspace) {
-      return res.status(404).json({ error: 'Workspace not found' });
+      console.error('❌ No workspace found for goal update');
+      return res.status(404).json({ success: false, error: 'Workspace not found' });
     }
+    
+    console.log(`🎯 Updating goal for workspace ${workspace.slug}:`, { title, amount, startFrom });
     
     await database.updateWorkspaceSettings(workspace.id, {
       goalTitle: title,
@@ -1166,16 +1213,25 @@ app.post('/admin/goal', requireAdmin, async (req, res) => {
       goalStartFrom: Number(startFrom) || 0
     });
     
+    console.log('✅ Goal settings updated in database');
+    
+    // Broadcast progress update (with error handling)
     await broadcastProgress(workspace.id);
     
     const settings = await database.getWorkspaceSettings(workspace.id);
-    res.json({ success: true, goal: {
-      title: settings.goalTitle,
-      amount: settings.goalAmount,
-      startFrom: settings.goalStartFrom
-    }});
+    const response = { 
+      success: true, 
+      goal: {
+        title: settings.goalTitle,
+        amount: settings.goalAmount,
+        startFrom: settings.goalStartFrom
+      }
+    };
+    
+    console.log('✅ Goal update complete, sending response:', response);
+    res.json(response);
   } catch (error) {
-    console.error('Goal update error:', error);
+    console.error('❌ Goal update error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -1198,6 +1254,7 @@ app.post('/admin/reset', requireAdmin, async (req, res) => {
 
 // ECPay credentials management
 app.get('/admin/ecpay', requireAdmin, async (req, res) => {
+  console.log('🔑 GET /admin/ecpay called');
   try {
     const workspace = await getUserWorkspaceFromSession(req);
     
@@ -1252,6 +1309,7 @@ app.post('/admin/ecpay', requireAdmin, async (req, res) => {
 
 // Overlay settings management
 app.get('/admin/overlay', requireAdmin, async (req, res) => {
+  console.log('🎨 GET /admin/overlay called');
   try {
     const workspace = await getUserWorkspaceFromSession(req);
     

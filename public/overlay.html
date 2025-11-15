@@ -845,6 +845,7 @@
 
     function renderProgress(data) {
       const { title, current, goal, percent, donations, actualDonations, startFrom } = data;
+      console.log('📊 Rendering progress:', { current, goal, percent, donationCount: donations?.length || 0, lastTotal });
       
       // Update current goal for normalization calculations
       if (goal) {
@@ -893,15 +894,18 @@
         amountInfoEl.textContent = `NT$ ${formatNumber(current)} / NT$ ${formatNumber(goal)}`;
       }
       
-      // Check for new donation (animate if total increased)
-      if (current > lastTotal && lastTotal > 0) {
-        progressContainerEl.classList.add('new-donation');
-        progressFillEl.classList.add('animate');
-        
-        setTimeout(() => {
-          progressContainerEl.classList.remove('new-donation');
-          progressFillEl.classList.remove('animate');
-        }, 600);
+      // Check for donation change (animate if total changed)
+      if (current !== lastTotal && lastTotal >= 0) {
+        // Animate on increase
+        if (current > lastTotal) {
+          progressContainerEl.classList.add('new-donation');
+          progressFillEl.classList.add('animate');
+          
+          setTimeout(() => {
+            progressContainerEl.classList.remove('new-donation');
+            progressFillEl.classList.remove('animate');
+          }, 600);
+        }
       }
       lastTotal = current;
       
@@ -968,15 +972,25 @@
       }
     }
 
+    // SSE reconnection with exponential backoff
+    let sseReconnectAttempts = 0;
+    const MAX_RECONNECT_DELAY = 30000; // 30 seconds max
+    
     // Server-Sent Events for real-time updates
     function setupSSE() {
       const eventsUrl = workspaceSlug ? `/events?slug=${workspaceSlug}` : '/events';
       console.log('🔌 Connecting to SSE:', eventsUrl);
       const eventSource = new EventSource(eventsUrl);
       
+      eventSource.onopen = function() {
+        console.log('✅ SSE connection established');
+        sseReconnectAttempts = 0; // Reset on successful connection
+      };
+      
       eventSource.onmessage = function(event) {
         try {
           const data = JSON.parse(event.data);
+          console.log('📡 SSE update received');
           renderProgress(data);
         } catch (error) {
           console.error('Error parsing SSE data:', error);
@@ -987,31 +1001,38 @@
       eventSource.addEventListener('overlay-settings', function(event) {
         try {
           const newSettings = JSON.parse(event.data);
-          console.log('Received overlay settings update:', newSettings);
-          overlaySettings = { ...overlaySettings, ...newSettings };
-          applySettings();
+          console.log('🎨 Overlay settings updated via SSE:', newSettings);
+          applyOverlaySettings(newSettings);
         } catch (error) {
-          console.error('Error parsing overlay settings update:', error);
+          console.error('Error parsing overlay settings:', error);
         }
       });
       
       eventSource.onerror = function(error) {
-        console.error('SSE connection error:', error);
-        // Try to reconnect after 5 seconds
-        setTimeout(() => {
-          if (eventSource.readyState === EventSource.CLOSED) {
+        console.error('❌ SSE connection error:', error);
+        
+        if (eventSource.readyState === EventSource.CLOSED) {
+          // Exponential backoff: 2s, 4s, 8s, 16s, 30s (max)
+          sseReconnectAttempts++;
+          const delay = Math.min(1000 * Math.pow(2, sseReconnectAttempts), MAX_RECONNECT_DELAY);
+          console.log(`🔁 Reconnecting in ${delay/1000}s (attempt ${sseReconnectAttempts})...`);
+          
+          setTimeout(() => {
             setupSSE();
-          }
-        }, 5000);
+          }, delay);
+        }
       };
       
       return eventSource;
     }
 
+    // Global eventSource variable for cleanup
+    let eventSource = null;
+    
     // Initialize
     loadOverlaySettings().then(() => {
       loadInitialData();
-      const eventSource = setupSSE();
+      eventSource = setupSSE();
     });
 
     // Clean up on page unload
