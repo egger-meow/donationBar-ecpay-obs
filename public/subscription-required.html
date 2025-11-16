@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>需要訂閱 - DonationBar</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', 'Microsoft JhengHei', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      padding: 20px;
+    }
+
+    .container {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 60px 40px;
+      text-align: center;
+      max-width: 500px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .icon {
+      font-size: 80px;
+      margin-bottom: 20px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+
+    h1 {
+      font-size: 32px;
+      margin-bottom: 15px;
+      font-weight: 700;
+    }
+
+    p {
+      font-size: 18px;
+      line-height: 1.6;
+      margin-bottom: 10px;
+      opacity: 0.9;
+    }
+
+    .feature-list {
+      text-align: left;
+      margin: 30px 0;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+    }
+
+    .feature-list li {
+      margin: 10px 0;
+      padding-left: 25px;
+      position: relative;
+      font-size: 16px;
+    }
+
+    .feature-list li:before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: #4ade80;
+      font-weight: bold;
+      font-size: 18px;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      margin-top: 30px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 15px 30px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+      color: white;
+      box-shadow: 0 4px 15px rgba(74, 222, 128, 0.4);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(74, 222, 128, 0.6);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .price {
+      font-size: 24px;
+      font-weight: 700;
+      color: #4ade80;
+      margin: 20px 0;
+    }
+
+    .trial-badge {
+      display: inline-block;
+      background: #fbbf24;
+      color: #78350f;
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">🔒</div>
+    <h1>需要訂閱才能使用</h1>
+    <p>您的試用期已結束</p>
+    <p>請訂閱付費方案以繼續使用此服務</p>
+
+    <div class="price">
+      每月只要 NT$ 70
+    </div>
+
+    <div class="feature-list">
+      <ul style="list-style: none;">
+        <li>無限制斗內接收</li>
+        <li>即時 OBS 斗內條顯示</li>
+        <li>客製化斗內頁面與疊加層</li>
+        <li>ECPay 金流整合</li>
+        <li>斗內歷史紀錄</li>
+        <li>目標追蹤功能</li>
+      </ul>
+    </div>
+
+    <div class="trial-badge">
+      新用戶享 30 天免費試用
+    </div>
+  </div>
+
+  <script>
+    // Auto-detect if user came from specific page
+    const urlParams = new URLSearchParams(window.location.search);
+    const from = urlParams.get('from');
+    
+    if (from === 'overlay') {
+      document.querySelector('h1').textContent = '斗內條疊加層需要訂閱';
+      document.querySelector('p').textContent = '此功能需要付費訂閱才能使用';
+    } else if (from === 'donate') {
+      document.querySelector('h1').textContent = '斗內頁面需要訂閱';
+      document.querySelector('p').textContent = '此功能需要付費訂閱才能使用';
+    }
+  </script>
+</body>
+</html>

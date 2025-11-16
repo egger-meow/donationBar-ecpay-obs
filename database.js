@@ -711,6 +711,62 @@ class Database {
   }
 
   /**
+   * Check if device/IP has already used trial (fraud prevention)
+   */
+  async hasUsedTrial(fingerprint) {
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query(
+        'SELECT COUNT(*) FROM fraud_prevention WHERE fingerprint = $1 AND action_type = $2',
+        [fingerprint, 'trial_used']
+      );
+      return parseInt(result.rows[0].count) > 0;
+    } else {
+      const data = await this.readJSON();
+      return data.fraudPrevention?.some(
+        fp => fp.fingerprint === fingerprint && fp.actionType === 'trial_used'
+      ) || false;
+    }
+  }
+
+  /**
+   * Record trial usage to prevent abuse
+   */
+  async recordTrialUsage(userId, fingerprint, metadata = {}) {
+    if (this.isProduction && this.connected) {
+      await pgClient.query(`
+        INSERT INTO fraud_prevention (
+          user_id, fingerprint, action_type, ip_address, user_agent, metadata
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [
+        userId,
+        fingerprint,
+        'trial_used',
+        metadata.ipAddress || null,
+        metadata.userAgent || null,
+        JSON.stringify(metadata)
+      ]);
+    } else {
+      const data = await this.readJSON();
+      if (!data.fraudPrevention) data.fraudPrevention = [];
+      
+      data.fraudPrevention.push({
+        id: uuidv4(),
+        userId,
+        fingerprint,
+        actionType: 'trial_used',
+        ipAddress: metadata.ipAddress || null,
+        userAgent: metadata.userAgent || null,
+        metadata,
+        createdAt: new Date().toISOString()
+      });
+      
+      await this.writeJSON(data);
+    }
+    console.log(`🛡️ Trial usage recorded for fingerprint: ${fingerprint}`);
+  }
+
+  /**
    * Create subscription for user
    */
   async createSubscription(userId, subscriptionData) {

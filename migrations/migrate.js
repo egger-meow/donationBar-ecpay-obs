@@ -350,6 +350,38 @@ async function migratePostgreSQL() {
 
     console.log('✅ Created table: audit_logs');
 
+    // ==================== TABLE: fraud_prevention ====================
+    await client.query(`
+      CREATE TABLE fraud_prevention (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        
+        fingerprint VARCHAR(255) NOT NULL,
+        action_type VARCHAR(50) NOT NULL,
+        
+        ip_address INET,
+        user_agent TEXT,
+        metadata JSONB DEFAULT '{}',
+        
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX idx_fraud_prevention_fingerprint ON fraud_prevention(fingerprint)
+    `);
+    await client.query(`
+      CREATE INDEX idx_fraud_prevention_action ON fraud_prevention(action_type)
+    `);
+    await client.query(`
+      CREATE INDEX idx_fraud_prevention_created ON fraud_prevention(created_at DESC)
+    `);
+    await client.query(`
+      CREATE INDEX idx_fraud_prevention_unique ON fraud_prevention(fingerprint, action_type)
+    `);
+
+    console.log('✅ Created table: fraud_prevention');
+
     // ==================== TABLE: feedback ====================
     await client.query(`
       CREATE TABLE feedback (
@@ -725,6 +757,7 @@ async function migrateSandbox() {
         paymentProviders: [],
         donations: [],
         apiKeys: [],
+        fraudPrevention: [],
         feedback: [],
         auditLogs: []
       };
