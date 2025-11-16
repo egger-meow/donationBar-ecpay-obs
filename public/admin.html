@@ -1804,6 +1804,17 @@
         `;
       }
       
+      // Free Plan Warning (show directly, no need to click button)
+      if (subscription.planType === 'free' && !subscription.isTrial) {
+        statusHTML += `
+          <div class="trial-warning urgent" style="background: rgba(255, 107, 107, 0.15); border-color: #ff6b6b;">
+            <strong>⚠️ 斗內條和捐款頁面已停用</strong><br>
+            您目前使用免費方案，請訂閱付費方案以繼續使用服務<br>
+            <span style="font-size: 14px; color: #a0a0a0;">每月僅需 NT$ 70，享有完整功能</span>
+          </div>
+        `;
+      }
+      
       statusContainer.innerHTML = statusHTML;
       
       // Render Subscription Management

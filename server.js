@@ -44,38 +44,101 @@ passport.deserializeUser(async (id, done) => {
   }
 });
 
+// Fraud Prevention: Generate device fingerprint from request
+function generateDeviceFingerprint(req) {
+  // Normalize IP address to prevent IPv4/IPv6 format mismatches
+  let ip = req.ip || req.connection.remoteAddress || '';
+  
+  // Convert IPv6-mapped IPv4 addresses to pure IPv4
+  // ::ffff:127.0.0.1 → 127.0.0.1
+  if (ip.startsWith('::ffff:')) {
+    ip = ip.substring(7);
+  }
+  // Convert IPv6 localhost to IPv4
+  // ::1 → 127.0.0.1
+  if (ip === '::1') {
+    ip = '127.0.0.1';
+  }
+  
+  // Combine multiple device identifiers
+  const components = [
+    ip,
+    req.headers['user-agent'] || '',
+    req.headers['accept-language'] || '',
+    req.headers['accept-encoding'] || ''
+  ];
+  
+  const raw = components.join('|');
+  return crypto.createHash('sha256').update(raw).digest('hex');
+}
+
 // Google OAuth Strategy
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   passport.use(new GoogleStrategy({
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3000/api/auth/google/callback'
+      callbackURL: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3000/api/auth/google/callback',
+      passReqToCallback: true // Enable access to req in callback
     },
-    async (accessToken, refreshToken, profile, done) => {
+    async (req, accessToken, refreshToken, profile, done) => {
       try {
         // Check if user exists by OAuth provider ID
         let user = await database.findUserByEmail(profile.emails[0].value);
         
         if (!user) {
-          // Create new user from Google profile
-          const username = profile.emails[0].value.split('@')[0] + '-' + Date.now();
-          user = await database.createUser({
-            email: profile.emails[0].value,
-            username: username,
-            passwordHash: null, // OAuth users don't have passwords
-            displayName: profile.displayName,
-            authProvider: 'google',
-            oauthProviderId: profile.id,
-            emailVerified: true // Google emails are pre-verified
-          });
+          // === FRAUD PREVENTION: Check if device already used trial ===
+          const fingerprint = generateDeviceFingerprint(req);
+          const hasUsedTrial = await database.hasUsedTrial(fingerprint);
+          
+          if (hasUsedTrial) {
+            console.warn(`⚠️ Trial abuse detected: fingerprint ${fingerprint} already used`);
+            // Create user without trial (direct to free plan or require payment)
+            user = await database.createUser({
+              email: profile.emails[0].value,
+              username: profile.emails[0].value.split('@')[0] + '-' + Date.now(),
+              passwordHash: null,
+              displayName: profile.displayName,
+              authProvider: 'google',
+              oauthProviderId: profile.id,
+              emailVerified: true
+            });
 
-          // Create trial subscription (30 days by default)
-          await database.createSubscription(user.id, {
-            planType: 'trial',
-            status: 'active',
-            isTrial: true
-            // trialEndDate will be automatically calculated in database.createSubscription()
-          });
+            // No trial - create free plan instead
+            await database.createSubscription(user.id, {
+              planType: 'free',
+              status: 'active',
+              isTrial: false,
+              pricePerMonth: 0
+            });
+            
+            console.log(`🚨 User ${user.email} created WITHOUT trial (abuse prevention)`);
+          } else {
+            // Normal flow - create user with trial
+            user = await database.createUser({
+              email: profile.emails[0].value,
+              username: profile.emails[0].value.split('@')[0] + '-' + Date.now(),
+              passwordHash: null,
+              displayName: profile.displayName,
+              authProvider: 'google',
+              oauthProviderId: profile.id,
+              emailVerified: true
+            });
+
+            // Create trial subscription (30 days by default)
+            await database.createSubscription(user.id, {
+              planType: 'trial',
+              status: 'active',
+              isTrial: true
+              // trialEndDate will be automatically calculated in database.createSubscription()
+            });
+            
+            // Record trial usage to prevent future abuse
+            await database.recordTrialUsage(user.id, fingerprint, {
+              ipAddress: req.ip || req.connection.remoteAddress,
+              userAgent: req.headers['user-agent'],
+              email: user.email
+            });
+          }
 
           // Check if any workspaces exist
           const allWorkspaces = await database.getAllWorkspaces();
@@ -84,13 +147,30 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           // Create workspace - use 'default' slug for first workspace
           await database.createWorkspace(user.id, {
             workspaceName: isFirstWorkspace ? 'Default Workspace' : `${profile.displayName}'s Workspace`,
-            slug: isFirstWorkspace ? 'default' : `${username}`.toLowerCase().replace(/[^a-z0-9-]/g, '')
+            slug: isFirstWorkspace ? 'default' : user.username.toLowerCase().replace(/[^a-z0-9-]/g, '')
           });
 
           console.log(`✅ New user created via Google OAuth: ${user.email}`);
-        } else if (user.authProvider !== 'google') {
-          // User exists with local auth, link Google account
-          console.log(`ℹ️ User ${user.email} logging in with Google (originally local auth)`);
+        } else {
+          // Existing user - check if they have a workspace
+          console.log(`ℹ️ Existing user logging in: ${user.email}`);
+          
+          const userWorkspaces = await database.getUserWorkspaces(user.id);
+          if (!userWorkspaces || userWorkspaces.length === 0) {
+            console.log(`⚠️ User ${user.email} has no workspace, creating one...`);
+            
+            // Check if any workspaces exist in the system
+            const allWorkspaces = await database.getAllWorkspaces();
+            const isFirstWorkspace = allWorkspaces.length === 0;
+            
+            // Create workspace for existing user
+            await database.createWorkspace(user.id, {
+              workspaceName: isFirstWorkspace ? 'Default Workspace' : `${user.displayName || user.username}'s Workspace`,
+              slug: isFirstWorkspace ? 'default' : user.username.toLowerCase().replace(/[^a-z0-9-]/g, '')
+            });
+            
+            console.log(`✅ Workspace created for existing user: ${user.email}`);
+          }
         }
 
         return done(null, user);
@@ -557,8 +637,54 @@ app.get('/progress', async (req, res) => {
 // PAGE ROUTES (Multi-User Support)
 // =============================================
 
-// Multi-user overlay routes
-app.get('/overlay/:slug', (req, res) => {
+// Middleware: Check if workspace owner has active subscription
+async function requireActiveSubscription(req, res, next) {
+  try {
+    const slug = req.params.slug || DEFAULT_WORKSPACE_SLUG;
+    const workspace = await getWorkspaceFromSlug(slug);
+    
+    if (!workspace) {
+      console.warn(`⚠️ Workspace not found: ${slug}`);
+      return res.redirect('/subscription-required.html?from=' + (req.path.includes('overlay') ? 'overlay' : 'donate'));
+    }
+    
+    // Get workspace owner's subscription
+    const subscription = await database.getUserSubscription(workspace.userId);
+    
+    if (!subscription) {
+      console.warn(`⚠️ No subscription found for workspace owner: ${workspace.userId}`);
+      return res.redirect('/subscription-required.html?from=' + (req.path.includes('overlay') ? 'overlay' : 'donate'));
+    }
+    
+    // Check if subscription allows access
+    const allowedPlans = ['trial', 'free_pass', 'basic', 'pro', 'enterprise'];
+    const isActive = subscription.status === 'active';
+    const hasValidPlan = allowedPlans.includes(subscription.planType);
+    
+    // Check if trial has expired
+    if (subscription.isTrial && subscription.trialEndDate) {
+      const trialEnd = new Date(subscription.trialEndDate);
+      if (new Date() > trialEnd) {
+        console.warn(`⚠️ Trial expired for workspace: ${slug}`);
+        return res.redirect('/subscription-required.html?from=' + (req.path.includes('overlay') ? 'overlay' : 'donate'));
+      }
+    }
+    
+    if (!isActive || !hasValidPlan) {
+      console.warn(`⚠️ Invalid subscription for workspace ${slug}: ${subscription.planType} (${subscription.status})`);
+      return res.redirect('/subscription-required.html?from=' + (req.path.includes('overlay') ? 'overlay' : 'donate'));
+    }
+    
+    // Subscription is valid, allow access
+    next();
+  } catch (error) {
+    console.error('Error checking subscription:', error);
+    return res.redirect('/subscription-required.html');
+  }
+}
+
+// Multi-user overlay routes (with subscription check)
+app.get('/overlay/:slug', requireActiveSubscription, (req, res) => {
   res.setHeader('Cache-Control','no-cache, no-store, must-revalidate');
   res.setHeader('Pragma','no-cache');
   res.setHeader('Expires','0');
@@ -566,15 +692,15 @@ app.get('/overlay/:slug', (req, res) => {
 });
 
 // Legacy overlay route (backward compatibility - uses default workspace)
-app.get('/overlay', (req, res) => {
+app.get('/overlay', requireActiveSubscription, (req, res) => {
   res.setHeader('Cache-Control','no-cache, no-store, must-revalidate');
   res.setHeader('Pragma','no-cache');
   res.setHeader('Expires','0');
   res.sendFile(path.join(__dirname, 'public', 'overlay.html'));
 });
 
-// Multi-user donate routes
-app.get('/donate/:slug', (req, res) => {
+// Multi-user donate routes (with subscription check)
+app.get('/donate/:slug', requireActiveSubscription, (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
@@ -582,7 +708,7 @@ app.get('/donate/:slug', (req, res) => {
 });
 
 // Legacy donate route (backward compatibility - uses default workspace)
-app.get('/donate', (req, res) => {
+app.get('/donate', requireActiveSubscription, (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
