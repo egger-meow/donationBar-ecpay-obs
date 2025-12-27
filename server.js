@@ -572,11 +572,9 @@ app.post('/webhook/ecpay/generate-test-payload', async (req, res) => {
       Data: encryptedData
     };
 
-    // Generate curl command for convenience
+    // Generate curl command for convenience (single line for easy copy-paste)
     const baseUrl = process.env.BASE_URL || 'https://donationbar-ecpay-obs.onrender.com';
-    const curlCommand = `curl -X POST "${baseUrl}/webhook/ecpay" \\
-  -H "Content-Type: application/x-www-form-urlencoded" \\
-  -d "MerchantID=${encodeURIComponent(webhookPayload.MerchantID)}&TransCode=${webhookPayload.TransCode}&Data=${encodeURIComponent(webhookPayload.Data)}"`;
+    const curlCommand = `curl -X POST "${baseUrl}/webhook/ecpay" -H "Content-Type: application/x-www-form-urlencoded" -d "MerchantID=${encodeURIComponent(webhookPayload.MerchantID)}&TransCode=${webhookPayload.TransCode}&Data=${encodeURIComponent(webhookPayload.Data)}"`;
 
     res.json({
       success: true,
