@@ -112,6 +112,49 @@ curl -X POST http://localhost:3000/webhook/ecpay \
 3. **Idempotency**: Duplicate trade numbers are automatically ignored by the server
 4. **Simulated Payments**: Marked with `SimulatePaid: 1` and won't be added to the database
 
+## Remote Testing (Production/Staging)
+
+For testing the deployed webhook at `https://donationbar-ecpay-obs.onrender.com` without making real ECPay payments:
+
+### Setup
+1. Set `WEBHOOK_TEST_SECRET` environment variable on Render (e.g., a random UUID)
+2. Use this secret in the `X-Test-Secret` header
+
+### Generate Encrypted Payload (Full Flow Test)
+Generates a properly encrypted payload to test the real `/webhook/ecpay` endpoint:
+
+```bash
+# Step 1: Generate the encrypted payload
+curl -X POST "https://donationbar-ecpay-obs.onrender.com/webhook/ecpay/generate-test-payload" \
+  -H "Content-Type: application/json" \
+  -H "X-Test-Secret: YOUR_WEBHOOK_TEST_SECRET" \
+  -d '{"amount": 200, "nickname": "FullTestUser", "message": "Testing full encryption flow"}'
+
+# Step 2: Use the returned curlCommand to call the real webhook
+# (The response includes a ready-to-use curl command)
+```
+
+### Postman Setup
+
+- **Method**: POST
+- **URL**: `https://donationbar-ecpay-obs.onrender.com/webhook/ecpay/generate-test-payload`
+- **Headers**:
+  - `Content-Type: application/json`
+  - `X-Test-Secret: YOUR_WEBHOOK_TEST_SECRET`
+- **Body** (raw JSON):
+```json
+{
+  "amount": 100,
+  "nickname": "PostmanTest",
+  "message": "Testing from Postman"
+}
+```
+
+### Security Notes
+- Test endpoints are **disabled by default** (require `WEBHOOK_TEST_SECRET` env var)
+- Never commit or share your `WEBHOOK_TEST_SECRET`
+- Consider removing or disabling test endpoints in production after initial verification
+
 ## Next Steps
 
 After successful local testing:
