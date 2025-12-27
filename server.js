@@ -230,6 +230,29 @@ function decodeECPayJsonLike(str) {
   return decodeURIComponent(String(str).replace(/\+/g, '%20'));
 }
 
+// ECPay Data encryption for testing webhook (AES-CBC)
+async function encryptECPayData(data) {
+  const { hashKey, hashIV } = await getECPayCredentials();
+
+  try {
+    const key = Buffer.from(hashKey, 'utf8');
+    const iv  = Buffer.from(hashIV,  'utf8');
+    
+    // URL-encode the JSON, then encrypt
+    const jsonText = JSON.stringify(data);
+    const urlEncoded = encodeURIComponent(jsonText);
+    
+    const cipher = crypto.createCipheriv('aes-128-cbc', key, iv);
+    let encrypted = cipher.update(urlEncoded, 'utf8', 'base64');
+    encrypted += cipher.final('base64');
+    
+    return encrypted;
+  } catch (error) {
+    console.error('Failed to encrypt ECPay data:', error);
+    return null;
+  }
+}
+
 // ECPay Data decryption for webhook (AES-CBC)
 async function decryptECPayData(encryptedData) {
   const { hashKey, hashIV } = await getECPayCredentials();
@@ -477,6 +500,95 @@ app.post('/webhook/ecpay', async (req, res) => {
   } catch (error) {
     console.error('❌ Webhook error:', error);
     return res.status(500).send('0|Server error');
+  }
+});
+
+// ============================================================================
+// TEST WEBHOOK ENDPOINT - Generate encrypted payload for testing real webhook
+// ============================================================================
+// Usage with curl:
+//   curl -X POST "https://donationbar-ecpay-obs.onrender.com/webhook/ecpay/generate-test-payload" \
+//     -H "Content-Type: application/json" \
+//     -H "X-Test-Secret: YOUR_WEBHOOK_TEST_SECRET" \
+//     -d '{"amount": 100, "nickname": "TestUser", "message": "Test donation"}'
+// ============================================================================
+
+// Generate encrypted payload for testing the real /webhook/ecpay endpoint
+app.post('/webhook/ecpay/generate-test-payload', async (req, res) => {
+  const testSecret = process.env.WEBHOOK_TEST_SECRET;
+  
+  if (!testSecret) {
+    return res.status(503).json({ 
+      error: 'Test endpoint disabled', 
+      message: 'Set WEBHOOK_TEST_SECRET environment variable to enable' 
+    });
+  }
+  
+  const providedSecret = req.headers['x-test-secret'];
+  if (providedSecret !== testSecret) {
+    return res.status(401).json({ error: 'Invalid or missing X-Test-Secret header' });
+  }
+
+  try {
+    const { amount, nickname, message } = req.body;
+    const credentials = await getECPayCredentials();
+    
+    const amt = parseInt(amount, 10) || 100;
+    const tradeNo = 'TEST' + Date.now();
+    const now = new Date();
+    const paymentDate = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+
+    // Build ECPay-like decrypted data structure
+    const decryptedData = {
+      RtnCode: 1,
+      RtnMsg: 'Success',
+      PlatformID: '',
+      MerchantID: credentials.merchantId,
+      OrderInfo: {
+        MerchantTradeNo: tradeNo,
+        TradeNo: 'ECPAY' + Date.now(),
+        TradeAmt: amt,
+        TradeStatus: 1,
+        PaymentType: 'Credit_CreditCard',
+        PaymentDate: paymentDate,
+        TradeDate: paymentDate
+      },
+      PatronName: nickname || 'TestUser',
+      PatronNote: message || '',
+      SimulatePaid: 0
+    };
+
+    // Encrypt the data
+    const encryptedData = await encryptECPayData(decryptedData);
+    
+    if (!encryptedData) {
+      return res.status(500).json({ error: 'Failed to encrypt test data' });
+    }
+
+    // Build the full webhook payload
+    const webhookPayload = {
+      MerchantID: credentials.merchantId,
+      TransCode: 1,
+      Data: encryptedData
+    };
+
+    // Generate curl command for convenience
+    const baseUrl = process.env.BASE_URL || 'https://donationbar-ecpay-obs.onrender.com';
+    const curlCommand = `curl -X POST "${baseUrl}/webhook/ecpay" \\
+  -H "Content-Type: application/x-www-form-urlencoded" \\
+  -d "MerchantID=${encodeURIComponent(webhookPayload.MerchantID)}&TransCode=${webhookPayload.TransCode}&Data=${encodeURIComponent(webhookPayload.Data)}"`;
+
+    res.json({
+      success: true,
+      message: 'Test payload generated. Use the curl command or payload below to test the real webhook.',
+      payload: webhookPayload,
+      curlCommand,
+      decryptedDataPreview: decryptedData
+    });
+
+  } catch (error) {
+    console.error('❌ Generate test payload error:', error);
+    return res.status(500).json({ error: 'Server error', details: error.message });
   }
 });
 
