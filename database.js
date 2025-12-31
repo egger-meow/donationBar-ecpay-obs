@@ -86,8 +86,10 @@ class Database {
       workspaceSettings: [],
       paymentProviders: [],
       donations: [],
+      paymentHistory: [],
       apiKeys: [],
       feedback: [],
+      fraudPrevention: [],
       auditLogs: []
     };
   }
@@ -903,6 +905,235 @@ class Database {
 
       await this.writeJSON(data);
       return subscription;
+    }
+  }
+
+  // =============================================
+  // PAYMENT HISTORY METHODS
+  // =============================================
+
+  /**
+   * Create payment record
+   */
+  async createPaymentRecord(paymentData) {
+    const paymentId = uuidv4();
+    
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query(`
+        INSERT INTO payment_history (
+          id, subscription_id, user_id, amount, currency, status,
+          ecpay_trade_no, ecpay_merchant_trade_no, ecpay_payment_date,
+          payment_method, payment_method_last4, payment_method_type,
+          card_auth_code, card_first6, card_last4, issuing_bank, issuing_bank_code,
+          error_message, error_code, retry_count,
+          period_type, frequency, exec_times, total_success_times, total_success_amount,
+          paid_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+        RETURNING *
+      `, [
+        paymentId,
+        paymentData.subscriptionId,
+        paymentData.userId,
+        paymentData.amount,
+        paymentData.currency || 'TWD',
+        paymentData.status,
+        paymentData.ecpayTradeNo || null,
+        paymentData.ecpayMerchantTradeNo || null,
+        paymentData.ecpayPaymentDate || null,
+        paymentData.paymentMethod || null,
+        paymentData.paymentMethodLast4 || null,
+        paymentData.paymentMethodType || null,
+        paymentData.cardAuthCode || null,
+        paymentData.cardFirst6 || null,
+        paymentData.cardLast4 || null,
+        paymentData.issuingBank || null,
+        paymentData.issuingBankCode || null,
+        paymentData.errorMessage || null,
+        paymentData.errorCode || null,
+        paymentData.retryCount || 0,
+        paymentData.periodType || null,
+        paymentData.frequency || null,
+        paymentData.execTimes || null,
+        paymentData.totalSuccessTimes || null,
+        paymentData.totalSuccessAmount || null,
+        paymentData.status === 'success' ? (paymentData.paidAt || new Date()) : null
+      ]);
+      return this.camelCaseKeys(result.rows[0]);
+    } else {
+      const data = await this.readJSON();
+      if (!data.paymentHistory) data.paymentHistory = [];
+      
+      const newPayment = {
+        id: paymentId,
+        subscriptionId: paymentData.subscriptionId,
+        userId: paymentData.userId,
+        amount: paymentData.amount,
+        currency: paymentData.currency || 'TWD',
+        status: paymentData.status,
+        ecpayTradeNo: paymentData.ecpayTradeNo || null,
+        ecpayMerchantTradeNo: paymentData.ecpayMerchantTradeNo || null,
+        ecpayPaymentDate: paymentData.ecpayPaymentDate || null,
+        paymentMethod: paymentData.paymentMethod || null,
+        paymentMethodLast4: paymentData.paymentMethodLast4 || null,
+        paymentMethodType: paymentData.paymentMethodType || null,
+        cardAuthCode: paymentData.cardAuthCode || null,
+        cardFirst6: paymentData.cardFirst6 || null,
+        cardLast4: paymentData.cardLast4 || null,
+        issuingBank: paymentData.issuingBank || null,
+        issuingBankCode: paymentData.issuingBankCode || null,
+        errorMessage: paymentData.errorMessage || null,
+        errorCode: paymentData.errorCode || null,
+        retryCount: paymentData.retryCount || 0,
+        periodType: paymentData.periodType || null,
+        frequency: paymentData.frequency || null,
+        execTimes: paymentData.execTimes || null,
+        totalSuccessTimes: paymentData.totalSuccessTimes || null,
+        totalSuccessAmount: paymentData.totalSuccessAmount || null,
+        createdAt: new Date().toISOString(),
+        paidAt: paymentData.status === 'success' ? (paymentData.paidAt || new Date().toISOString()) : null,
+        updatedAt: new Date().toISOString()
+      };
+      
+      data.paymentHistory.push(newPayment);
+      await this.writeJSON(data);
+      return newPayment;
+    }
+  }
+
+  /**
+   * Get payment history for a subscription
+   */
+  async getPaymentHistory(subscriptionId, limit = 50) {
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query(`
+        SELECT * FROM payment_history
+        WHERE subscription_id = $1
+        ORDER BY created_at DESC
+        LIMIT $2
+      `, [subscriptionId, limit]);
+      return result.rows.map(row => this.camelCaseKeys(row));
+    } else {
+      const data = await this.readJSON();
+      if (!data.paymentHistory) return [];
+      
+      return data.paymentHistory
+        .filter(p => p.subscriptionId === subscriptionId)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, limit);
+    }
+  }
+
+  /**
+   * Get payment history for a user (across all subscriptions)
+   */
+  async getUserPaymentHistory(userId, limit = 50) {
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query(`
+        SELECT * FROM payment_history
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT $2
+      `, [userId, limit]);
+      return result.rows.map(row => this.camelCaseKeys(row));
+    } else {
+      const data = await this.readJSON();
+      if (!data.paymentHistory) return [];
+      
+      return data.paymentHistory
+        .filter(p => p.userId === userId)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, limit);
+    }
+  }
+
+  /**
+   * Update payment record
+   */
+  async updatePaymentRecord(paymentId, updateData) {
+    if (this.isProduction && this.connected) {
+      const fields = [];
+      const values = [];
+      let paramIndex = 1;
+
+      if (updateData.status !== undefined) {
+        fields.push(`status = $${paramIndex++}`);
+        values.push(updateData.status);
+      }
+      if (updateData.errorMessage !== undefined) {
+        fields.push(`error_message = $${paramIndex++}`);
+        values.push(updateData.errorMessage);
+      }
+      if (updateData.errorCode !== undefined) {
+        fields.push(`error_code = $${paramIndex++}`);
+        values.push(updateData.errorCode);
+      }
+      if (updateData.retryCount !== undefined) {
+        fields.push(`retry_count = $${paramIndex++}`);
+        values.push(updateData.retryCount);
+      }
+      if (updateData.nextRetryAt !== undefined) {
+        fields.push(`next_retry_at = $${paramIndex++}`);
+        values.push(updateData.nextRetryAt);
+      }
+
+      fields.push(`updated_at = NOW()`);
+      values.push(paymentId);
+
+      const query = `
+        UPDATE payment_history 
+        SET ${fields.join(', ')}
+        WHERE id = $${paramIndex}
+        RETURNING *
+      `;
+
+      const result = await pgClient.query(query, values);
+      return result.rows.length > 0 ? this.camelCaseKeys(result.rows[0]) : null;
+    } else {
+      const data = await this.readJSON();
+      if (!data.paymentHistory) return null;
+      
+      const payment = data.paymentHistory.find(p => p.id === paymentId);
+      if (!payment) return null;
+
+      Object.assign(payment, {
+        ...updateData,
+        updatedAt: new Date().toISOString()
+      });
+
+      await this.writeJSON(data);
+      return payment;
+    }
+  }
+
+  /**
+   * Get failed payments that need retry
+   */
+  async getFailedPaymentsForRetry() {
+    const now = new Date();
+    
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query(`
+        SELECT * FROM payment_history
+        WHERE status = 'failed'
+        AND retry_count < 3
+        AND (next_retry_at IS NULL OR next_retry_at <= $1)
+        ORDER BY created_at ASC
+        LIMIT 100
+      `, [now]);
+      return result.rows.map(row => this.camelCaseKeys(row));
+    } else {
+      const data = await this.readJSON();
+      if (!data.paymentHistory) return [];
+      
+      return data.paymentHistory
+        .filter(p => 
+          p.status === 'failed' &&
+          (p.retryCount || 0) < 3 &&
+          (!p.nextRetryAt || new Date(p.nextRetryAt) <= now)
+        )
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+        .slice(0, 100);
     }
   }
 
