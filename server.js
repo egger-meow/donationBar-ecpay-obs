@@ -608,6 +608,9 @@ function requireAdmin(req, res, next) {
   return res.redirect('/login');
 }
 
+// Alias for requireAdmin (used by subscription routes)
+const requireAuth = requireAdmin;
+
 // =============================================
 // API ROUTES (Multi-User Support)
 // =============================================
