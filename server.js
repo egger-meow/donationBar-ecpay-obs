@@ -1561,6 +1561,511 @@ app.get('/api/schema', async (req, res) => {
   }
 });
 
+// =============================================
+// SUBSCRIPTION ENDPOINTS (Week 1-2 Implementation)
+// =============================================
+
+/**
+ * POST /subscription/checkout
+ * Create ECPay periodic payment (subscription)
+ * This initiates a recurring payment authorization
+ */
+app.post('/subscription/checkout', requireAuth, async (req, res) => {
+  try {
+    const user = await database.findUserById(req.session.userId);
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    // Check if user already has an active subscription
+    const existingSubscription = await database.getUserSubscription(user.id);
+    if (existingSubscription && existingSubscription.status === 'active' && !existingSubscription.isTrial) {
+      return res.status(400).json({ error: 'User already has an active subscription' });
+    }
+
+    // Get user's workspace
+    const workspace = await database.getUserWorkspace(user.id);
+    if (!workspace) {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
+
+    const credentials = await getECPayCredentials(workspace.id);
+    
+    // Subscription parameters
+    const monthlyPrice = parseInt(process.env.SUBSCRIPTION_MONTHLY_PRICE) || 70;
+    const tradeNo = 'SUB' + Date.now();
+    const tradeDate = formatECPayDate(new Date());
+
+    // ECPay Periodic Payment Parameters (based on official docs)
+    const params = {
+      MerchantID: credentials.merchantId,
+      MerchantTradeNo: tradeNo,
+      MerchantTradeDate: tradeDate,
+      PaymentType: 'aio',
+      TotalAmount: String(monthlyPrice),
+      TradeDesc: 'Subscription Service',
+      ItemName: 'Monthly Subscription x1',
+      ReturnURL: `${process.env.BASE_URL}/ecpay/return`,
+      OrderResultURL: `${process.env.BASE_URL}/subscription/success`,
+      ChoosePayment: 'Credit',
+      EncryptType: 1,
+      
+      // Periodic payment specific parameters
+      PeriodAmount: String(monthlyPrice),    // Amount for each period
+      PeriodType: 'M',                        // M = Monthly
+      Frequency: 1,                            // Every 1 month
+      ExecTimes: 999,                          // Maximum times (999 = until cancelled)
+      PeriodReturnURL: `${process.env.BASE_URL}/ecpay/period/callback`,
+      
+      // Custom fields to track user and subscription
+      CustomField1: user.id,
+      CustomField2: workspace.id,
+      CustomField3: existingSubscription?.id || 'new'
+    };
+
+    // Generate CheckMacValue
+    params.CheckMacValue = await generateCheckMacValue(params, workspace.id);
+
+    console.log('💳 Creating subscription checkout for user:', user.email);
+    console.log('📝 Subscription params:', {
+      tradeNo,
+      amount: monthlyPrice,
+      periodType: params.PeriodType,
+      frequency: params.Frequency
+    });
+
+    // Update or create subscription record
+    if (existingSubscription) {
+      await database.updateSubscription(user.id, {
+        ecpayMerchantTradeNo: tradeNo,
+        status: 'pending',
+        planType: 'pro',
+        pricePerMonth: monthlyPrice
+      });
+    } else {
+      await database.createSubscription(user.id, {
+        planType: 'pro',
+        status: 'pending',
+        pricePerMonth: monthlyPrice,
+        isTrial: false,
+        ecpayMerchantTradeNo: tradeNo
+      });
+    }
+
+    // Create auto-submit form HTML
+    const action = 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5'; // Use stage for testing
+    const inputs = Object.entries(params)
+      .map(([k, v]) => `<input type="hidden" name="${k}" value="${String(v)}">`)
+      .join('\n');
+
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Redirecting to Payment...</title>
+        <style>
+          body { font-family: system-ui; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; }
+          .container { text-align: center; }
+          .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        </style>
+      </head>
+      <body onload="document.forms[0].submit()">
+        <div class="container">
+          <div class="spinner"></div>
+          <p>Redirecting to ECPay payment page...</p>
+          <p style="font-size: 12px; color: #666;">Please do not close this window</p>
+        </div>
+        <form method="post" action="${action}">
+          ${inputs}
+        </form>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error('❌ Subscription checkout error:', error);
+    res.status(500).json({ error: 'Failed to create subscription', message: error.message });
+  }
+});
+
+/**
+ * POST /ecpay/period/callback
+ * ⚠️ CRITICAL ENDPOINT - Receives monthly recurring payment notifications
+ * Called by ECPay from 2nd payment onwards
+ * MUST respond with "1|OK"
+ */
+app.post('/ecpay/period/callback', async (req, res) => {
+  console.log('💰 ECPay Period Callback received');
+  console.log('📦 Payload:', JSON.stringify(req.body, null, 2));
+
+  try {
+    const payload = req.body;
+
+    // Verify merchant ID
+    const merchantId = payload.MerchantID;
+    
+    // Decrypt the Data field (ECPay sends encrypted JSON)
+    const decryptedData = await decryptECPayData(payload.Data);
+    
+    if (!decryptedData) {
+      console.error('❌ Failed to decrypt period callback data');
+      return res.send('0|Decryption failed');
+    }
+
+    console.log('✅ Decrypted period callback data:', JSON.stringify(decryptedData, null, 2));
+
+    // Extract order info
+    const orderInfo = decryptedData.OrderInfo || {};
+    const cardInfo = decryptedData.CardInfo || {};
+    const rtnCode = Number(decryptedData.RtnCode);
+    
+    // Get subscription from CustomField or MerchantTradeNo
+    const userId = decryptedData.CustomField || orderInfo.CustomField;
+    const subscription = await database.getUserSubscription(userId);
+
+    if (!subscription) {
+      console.error('❌ Subscription not found for userId:', userId);
+      return res.send('1|OK'); // Still acknowledge to avoid ECPay retry
+    }
+
+    // Determine payment status
+    const paymentSuccess = rtnCode === 1 && Number(orderInfo.TradeStatus) === 1;
+    const paymentStatus = paymentSuccess ? 'success' : 'failed';
+
+    // Create payment record
+    const paymentRecord = await database.createPaymentRecord({
+      subscriptionId: subscription.id,
+      userId: subscription.userId,
+      amount: orderInfo.TradeAmt || decryptedData.PeriodAmount,
+      currency: 'TWD',
+      status: paymentStatus,
+      ecpayTradeNo: orderInfo.TradeNo,
+      ecpayMerchantTradeNo: orderInfo.MerchantTradeNo,
+      ecpayPaymentDate: orderInfo.PaymentDate,
+      paymentMethod: orderInfo.PaymentType,
+      paymentMethodType: orderInfo.PaymentType,
+      cardAuthCode: cardInfo.AuthCode,
+      cardFirst6: cardInfo.Card6No,
+      cardLast4: cardInfo.Card4No,
+      issuingBank: cardInfo.IssuingBank,
+      issuingBankCode: cardInfo.IssuingBankCode,
+      periodType: decryptedData.PeriodType,
+      frequency: decryptedData.Frequency,
+      execTimes: decryptedData.ExecTimes,
+      totalSuccessTimes: decryptedData.TotalSuccessTimes,
+      totalSuccessAmount: decryptedData.TotalSuccessAmount,
+      errorMessage: paymentSuccess ? null : decryptedData.RtnMsg
+    });
+
+    console.log(`📝 Payment record created: ${paymentRecord.id} (${paymentStatus})`);
+
+    // Update subscription based on payment result
+    if (paymentSuccess) {
+      // Calculate next billing date (add 1 month)
+      const nextBillingDate = new Date();
+      nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+
+      await database.updateSubscription(subscription.userId, {
+        status: 'active',
+        lastPaymentDate: new Date(),
+        lastPaymentStatus: 'success',
+        failedPaymentCount: 0,
+        lastFailedAt: null,
+        nextBillingDate: nextBillingDate.toISOString(),
+        ecpayTradeNo: orderInfo.TradeNo
+      });
+
+      console.log(`✅ Subscription payment successful for user ${subscription.userId}`);
+      console.log(`   Amount: NT$${orderInfo.TradeAmt}`);
+      console.log(`   Next billing: ${nextBillingDate.toISOString()}`);
+
+      // TODO: Send success email notification
+    } else {
+      // Payment failed - update failure count
+      const failedCount = (subscription.failedPaymentCount || 0) + 1;
+      const gracePeriodDays = 7; // 7 days grace period
+      const gracePeriodEnd = new Date();
+      gracePeriodEnd.setDate(gracePeriodEnd.getDate() + gracePeriodDays);
+
+      await database.updateSubscription(subscription.userId, {
+        lastPaymentStatus: 'failed',
+        failedPaymentCount: failedCount,
+        lastFailedAt: new Date(),
+        gracePeriodEndAt: gracePeriodEnd.toISOString()
+      });
+
+      console.warn(`⚠️ Payment failed for subscription ${subscription.id}`);
+      console.warn(`   Failed count: ${failedCount}`);
+      console.warn(`   Grace period until: ${gracePeriodEnd.toISOString()}`);
+
+      // If failed 6 times, ECPay automatically stops (per their docs)
+      if (failedCount >= 6) {
+        await database.updateSubscription(subscription.userId, {
+          status: 'cancelled',
+          canceledAt: new Date()
+        });
+        console.error(`❌ Subscription cancelled after 6 failed payments`);
+      }
+
+      // TODO: Send failed payment email notification
+    }
+
+    // Log audit trail
+    await database.addAuditLog({
+      userId: subscription.userId,
+      action: `subscription_payment_${paymentStatus}`,
+      resourceType: 'subscription',
+      resourceId: subscription.id,
+      status: paymentStatus,
+      metadata: {
+        amount: orderInfo.TradeAmt,
+        ecpayTradeNo: orderInfo.TradeNo,
+        failedCount: subscription.failedPaymentCount
+      }
+    });
+
+    // MUST return 1|OK to ECPay
+    return res.send('1|OK');
+
+  } catch (error) {
+    console.error('❌ Period callback error:', error);
+    console.error('Stack:', error.stack);
+    // Still return 1|OK to avoid ECPay retrying indefinitely
+    return res.send('1|OK');
+  }
+});
+
+/**
+ * GET /api/subscription/payment-history
+ * Get payment history for logged-in user
+ */
+app.get('/api/subscription/payment-history', requireAuth, async (req, res) => {
+  try {
+    const user = await database.findUserById(req.session.userId);
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    const limit = parseInt(req.query.limit) || 50;
+    const paymentHistory = await database.getUserPaymentHistory(user.id, limit);
+
+    res.json({
+      success: true,
+      payments: paymentHistory.map(p => ({
+        id: p.id,
+        date: p.paidAt || p.createdAt,
+        amount: p.amount,
+        currency: p.currency,
+        status: p.status,
+        paymentMethod: `${p.paymentMethodType || 'Credit Card'} ${p.cardLast4 ? '****' + p.cardLast4 : ''}`.trim(),
+        ecpayTradeNo: p.ecpayTradeNo,
+        invoiceNumber: p.invoiceNumber,
+        invoiceUrl: p.invoiceUrl
+      }))
+    });
+  } catch (error) {
+    console.error('❌ Get payment history error:', error);
+    res.status(500).json({ error: 'Failed to retrieve payment history' });
+  }
+});
+
+/**
+ * POST /subscription/cancel
+ * Cancel user's subscription
+ */
+app.post('/subscription/cancel', requireAuth, async (req, res) => {
+  try {
+    const user = await database.findUserById(req.session.userId);
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    const subscription = await database.getUserSubscription(user.id);
+    if (!subscription) {
+      return res.status(404).json({ error: 'No active subscription found' });
+    }
+
+    if (subscription.status === 'cancelled') {
+      return res.status(400).json({ error: 'Subscription already cancelled' });
+    }
+
+    // Calculate grace period (until end of current billing cycle)
+    const gracePeriodEnd = subscription.nextBillingDate || new Date();
+
+    await database.updateSubscription(user.id, {
+      status: 'cancelled',
+      canceledAt: new Date(),
+      gracePeriodEndAt: gracePeriodEnd
+    });
+
+    // Log audit trail
+    await database.addAuditLog({
+      userId: user.id,
+      action: 'subscription_cancelled',
+      resourceType: 'subscription',
+      resourceId: subscription.id,
+      status: 'success',
+      metadata: { gracePeriodEnd }
+    });
+
+    console.log(`🚫 Subscription cancelled for user ${user.email}`);
+    console.log(`   Access until: ${gracePeriodEnd}`);
+
+    res.json({
+      success: true,
+      message: 'Subscription cancelled successfully',
+      gracePeriodEnd
+    });
+
+    // TODO: Send cancellation confirmation email
+  } catch (error) {
+    console.error('❌ Cancel subscription error:', error);
+    res.status(500).json({ error: 'Failed to cancel subscription' });
+  }
+});
+
+/**
+ * POST /subscription/pause
+ * Pause user's subscription temporarily
+ */
+app.post('/subscription/pause', requireAuth, async (req, res) => {
+  try {
+    const user = await database.findUserById(req.session.userId);
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    const subscription = await database.getUserSubscription(user.id);
+    if (!subscription) {
+      return res.status(404).json({ error: 'No active subscription found' });
+    }
+
+    if (subscription.status !== 'active') {
+      return res.status(400).json({ error: 'Can only pause active subscriptions' });
+    }
+
+    await database.updateSubscription(user.id, {
+      status: 'paused',
+      pausedAt: new Date()
+    });
+
+    // Log audit trail
+    await database.addAuditLog({
+      userId: user.id,
+      action: 'subscription_paused',
+      resourceType: 'subscription',
+      resourceId: subscription.id,
+      status: 'success'
+    });
+
+    console.log(`⏸️ Subscription paused for user ${user.email}`);
+
+    res.json({
+      success: true,
+      message: 'Subscription paused successfully'
+    });
+
+    // TODO: Send pause confirmation email
+  } catch (error) {
+    console.error('❌ Pause subscription error:', error);
+    res.status(500).json({ error: 'Failed to pause subscription' });
+  }
+});
+
+/**
+ * POST /subscription/resume
+ * Resume a paused subscription
+ */
+app.post('/subscription/resume', requireAuth, async (req, res) => {
+  try {
+    const user = await database.findUserById(req.session.userId);
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    const subscription = await database.getUserSubscription(user.id);
+    if (!subscription) {
+      return res.status(404).json({ error: 'No subscription found' });
+    }
+
+    if (subscription.status !== 'paused') {
+      return res.status(400).json({ error: 'Subscription is not paused' });
+    }
+
+    await database.updateSubscription(user.id, {
+      status: 'active',
+      pausedAt: null
+    });
+
+    // Log audit trail
+    await database.addAuditLog({
+      userId: user.id,
+      action: 'subscription_resumed',
+      resourceType: 'subscription',
+      resourceId: subscription.id,
+      status: 'success'
+    });
+
+    console.log(`▶️ Subscription resumed for user ${user.email}`);
+
+    res.json({
+      success: true,
+      message: 'Subscription resumed successfully'
+    });
+  } catch (error) {
+    console.error('❌ Resume subscription error:', error);
+    res.status(500).json({ error: 'Failed to resume subscription' });
+  }
+});
+
+/**
+ * GET /api/subscription/status
+ * Get current subscription status for logged-in user
+ */
+app.get('/api/subscription/status', requireAuth, async (req, res) => {
+  try {
+    const user = await database.findUserById(req.session.userId);
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    const subscription = await database.getUserSubscription(user.id);
+    
+    if (!subscription) {
+      return res.json({
+        hasSubscription: false,
+        status: 'none'
+      });
+    }
+
+    res.json({
+      hasSubscription: true,
+      subscription: {
+        id: subscription.id,
+        planType: subscription.planType,
+        status: subscription.status,
+        pricePerMonth: subscription.pricePerMonth,
+        currency: subscription.currency,
+        isTrial: subscription.isTrial,
+        trialEndDate: subscription.trialEndDate,
+        billingCycleStart: subscription.billingCycleStart,
+        nextBillingDate: subscription.nextBillingDate,
+        lastPaymentDate: subscription.lastPaymentDate,
+        lastPaymentStatus: subscription.lastPaymentStatus,
+        failedPaymentCount: subscription.failedPaymentCount,
+        gracePeriodEndAt: subscription.gracePeriodEndAt,
+        pausedAt: subscription.pausedAt,
+        canceledAt: subscription.canceledAt,
+        createdAt: subscription.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('❌ Get subscription status error:', error);
+    res.status(500).json({ error: 'Failed to retrieve subscription status' });
+  }
+});
+
 // Start server
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
