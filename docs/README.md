@@ -1,14 +1,14 @@
 # 📚 DonationBar Documentation
 
-Welcome to the DonationBar documentation! All guides are organized by category.
+All guides organized by category.
 
 ---
 
 ## 📖 Quick Links
 
-### 🚀 Getting Started
-- [Main README](../README.md) - Project overview and quick start
+- [Main README](../README.md) - Project overview
 - [Complete Setup Guide](setup/COMPLETE_SETUP_GUIDE.md) - Full setup instructions
+- [Subscription System](subscription/SUBSCRIPTION_IMPLEMENTATION.md) - ECPay subscription
 
 ---
 
@@ -17,22 +17,28 @@ Welcome to the DonationBar documentation! All guides are organized by category.
 ### 🔧 Setup & Configuration
 Location: `docs/setup/`
 
-- **[Complete Setup Guide](setup/COMPLETE_SETUP_GUIDE.md)** - End-to-end setup instructions
-- **[Google OAuth Setup](setup/GOOGLE_OAUTH_SETUP.md)** - Configure Google OAuth 2.0
-- **[Deployment Guide](setup/DEPLOYMENT.md)** - Production deployment instructions
+- **[Complete Setup Guide](setup/COMPLETE_SETUP_GUIDE.md)** - End-to-end setup
+- **[Google OAuth Setup](setup/GOOGLE_OAUTH_SETUP.md)** - Google OAuth 2.0 config
+- **[Deployment Guide](setup/DEPLOYMENT.md)** - Production deployment
+
+### 💳 Subscription System
+Location: `docs/subscription/`
+
+- **[Subscription Implementation](subscription/SUBSCRIPTION_IMPLEMENTATION.md)** - Complete subscription system docs
+- **[ECPay Requirements](subscription/ECPAY_REQUIREMENTS.md)** - ECPay periodic payment specs (中文)
 
 ### 💾 Database
 Location: `docs/database/`
 
 - **[Database Schema (Original)](database/DATABASE-SCHEMA.md)** - Single-user schema
 - **[Database Schema (Multi-user)](database/SCHEMA_MULTIUSER.md)** - Multi-user schema
-- **[Schema Guide](database/SCHEMA-GUIDE.md)** - Quick reference for database structure
+- **[Schema Guide](database/SCHEMA-GUIDE.md)** - Quick reference
 
 ### 🔄 Migration
 Location: `docs/migration/`
 
-- **[Migration Guide](migration/MIGRATION_GUIDE.md)** - Step-by-step migration instructions
-- **[Migration Summary](migration/MIGRATION_SUMMARY.md)** - Overview of migration changes
+- **[Migration Guide](migration/MIGRATION_GUIDE.md)** - Step-by-step migration
+- **[Migration Summary](migration/MIGRATION_SUMMARY.md)** - Migration changes overview
 
 ### ✨ Features
 Location: `docs/features/`
@@ -43,6 +49,7 @@ Location: `docs/features/`
 - **[Overlay Preview](features/OVERLAY_PREVIEW.md)** - Donation overlay features
 - **[Webhook Setup](features/WEBHOOK_SETUP.md)** - ECPay webhook configuration
 - **[Webhook Testing](features/TEST-WEBHOOK-README.md)** - Testing webhooks
+- **[Easter Egg](features/EASTER_EGG.md)** - Secret free pass feature
 
 ### 🔌 API Reference
 Location: `docs/api/`
@@ -67,6 +74,9 @@ docs/
 │   ├── COMPLETE_SETUP_GUIDE.md
 │   ├── GOOGLE_OAUTH_SETUP.md
 │   └── DEPLOYMENT.md
+├── subscription/
+│   ├── SUBSCRIPTION_IMPLEMENTATION.md
+│   └── ECPAY_REQUIREMENTS.md
 ├── database/
 │   ├── DATABASE-SCHEMA.md
 │   ├── SCHEMA_MULTIUSER.md
@@ -80,7 +90,8 @@ docs/
 │   ├── AUTH_PAGES_STYLING_UPDATE.md
 │   ├── OVERLAY_PREVIEW.md
 │   ├── WEBHOOK_SETUP.md
-│   └── TEST-WEBHOOK-README.md
+│   ├── TEST-WEBHOOK-README.md
+│   └── EASTER_EGG.md
 ├── api/
 │   └── API_METHODS_REFERENCE.md
 └── development/
@@ -94,9 +105,13 @@ docs/
 ## 🎯 Common Tasks
 
 ### New to the project?
-1. Read the [Main README](../README.md)
-2. Follow the [Complete Setup Guide](setup/COMPLETE_SETUP_GUIDE.md)
-3. Review [Database Schema](database/SCHEMA_MULTIUSER.md)
+1. [Main README](../README.md)
+2. [Complete Setup Guide](setup/COMPLETE_SETUP_GUIDE.md)
+3. [Database Schema](database/SCHEMA_MULTIUSER.md)
+
+### Setting up subscriptions?
+1. [Subscription Implementation](subscription/SUBSCRIPTION_IMPLEMENTATION.md)
+2. [ECPay Requirements](subscription/ECPAY_REQUIREMENTS.md)
 
 ### Setting up authentication?
 1. [Authentication Features](features/AUTH_FEATURES_SUMMARY.md)
@@ -131,6 +146,7 @@ When adding new documentation:
 ## 💡 Tips
 
 - **Starting fresh?** → [Complete Setup Guide](setup/COMPLETE_SETUP_GUIDE.md)
+- **Subscriptions?** → [Subscription Implementation](subscription/SUBSCRIPTION_IMPLEMENTATION.md)
 - **Migrating?** → [Migration Guide](migration/MIGRATION_GUIDE.md)
 - **Need API info?** → [API Reference](api/API_METHODS_REFERENCE.md)
 - **Deploying?** → [Deployment Guide](setup/DEPLOYMENT.md)
@@ -138,5 +154,5 @@ When adding new documentation:
 
 ---
 
-**Last Updated**: November 2025  
-**Version**: Multi-user with OAuth
+**Last Updated**: January 2026  
+**Version**: Multi-user with OAuth + Subscription System
