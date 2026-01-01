@@ -612,6 +612,16 @@ function requireAdmin(req, res, next) {
 const requireAuth = requireAdmin;
 
 // =============================================
+// ROOT ROUTE - Redirect based on auth status
+// =============================================
+app.get('/', (req, res) => {
+  if (req.session && req.session.userId) {
+    return res.redirect('/admin.html');
+  }
+  return res.redirect('/login.html');
+});
+
+// =============================================
 // API ROUTES (Multi-User Support)
 // =============================================
 
