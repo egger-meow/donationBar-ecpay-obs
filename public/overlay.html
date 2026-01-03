@@ -78,11 +78,14 @@
       width: 100%;
       height: 100%;
       background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-      animation: shimmer 2s infinite;
+      /* Shimmer only on hover/active for performance */
+      animation: none;
+      will-change: transform;
+      transform: translateZ(0);
     }
 
     .progress-fill.animate::before {
-      animation: shimmer 2s infinite;
+      animation: shimmer 1.5s ease-out;
     }
 
     /* Cute liquid-filled circle gauge */
@@ -111,29 +114,21 @@
       transition: height 1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
 
-    /* Wave effect on liquid */
+    /* Wave effect on liquid - simplified for performance */
     .liquid-fill::before {
       content: '';
       position: absolute;
-      top: -10px;
-      left: -50%;
-      width: 200%;
-      height: 20px;
-      background: radial-gradient(ellipse at center, rgba(255,255,255,0.3) 0%, transparent 70%);
-      border-radius: 45%;
-      animation: wave 3s ease-in-out infinite;
+      top: -6px;
+      left: 0;
+      width: 100%;
+      height: 12px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 50%;
+      /* Removed infinite animation for performance */
     }
 
     .liquid-fill::after {
-      content: '';
-      position: absolute;
-      top: -8px;
-      left: -30%;
-      width: 200%;
-      height: 18px;
-      background: radial-gradient(ellipse at center, rgba(255,255,255,0.2) 0%, transparent 70%);
-      border-radius: 48%;
-      animation: wave 3.5s ease-in-out infinite reverse;
+      display: none; /* Disabled second wave for performance */
     }
 
     @keyframes wave {
@@ -202,19 +197,21 @@
     }
 
     .donation-item {
-      background: rgba(0,0,0,0.3);
+      background: rgba(0,0,0,0.7);
       border-radius: 15px;
       padding: 8px 15px;
       margin: 5px 0;
       color: var(--fg);
       font-size: 14px;
-      backdrop-filter: blur(10px);
+      /* Removed backdrop-filter: blur() for performance */
       border: 1px solid rgba(255,255,255,0.1);
       animation: slideInRight 0.5s ease;
       text-align: center;
       display: inline-block;
       max-width: 90%;
       box-sizing: border-box;
+      will-change: transform, opacity;
+      transform: translateZ(0);
     }
 
     .donation-amount {
@@ -267,10 +264,10 @@
 
     @keyframes goalCompleteGlow {
       0%, 100% {
-        box-shadow: 0 0 5px var(--bar), 0 0 10px var(--bar), 0 0 15px var(--bar);
+        box-shadow: 0 0 10px var(--bar);
       }
       50% {
-        box-shadow: 0 0 20px var(--bar), 0 0 30px var(--bar), 0 0 40px var(--bar);
+        box-shadow: 0 0 20px var(--bar);
       }
     }
 
@@ -300,9 +297,9 @@
     }
 
     .celebration-text {
-      animation: celebration 1s ease-in-out infinite;
+      animation: celebration 1s ease-in-out 3;
       color: #ffd700 !important;
-      text-shadow: 0 0 20px #ffd700, 0 0 30px #ffd700, 0 0 40px #ffd700;
+      text-shadow: 0 0 15px #ffd700;
     }
 
     .confetti-container {
@@ -317,9 +314,10 @@
 
     .confetti {
       position: absolute;
-      width: 10px;
-      height: 10px;
-      animation: confetti 3s linear infinite;
+      width: 8px;
+      height: 8px;
+      animation: confetti 3s linear forwards;
+      will-change: transform;
     }
 
     .confetti:nth-child(odd) {
@@ -364,22 +362,20 @@
       color: white;
       padding: 25px 35px;
       border-radius: 20px;
-      box-shadow: 
-        0 20px 40px rgba(255, 71, 87, 0.4),
-        0 0 0 3px rgba(255, 255, 255, 0.3),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      box-shadow: 0 15px 35px rgba(255, 71, 87, 0.5);
       font-family: 'Segoe UI', system-ui, sans-serif;
       z-index: 1000;
       transform: translateX(-50%) translateY(-50px) scale(0.8);
       opacity: 0;
-      transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
       border: 2px solid rgba(255, 255, 255, 0.5);
-      backdrop-filter: blur(10px);
+      /* Removed backdrop-filter for performance */
       min-width: 300px;
       max-width: 90%;
       text-align: center;
       visibility: hidden;
       margin: 0;
+      will-change: transform, opacity;
     }
 
     .donation-alert.show {
@@ -441,16 +437,10 @@
 
     @keyframes alertPulse {
       0%, 100% {
-        box-shadow: 
-          0 20px 40px rgba(255, 71, 87, 0.4),
-          0 0 0 3px rgba(255, 255, 255, 0.3),
-          inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        transform: translateX(-50%) scale(1);
       }
       50% {
-        box-shadow: 
-          0 25px 50px rgba(255, 71, 87, 0.6),
-          0 0 0 5px rgba(255, 255, 255, 0.5),
-          inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        transform: translateX(-50%) scale(1.02);
       }
     }
 
@@ -778,27 +768,30 @@
       }, duration);
     }
 
-    // Goal completion celebration functions
+    // Goal completion celebration functions - optimized for performance
     function createConfetti() {
       const container = document.getElementById('confettiContainer');
-      const confettiCount = 50;
+      const confettiCount = 25; // Reduced from 50 for better performance
       
       // Clear existing confetti
       container.innerHTML = '';
       
+      // Use DocumentFragment for batch DOM insertion
+      const fragment = document.createDocumentFragment();
       for (let i = 0; i < confettiCount; i++) {
         const confetti = document.createElement('div');
         confetti.className = 'confetti';
         confetti.style.left = Math.random() * 100 + '%';
-        confetti.style.animationDelay = Math.random() * 3 + 's';
-        confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
-        container.appendChild(confetti);
+        confetti.style.animationDelay = Math.random() * 2 + 's';
+        confetti.style.animationDuration = (Math.random() * 1.5 + 2) + 's';
+        fragment.appendChild(confetti);
       }
+      container.appendChild(fragment);
       
       // Remove confetti after animation
       setTimeout(() => {
         container.innerHTML = '';
-      }, 6000);
+      }, 5000);
     }
 
     function celebrateGoalComplete(goalTitle) {

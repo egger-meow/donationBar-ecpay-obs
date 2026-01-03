@@ -24,7 +24,7 @@
       overflow: hidden;
     }
 
-    /* Animated background particles */
+    /* Static background overlay - optimized for performance */
     body::before {
       content: '';
       position: absolute;
@@ -34,27 +34,22 @@
       height: 100%;
       background: 
         radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
-        radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.08) 0%, transparent 50%),
-        radial-gradient(circle at 40% 20%, rgba(255, 255, 255, 0.05) 0%, transparent 50%);
-      animation: pulse 8s ease-in-out infinite alternate;
-    }
-
-    @keyframes pulse {
-      0% { opacity: 0.5; transform: scale(1); }
-      100% { opacity: 1; transform: scale(1.1); }
+        radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.08) 0%, transparent 50%);
+      /* Removed infinite animation for performance */
+      opacity: 0.8;
     }
 
     .login-container {
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(30px);
+      background: rgba(255, 255, 255, 0.98);
+      /* Removed backdrop-filter for performance */
       border-radius: 24px;
       padding: 50px 40px;
-      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
       width: 100%;
       max-width: 460px;
       position: relative;
       z-index: 1;
-      animation: slideIn 0.6s ease-out;
+      animation: slideIn 0.5s ease-out;
     }
 
     @keyframes slideIn {
@@ -76,12 +71,7 @@
     .logo {
       font-size: 52px;
       margin-bottom: 15px;
-      animation: float 3s ease-in-out infinite;
-    }
-
-    @keyframes float {
-      0%, 100% { transform: translateY(0px); }
-      50% { transform: translateY(-10px); }
+      /* Removed infinite float animation for performance */
     }
 
     .header h1 {
