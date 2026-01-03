@@ -982,10 +982,10 @@ app.post('/api/feedback', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    // Store feedback in database
-    const workspace = await getDefaultWorkspace();
+    // Store feedback in database - use logged-in user's ID, not default workspace
+    const userId = req.session.userId;
     const feedback = await database.createFeedback({
-      userId: workspace.userId,
+      userId: userId,
       type: type || 'general',
       message: message,
       email: email || null,
@@ -1008,8 +1008,8 @@ app.post('/api/feedback', requireAdmin, async (req, res) => {
     
     if (message.trim() === secretCode) {
       try {
-        // Upgrade user to free_pass
-        await database.updateSubscription(workspace.userId, {
+        // Upgrade user to free_pass - use session userId (logged-in user)
+        await database.updateSubscription(userId, {
           planType: 'free_pass',
           status: 'active',
           isTrial: false,
@@ -1019,11 +1019,11 @@ app.post('/api/feedback', requireAdmin, async (req, res) => {
         
         easterEggActivated = true;
         
-        console.log(`🎉🎁 FREE PASS ACTIVATED for user ${workspace.userId}!`);
+        console.log(`🎉🎁 FREE PASS ACTIVATED for user ${userId}!`);
         
         // Add special audit log
         await database.addAuditLog({
-          userId: workspace.userId,
+          userId: userId,
           action: 'subscription.free_pass_granted',
           resourceType: 'subscription',
           resourceId: feedback.id,
@@ -1040,7 +1040,7 @@ app.post('/api/feedback', requireAdmin, async (req, res) => {
 
     // Add regular audit log
     await database.addAuditLog({
-      userId: workspace.userId,
+      userId: userId,
       action: 'feedback.submitted',
       resourceType: 'feedback',
       resourceId: feedback.id,
