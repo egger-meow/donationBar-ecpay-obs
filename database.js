@@ -16,11 +16,11 @@ class Database {
     const isSandbox = process.env.ENVIRONMENT === 'sandbox';
     this.isProduction = !isSandbox && (process.env.ENVIRONMENT === 'production' || process.env.DATABASE_URL);
     this.connected = false;
-    
+
     if (isSandbox) {
       console.log('🧪 Sandbox mode: Using local db.json file');
     }
-    
+
     if (this.isProduction) {
       this.initPostgreSQL();
     }
@@ -35,9 +35,17 @@ class Database {
         return;
       }
 
+      // Configure SSL with CA certificate for Aiven PostgreSQL
+      const sslConfig = databaseUrl.includes('sslmode=require')
+        ? {
+          rejectUnauthorized: !!process.env.DATABASE_CA,
+          ca: process.env.DATABASE_CA || undefined
+        }
+        : false;
+
       pgClient = new Client({
         connectionString: databaseUrl,
-        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+        ssl: sslConfig
       });
 
       await pgClient.connect();
@@ -46,10 +54,10 @@ class Database {
 
       // Create tables if they don't exist
       await this.createTables();
-      
+
       // Migrate data from JSON file if it exists and database is empty
       await this.migrateFromJSON();
-      
+
     } catch (error) {
       console.error('❌ PostgreSQL connection failed:', error.message);
       console.log('📝 Falling back to JSON file storage');
@@ -187,7 +195,7 @@ class Database {
       }
 
       console.log('✅ Migration completed successfully');
-      
+
     } catch (error) {
       console.error('❌ Migration failed:', error);
     }
@@ -205,7 +213,7 @@ class Database {
         const donationsResult = await pgClient.query(
           'SELECT trade_no, amount, payer, message, created_at FROM donations ORDER BY created_at DESC LIMIT 100'
         );
-        
+
         return {
           goal: {
             title: appData.goal_title || '斗內目標',
@@ -302,7 +310,7 @@ class Database {
           'SELECT trade_no FROM donations WHERE trade_no = $1',
           [tradeNo]
         );
-        
+
         if (existingDonation.rows.length > 0) {
           await pgClient.query('ROLLBACK');
           console.log(`Duplicate trade number: ${tradeNo}`);
@@ -318,7 +326,7 @@ class Database {
         // Update app data
         const appDataResult = await pgClient.query('SELECT * FROM app_data WHERE id = $1', ['main']);
         const currentData = appDataResult.rows[0] || {};
-        
+
         const newSeenTradeNos = [...(currentData.seen_trade_nos || []), tradeNo];
         const newTotal = (currentData.total || 0) + Number(amount);
 
@@ -343,12 +351,12 @@ class Database {
     } else {
       // Use JSON file method
       const data = await this.readDB();
-      
+
       if (data.seenTradeNos.includes(tradeNo)) {
         console.log(`Duplicate trade number: ${tradeNo}`);
         return false;
       }
-      
+
       data.seenTradeNos.push(tradeNo);
       data.total = (data.total || 0) + Number(amount);
       data.donations.push({
@@ -358,7 +366,7 @@ class Database {
         message: message || '',
         at: new Date().toISOString()
       });
-      
+
       await this.writeDB(data);
       console.log(`New donation: ${payer} donated NT$${amount}`);
       return true;
@@ -370,16 +378,16 @@ class Database {
     if (this.isProduction && this.connected) {
       try {
         await pgClient.query('BEGIN');
-        
+
         // Clear donations table
         await pgClient.query('DELETE FROM donations');
-        
+
         // Reset app_data (including goal_start_from)
         await pgClient.query(
           'UPDATE app_data SET total = 0, goal_start_from = 0, seen_trade_nos = $1, updated_at = NOW() WHERE id = $2',
           [[], 'main']
         );
-        
+
         await pgClient.query('COMMIT');
         console.log('✨ All donations cleared from database');
         return true;
