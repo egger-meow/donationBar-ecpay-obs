@@ -52,8 +52,9 @@ class Database {
         }
 
         sslConfig = {
-          rejectUnauthorized: !!caCert,
-          ca: caCert || undefined
+          rejectUnauthorized: true,
+          ca: caCert,
+          servername: 'donationbar-donationbar.j.aivencloud.com',
         };
       }
 
