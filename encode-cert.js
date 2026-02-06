@@ -1,0 +1,37 @@
+import fs from 'fs';
+
+const cert = `-----BEGIN CERTIFICATE-----
+MIIERDCCAqygAwIBAgIUO3T0W0T2L09kza7vpguHCjXzRj4wDQYJKoZIhvcNAQEM
+BQAwOjE4MDYGA1UEAwwvZjhkYjAwMmItMDIxMy00YWU5LTlkZTMtMTdhMWM5NDE3
+M2RlIFByb2plY3QgQ0EwHhcNMjYwMjA2MTcwNzIxWhcNMzYwMjA0MTcwNzIxWjA6
+MTgwNgYDVQQDDC9mOGRiMDAyYi0wMjEzLTRhZTktOWRlMy0xN2ExYzk0MTczZGUg
+UHJvamVjdCBDQTCCAaIwDQYJKoZIhvcNAQEBBQADggGPADCCAYoCggGBAKYlUtmz
+Gm4seIywW+ooMt+r8x2Hp9LMX0LB3JBkH5LjsK4+odoeG5s0rSMLXBogzpsAtRk0
+bgBalZTYH8EbrZ66CYJYCQGDPjhD7So5iErvj/7nUg37N3OuHGQd1MelBWp9sScU
+T2bBGq2KGRvZ+LBgpgq1hvUWgptjEkC0GaQ32TP5ktxhJC2ezl4v5e1YIF3pl5tT
+PXuSVW11b7izKC2VLed+rcyYE4RJl4TZfj/Yevw0Xed09vtj70nLXolde3RSWlaj
+Z3HH5+Pa6XoRlFAHiwQMSJDbsYzKxi//wXuPbvClYMswNSZJUHdpRkZHYnxOJa1z
+euMdlAFAOfHKHh5N0NtMBhihuobg8pMBboQXGRvHHH69e7mj8EcpKDfF2uaxymIS
+3Hd84vUvW27dmu0xFTRo0kijLLWg4JubWDLRmNJLbL7NxKfINYW6X0pEt0LORjfZ
++sYHw7RU8GlyxvQQApC0Ni8cfeFR9btdOfxn26CZ3/HUAuUngXW575h+9wIDAQAB
+o0IwQDAdBgNVHQ4EFgQU4QwXW5zRJdRWDqf6K6WvwsoDst4wEgYDVR0TAQH/BAgw
+BgEB/wIBADALBgNVHQ8EBAMCAQYwDQYJKoZIhvcNAQEMBQADggGBAH5T6Zm2PhLn
+QbLC2C6zpYNyXLVYq7pmZp+vYKAoqSjx58n9p3bxndeux7W/HnveZ1Nv656+wju1
+Qt+2Jkif6TFJrP9ovo5GUuqKpjhqxghqRV/Nb3HzbniaDmdaQ5iVQ6jxYxYiKc/Z
+iy1eil7h/xrMSil6ENchBn1oVNzf8L2bAbkPUCMA8LYLhk0oc2PHAsXA2OA7AWZ+
+oG/AiVqJr2EYZPLJw0nQmaaxdsUa5sJ0p+7oQOJyTWmnMWDrzXw9wifinbXZ92xJ
+nub9eoUfNUMBDmSLybW+eUP72eQg4yont5bTXozRAc+UFpJbUrDYmBU4BIRfH03v
+iYTgcQIIlNQgjK+/9KrL6UlkIIdsbxfG8nnf8Qqykb0rxpLfLXp8GkY3fQ/pFoM/
+9SzCYVoJ2WVLyo62KNJkeAaHgJaNqXpZDXSoQEA/8YarrUvd5A2vEPwK30Z59aJ2
+sU+nQI0XiQ2W4xEvSiIJJQcQwqLyn6JCZ258tKYMTzXPfwWThqNVVQ==
+-----END CERTIFICATE-----`;
+
+const base64 = Buffer.from(cert).toString('base64');
+
+// Save to file
+fs.writeFileSync('DATABASE_CA_VALUE.txt', base64, 'utf8');
+
+console.log('Base64 certificate saved to DATABASE_CA_VALUE.txt');
+console.log('Length:', base64.length, 'characters');
+console.log('');
+console.log('Open the file and copy the entire content to Render DATABASE_CA env var');

@@ -36,12 +36,26 @@ class Database {
       }
 
       // Configure SSL with CA certificate for Aiven PostgreSQL
-      const sslConfig = databaseUrl.includes('sslmode=require')
-        ? {
-          rejectUnauthorized: !!process.env.DATABASE_CA,
-          ca: process.env.DATABASE_CA || undefined
+      let sslConfig = false;
+      if (databaseUrl.includes('sslmode=require')) {
+        let caCert = process.env.DATABASE_CA;
+
+        // Decode Base64 if the cert doesn't start with -----BEGIN
+        if (caCert && !caCert.startsWith('-----BEGIN')) {
+          try {
+            caCert = Buffer.from(caCert, 'base64').toString('utf-8');
+            console.log('CA length:', caCert.length);
+            console.log(caCert.slice(0, 30));
+          } catch (e) {
+            console.error('Failed to decode DATABASE_CA from Base64:', e.message);
+          }
         }
-        : false;
+
+        sslConfig = {
+          rejectUnauthorized: !!caCert,
+          ca: caCert || undefined
+        };
+      }
 
       pgClient = new Client({
         connectionString: databaseUrl,
