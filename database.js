@@ -58,8 +58,15 @@ class Database {
         };
       }
 
+      // Parse DATABASE_URL to extract connection details
+      const dbUrl = new URL(databaseUrl);
+
       pgClient = new Client({
-        connectionString: databaseUrl,
+        user: dbUrl.username,
+        password: dbUrl.password,
+        host: dbUrl.hostname,
+        port: parseInt(dbUrl.port, 10),
+        database: dbUrl.pathname.slice(1), // Remove leading '/'
         ssl: sslConfig
       });
 
