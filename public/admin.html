@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -322,6 +323,7 @@
         opacity: 0;
         transform: translateY(-20px);
       }
+
       to {
         opacity: 1;
         transform: translateY(0);
@@ -332,23 +334,31 @@
       from {
         left: -100%;
       }
+
       to {
         left: 100%;
       }
     }
 
     @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
     }
 
     @keyframes pulse-success {
       0% {
         box-shadow: 0 0 0 0 rgba(70, 230, 90, 0.7);
       }
+
       70% {
         box-shadow: 0 0 0 10px rgba(70, 230, 90, 0);
       }
+
       100% {
         box-shadow: 0 0 0 0 rgba(70, 230, 90, 0);
       }
@@ -358,9 +368,11 @@
       0% {
         box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.7);
       }
+
       70% {
         box-shadow: 0 0 0 10px rgba(255, 107, 107, 0);
       }
+
       100% {
         box-shadow: 0 0 0 0 rgba(255, 107, 107, 0);
       }
@@ -435,8 +447,13 @@
     }
 
     @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
     }
 
     @keyframes slideUp {
@@ -444,6 +461,7 @@
         opacity: 0;
         transform: translateY(30px);
       }
+
       to {
         opacity: 1;
         transform: translateY(0);
@@ -454,11 +472,11 @@
       .dashboard {
         grid-template-columns: 1fr;
       }
-      
+
       .quick-links {
         flex-direction: column;
       }
-      
+
       .btn {
         width: 100%;
       }
@@ -545,6 +563,7 @@
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <div class="header">
@@ -579,7 +598,7 @@
             <div class="stat-label">捐款次數</div>
           </div>
         </div>
-        
+
         <div>
           <strong id="goalTitle">Loading...</strong>
           <div class="progress-bar">
@@ -599,20 +618,21 @@
             <label for="goalTitleInput">目標標題</label>
             <input type="text" id="goalTitleInput" placeholder="例：Gaming PC Goal" required>
           </div>
-          
+
           <div class="form-group">
             <label for="goalAmountInput">目標金額 (NT$)</label>
             <input type="number" id="goalAmountInput" min="1" placeholder="50000" required>
           </div>
-          
+
           <div class="form-group">
             <label for="goalStartFromInput">起始金額 (NT$)</label>
             <input type="number" id="goalStartFromInput" min="0" value="0" placeholder="0">
-            <div style="background: #ff6b6b; color: white; padding: 10px; border-radius: 5px; margin-top: 8px; font-size: 12px; line-height: 1.4;">
+            <div
+              style="background: #ff6b6b; color: white; padding: 10px; border-radius: 5px; margin-top: 8px; font-size: 12px; line-height: 1.4;">
               ⚠️ <strong>道德提醒：</strong>設定起始金額可能會誤導觀眾，讓他們以為您已經收到更多捐款。請謹慎使用此功能，並考慮透明度對於建立觀眾信任的重要性。
             </div>
           </div>
-          
+
           <button type="submit" class="btn btn-primary" id="goalSubmitBtn">💾 更新目標</button>
           <div class="form-feedback" id="goalFeedback"></div>
         </form>
@@ -636,17 +656,17 @@
             <label for="merchantIdInput">商店代號 (MerchantID)</label>
             <input type="text" id="merchantIdInput" placeholder="請輸入 ECPay 商店代號" required>
           </div>
-          
+
           <div class="form-group">
             <label for="hashKeyInput">HashKey</label>
             <input type="password" id="hashKeyInput" placeholder="請輸入 ECPay HashKey">
           </div>
-          
+
           <div class="form-group">
             <label for="hashIVInput">HashIV</label>
             <input type="password" id="hashIVInput" placeholder="請輸入 ECPay HashIV">
           </div>
-          
+
           <button type="submit" class="btn btn-primary" id="ecpaySubmitBtn">💾 更新 ECPay 設定</button>
           <div class="form-feedback" id="ecpayFeedback"></div>
         </form>
@@ -662,43 +682,43 @@
               <input type="checkbox" id="alertEnabledInput"> 啟用捐款提醒彈窗
             </label>
           </div>
-          
+
           <div class="form-group">
             <label>
               <input type="checkbox" id="alertSoundInput"> 播放捐款音效
             </label>
           </div>
-          
+
           <div class="form-group">
             <label for="fontSizeInput">字體大小 (px)</label>
             <input type="number" id="fontSizeInput" min="10" max="50" value="16">
           </div>
-          
+
           <div class="form-group">
             <label for="fontColorInput">字體顏色</label>
             <input type="color" id="fontColorInput" value="#ffffff">
           </div>
-          
+
           <div class="form-group">
             <label for="backgroundColorInput">背景顏色</label>
             <input type="color" id="backgroundColorInput" value="#1a1a1a">
           </div>
-          
+
           <div class="form-group">
             <label for="progressBarColorInput">進度條顏色</label>
             <input type="color" id="progressBarColorInput" value="#46e65a">
           </div>
-          
+
           <div class="form-group">
             <label for="progressBarHeightInput">進度條高度 (px)</label>
             <input type="number" id="progressBarHeightInput" min="10" max="100" value="30">
           </div>
-          
+
           <div class="form-group">
             <label for="progressBarCornerRadiusInput">進度條圓角 (px)</label>
             <input type="number" id="progressBarCornerRadiusInput" min="0" max="50" value="15">
           </div>
-          
+
           <div class="form-group">
             <label for="positionInput">位置</label>
             <select id="positionInput">
@@ -711,20 +731,21 @@
               <option value="bottom-right">右下</option>
             </select>
           </div>
-          
+
           <div class="form-group">
             <label for="widthInput">寬度 (px)</label>
             <input type="number" id="widthInput" min="300" max="1920" value="900">
           </div>
-          
+
           <div class="form-group">
             <label for="alertDurationInput">提醒顯示時間 (毫秒)</label>
             <input type="number" id="alertDurationInput" min="1000" max="30000" value="5000">
           </div>
-          
+
           <div class="form-group">
             <label for="donationDisplayModeInput">進度條下方捐款顯示模式</label>
-            <select id="donationDisplayModeInput" style="width: 100%; padding: 12px 15px; border-radius: 8px; border: 2px solid #2a2f36; background: #0f1216; color: #ffffff; font-size: 14px;">
+            <select id="donationDisplayModeInput"
+              style="width: 100%; padding: 12px 15px; border-radius: 8px; border: 2px solid #2a2f36; background: #0f1216; color: #ffffff; font-size: 14px;">
               <option value="top">顯示金額前 N 名 (從高到低)</option>
               <option value="latest">顯示最近 N 筆 (從新到舊)</option>
               <option value="hidden">不顯示</option>
@@ -733,7 +754,7 @@
               💡 控制進度條下方顯示哪些捐款記錄
             </div>
           </div>
-          
+
           <div class="form-group">
             <label for="donationDisplayCountInput">顯示捐款數量 (N)</label>
             <input type="number" id="donationDisplayCountInput" min="1" max="10" value="3">
@@ -741,7 +762,7 @@
               💡 設定要顯示幾筆捐款記錄 (1-10)
             </div>
           </div>
-          
+
           <button type="submit" class="btn btn-primary" id="overlaySubmitBtn">💾 更新 Overlay 設定</button>
           <div class="form-feedback" id="overlayFeedback"></div>
         </form>
@@ -754,7 +775,7 @@
           <button class="btn btn-danger" onclick="resetProgress()">
             🗑️ 重置進度 (清空所有捐款記錄)
           </button>
-          
+
           <div style="margin-top: 20px;">
             <h3 style="margin-bottom: 15px; color: #e0e0e0;">OBS 設定</h3>
             <p style="color: #a0a0a0; margin-bottom: 10px;">
@@ -776,14 +797,13 @@
         <p style="color: #a0a0a0; margin-bottom: 15px;">
           以下是您的 Overlay 即時預覽。調整設定後會自動反映在此預覽中。
         </p>
-        <div style="background: #000; border-radius: 8px; overflow: hidden; border: 2px solid #2a2f36; position: relative;">
-          <div style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 5px; font-size: 12px; color: #4CAF50; z-index: 10;">
+        <div
+          style="background: #000; border-radius: 8px; overflow: hidden; border: 2px solid #2a2f36; position: relative;">
+          <div
+            style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 5px; font-size: 12px; color: #4CAF50; z-index: 10;">
             ● LIVE
           </div>
-          <iframe 
-            id="overlayPreview" 
-            src="/overlay" 
-            style="width: 100%; height: 400px; border: none; display: block;"
+          <iframe id="overlayPreview" src="/overlay" style="width: 100%; height: 400px; border: none; display: block;"
             title="Overlay Preview">
           </iframe>
         </div>
@@ -808,12 +828,12 @@
     <div id="donationMethodsModal" class="modal-overlay">
       <div class="modal-content">
         <button class="modal-close" onclick="toggleDonationMethodsModal()">×</button>
-        
+
         <h2 style="margin-bottom: 10px;">💰 接受捐款的方式</h2>
         <p style="color: #a0a0a0; margin-bottom: 20px;">
           您可以選擇以下兩種方式來接受觀眾的捐款：
         </p>
-        
+
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px;">
           <!-- Method 1: Donate Page -->
           <div style="background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 12px; border: 2px solid #2a2f36;">
@@ -821,11 +841,13 @@
             <p style="color: #e0e0e0; margin-bottom: 15px; line-height: 1.6;">
               透過我們的捐款頁面，觀眾可以直接輸入金額和留言，系統會自動導向 ECPay 付款頁面。付款完成後會自動更新進度條。
             </p>
-            <div style="background: #0f1216; padding: 12px; border-radius: 8px; border: 1px solid #2a2f36; margin-bottom: 15px;">
+            <div
+              style="background: #0f1216; padding: 12px; border-radius: 8px; border: 1px solid #2a2f36; margin-bottom: 15px;">
               <div style="color: #808080; font-size: 12px; margin-bottom: 5px;">捐款頁面網址：</div>
               <code id="donatePageUrl" style="color: #46e65a; word-break: break-all; font-size: 13px;"></code>
             </div>
-            <button class="btn btn-secondary" onclick="copyToClipboard(document.getElementById('donatePageUrl').textContent, '捐款頁面網址已複製')">
+            <button class="btn btn-secondary"
+              onclick="copyToClipboard(document.getElementById('donatePageUrl').textContent, '捐款頁面網址已複製')">
               📋 複製網址
             </button>
             <a href="/donate" class="btn" target="_blank" style="background: #3498db; margin-left: 10px;">
@@ -839,14 +861,17 @@
             <p style="color: #e0e0e0; margin-bottom: 15px; line-height: 1.6;">
               如果您已經有自己的商店或捐款方式，可以在 ECPay 商店後台設定 Webhook，讓系統自動接收付款通知並更新進度條。
             </p>
-            <div style="background: #0f1216; padding: 12px; border-radius: 8px; border: 1px solid #2a2f36; margin-bottom: 15px;">
+            <div
+              style="background: #0f1216; padding: 12px; border-radius: 8px; border: 1px solid #2a2f36; margin-bottom: 15px;">
               <div style="color: #808080; font-size: 12px; margin-bottom: 5px;">Webhook 網址：</div>
               <code id="webhookUrl" style="color: #46e65a; word-break: break-all; font-size: 13px;"></code>
             </div>
-            <button class="btn btn-secondary" onclick="copyToClipboard(document.getElementById('webhookUrl').textContent, 'Webhook 網址已複製')">
+            <button class="btn btn-secondary"
+              onclick="copyToClipboard(document.getElementById('webhookUrl').textContent, 'Webhook 網址已複製')">
               📋 複製網址
             </button>
-            <div style="margin-top: 15px; padding: 12px; background: rgba(52, 152, 219, 0.1); border: 1px solid rgba(52, 152, 219, 0.3); border-radius: 8px;">
+            <div
+              style="margin-top: 15px; padding: 12px; background: rgba(52, 152, 219, 0.1); border: 1px solid rgba(52, 152, 219, 0.3); border-radius: 8px;">
               <div style="font-size: 13px; color: #3498db; margin-bottom: 8px;">⚙️ ECPay 設定步驟：</div>
               <ol style="color: #a0a0a0; font-size: 13px; margin-left: 20px; line-height: 1.8;">
                 <li>登入 ECPay 商店後台</li>
@@ -856,10 +881,17 @@
                 <li>儲存設定即可</li>
               </ol>
             </div>
+
+            <div
+              style="margin-top: 10px; padding: 10px; background: rgba(255, 107, 107, 0.1); border-left: 3px solid #ff6b6b; font-size: 13px; color: #e0e0e0; line-height: 1.5;">
+              <strong>⚠️ 重要：</strong><br>
+              所登入的 ECPay 商店後台帳號，必須與下方「ECPay 金流設定」填寫的 <strong>商店代號 (MerchantID)</strong> 一致，否則 Webhook 會因驗證失敗而無法運作。
+            </div>
           </div>
         </div>
 
-        <div style="margin-top: 20px; padding: 15px; background: rgba(255, 193, 7, 0.1); border: 2px solid rgba(255, 193, 7, 0.3); border-radius: 10px;">
+        <div
+          style="margin-top: 20px; padding: 15px; background: rgba(255, 193, 7, 0.1); border: 2px solid rgba(255, 193, 7, 0.3); border-radius: 10px;">
           <div style="font-size: 14px; color: #ffc107; margin-bottom: 8px;">💡 提示</div>
           <ul style="color: #e0e0e0; font-size: 13px; margin-left: 20px; line-height: 1.8;">
             <li>兩種方式可以同時使用，不會衝突</li>
@@ -884,13 +916,13 @@
     const remainingAmount = document.getElementById('remainingAmount');
     const donationsList = document.getElementById('donationsList');
     const obsUrl = document.getElementById('obsUrl');
-    
+
     // ECPay form elements
     const ecpayForm = document.getElementById('ecpayForm');
     const merchantIdInput = document.getElementById('merchantIdInput');
     const hashKeyInput = document.getElementById('hashKeyInput');
     const hashIVInput = document.getElementById('hashIVInput');
-    
+
     // Overlay settings form elements
     const overlaySettingsForm = document.getElementById('overlaySettingsForm');
     const alertEnabledInput = document.getElementById('alertEnabledInput');
@@ -938,7 +970,7 @@
     function toggleDonationMethodsModal() {
       const modal = document.getElementById('donationMethodsModal');
       modal.classList.toggle('active');
-      
+
       // Prevent body scroll when modal is open
       if (modal.classList.contains('active')) {
         document.body.style.overflow = 'hidden';
@@ -948,14 +980,14 @@
     }
 
     // Close modal when clicking outside the content
-    document.getElementById('donationMethodsModal')?.addEventListener('click', function(e) {
+    document.getElementById('donationMethodsModal')?.addEventListener('click', function (e) {
       if (e.target === this) {
         toggleDonationMethodsModal();
       }
     });
 
     // Close modal with ESC key
-    document.addEventListener('keydown', function(e) {
+    document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         const modal = document.getElementById('donationMethodsModal');
         if (modal?.classList.contains('active')) {
@@ -969,7 +1001,7 @@
       alert.className = `alert alert-${type}`;
       alert.textContent = message;
       alertContainer.appendChild(alert);
-      
+
       setTimeout(() => {
         if (alert.parentNode) {
           alert.style.animation = 'slideInDown 0.3s ease-out reverse';
@@ -1026,22 +1058,22 @@
 
     function renderProgress(data) {
       const { title, current, goal, percent, donations, actualDonations, startFrom } = data;
-      
+
       // Update stats - show total including startFrom
       currentTotal.textContent = `NT$ ${formatNumber(current)}`;
       progressPercent.textContent = `${percent || 0}%`;
       donationCount.textContent = donations ? donations.length : 0;
-      
+
       // Update progress bar
       goalTitle.textContent = title || 'Goal';
       progressFill.style.width = `${Math.min(100, percent || 0)}%`;
       remainingAmount.textContent = formatNumber(Math.max(0, goal - current));
-      
+
       // Update form with current values
       goalTitleInput.value = title || '';
       goalAmountInput.value = goal || '';
       goalStartFromInput.value = startFrom || 0;
-      
+
       // Render donations list
       if (donations && donations.length > 0) {
         const donationsHTML = donations
@@ -1056,7 +1088,7 @@
               </div>
             </div>
           `).join('');
-        
+
         donationsList.innerHTML = donationsHTML;
       } else {
         donationsList.innerHTML = '<div style="text-align: center; color: #a0a0a0; padding: 20px;">尚無捐款記錄</div>';
@@ -1078,16 +1110,16 @@
     // Update goal
     goalForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      
+
       setButtonLoading('goalSubmitBtn', true);
       showFormFeedback('goalFeedback', '正在更新目標設定...', 'info');
-      
+
       const formData = {
         title: goalTitleInput.value,
         amount: parseInt(goalAmountInput.value),
         startFrom: parseInt(goalStartFromInput.value) || 0
       };
-      
+
       try {
         const response = await fetch('/admin/goal', {
           method: 'POST',
@@ -1096,11 +1128,11 @@
           },
           body: JSON.stringify(formData)
         });
-        
+
         const result = await response.json();
-        
+
         setButtonLoading('goalSubmitBtn', false);
-        
+
         if (result.success) {
           showAlert('✅ 目標設定已更新！');
           showFormFeedback('goalFeedback', '✅ 目標設定成功更新', 'success');
@@ -1125,14 +1157,14 @@
       if (!confirm('確定要重置所有進度嗎？此操作無法復原。')) {
         return;
       }
-      
+
       try {
         const response = await fetch('/admin/reset', {
           method: 'POST'
         });
-        
+
         const result = await response.json();
-        
+
         if (result.success) {
           showAlert('進度已重置！');
           loadData(); // Refresh data
@@ -1147,7 +1179,7 @@
 
     // Real-time updates via SSE
     const eventSource = new EventSource('/events');
-    eventSource.onmessage = function(event) {
+    eventSource.onmessage = function (event) {
       try {
         const data = JSON.parse(event.data);
         renderProgress(data);
@@ -1157,7 +1189,7 @@
     };
 
     // Listen for admin notifications (webhook warnings/errors)
-    eventSource.addEventListener('admin-notification', function(event) {
+    eventSource.addEventListener('admin-notification', function (event) {
       try {
         const notification = JSON.parse(event.data);
         showWebhookNotification(notification);
@@ -1169,7 +1201,7 @@
     // Display webhook notifications
     function showWebhookNotification(notification) {
       const { type, message, details, timestamp } = notification;
-      
+
       const icons = {
         warning: '⚠️',
         error: '❌',
@@ -1178,7 +1210,7 @@
 
       const notifEl = document.createElement('div');
       notifEl.className = `webhook-notification ${type}`;
-      
+
       let detailsHtml = '';
       if (details) {
         const detailsText = Object.entries(details)
@@ -1188,7 +1220,7 @@
       }
 
       const time = new Date(timestamp).toLocaleTimeString('zh-TW');
-      
+
       notifEl.innerHTML = `
         <span class="icon">${icons[type] || '📡'}</span>
         <div class="content">
@@ -1198,9 +1230,9 @@
         </div>
         <button class="close-btn" onclick="this.parentElement.remove()">×</button>
       `;
-      
+
       alertContainer.insertBefore(notifEl, alertContainer.firstChild);
-      
+
       // Auto-remove after 30 seconds
       setTimeout(() => {
         if (notifEl.parentNode) {
@@ -1243,7 +1275,7 @@
       try {
         const response = await fetch('/admin/overlay');
         const settings = await response.json();
-        
+
         alertEnabledInput.checked = settings.alertEnabled !== false;
         alertSoundInput.checked = settings.alertSound !== false;
         fontSizeInput.value = settings.fontSize || 16;
@@ -1265,16 +1297,16 @@
     // Update ECPay credentials
     ecpayForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      
+
       setButtonLoading('ecpaySubmitBtn', true);
       showFormFeedback('ecpayFeedback', '正在更新 ECPay 設定...', 'info');
-      
+
       // Only send fields that have values (for partial updates)
       const formData = {};
       if (merchantIdInput.value.trim()) formData.merchantId = merchantIdInput.value.trim();
       if (hashKeyInput.value.trim()) formData.hashKey = hashKeyInput.value.trim();
       if (hashIVInput.value.trim()) formData.hashIV = hashIVInput.value.trim();
-      
+
       try {
         const response = await fetch('/admin/ecpay', {
           method: 'POST',
@@ -1283,11 +1315,11 @@
           },
           body: JSON.stringify(formData)
         });
-        
+
         const result = await response.json();
-        
+
         setButtonLoading('ecpaySubmitBtn', false);
-        
+
         if (result.success) {
           showAlert('✅ ECPay 金流設定已更新！');
           showFormFeedback('ecpayFeedback', '✅ ECPay 設定成功更新', 'success');
@@ -1314,10 +1346,10 @@
     // Update overlay settings
     overlaySettingsForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      
+
       setButtonLoading('overlaySubmitBtn', true);
       showFormFeedback('overlayFeedback', '正在更新 Overlay 設定...', 'info');
-      
+
       const settings = {
         alertEnabled: alertEnabledInput.checked,
         alertSound: alertSoundInput.checked,
@@ -1333,7 +1365,7 @@
         donationDisplayMode: donationDisplayModeInput.value,
         donationDisplayCount: parseInt(donationDisplayCountInput.value)
       };
-      
+
       try {
         const response = await fetch('/admin/overlay', {
           method: 'POST',
@@ -1342,11 +1374,11 @@
           },
           body: JSON.stringify(settings)
         });
-        
+
         const result = await response.json();
-        
+
         setButtonLoading('overlaySubmitBtn', false);
-        
+
         if (result.success) {
           showAlert('✅ Overlay 外觀設定已更新！');
           showFormFeedback('overlayFeedback', '✅ Overlay 設定成功更新', 'success');
@@ -1381,7 +1413,7 @@
     function togglePreviewSize() {
       const iframe = document.getElementById('overlayPreview');
       previewExpanded = !previewExpanded;
-      
+
       if (previewExpanded) {
         iframe.style.height = '600px';
         showAlert('📏 預覽已放大');
@@ -1397,4 +1429,5 @@
     loadOverlaySettings();
   </script>
 </body>
+
 </html>
