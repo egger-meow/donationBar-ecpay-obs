@@ -33,7 +33,7 @@ async function readDB() {
 // ECPay credential helpers
 async function getECPayCredentials() {
   const db = await readDB();
-  
+
   // Check if credentials exist in database and are not empty
   if (db.ecpay && db.ecpay.merchantId && db.ecpay.hashKey && db.ecpay.hashIV) {
     return {
@@ -42,14 +42,14 @@ async function getECPayCredentials() {
       hashIV: db.ecpay.hashIV
     };
   }
-  
+
   // Fallback to environment variables
   const envCredentials = {
     merchantId: process.env.MERCHANT_ID,
     hashKey: process.env.HASH_KEY,
     hashIV: process.env.HASH_IV
   };
-  
+
   // If env variables exist and db doesn't have them, save to db
   if (envCredentials.merchantId && envCredentials.hashKey && envCredentials.hashIV) {
     if (!db.ecpay) db.ecpay = {};
@@ -59,7 +59,7 @@ async function getECPayCredentials() {
     await writeDB(db);
     console.log('💾 ECPay credentials migrated from .env to database');
   }
-  
+
   return envCredentials;
 }
 
@@ -94,6 +94,24 @@ async function broadcastOverlaySettings() {
   }
 }
 
+// Broadcast admin notifications (warnings/errors) to connected admin panels
+function broadcastAdminNotification(type, message, details = null) {
+  const notification = {
+    type,      // 'warning', 'error', 'info'
+    message,
+    details,
+    timestamp: new Date().toISOString()
+  };
+  const payload = `event: admin-notification\ndata: ${JSON.stringify(notification)}\n\n`;
+  for (const res of sseClients) {
+    try {
+      res.write(payload);
+    } catch (error) {
+      sseClients.delete(res);
+    }
+  }
+}
+
 // SSE endpoint
 app.get('/events', async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
@@ -111,7 +129,7 @@ app.get('/events', async (req, res) => {
   }, 30000);
 
   sseClients.add(res);
-  
+
   req.on('close', () => {
     clearInterval(keepAlive);
     sseClients.delete(res);
@@ -126,12 +144,12 @@ async function getProgress() {
   const current = actualDonations + startFrom; // Add start_from to actual donations
   const goal = db.goal.amount;
   const percent = Math.min(100, Math.round((current / goal) * 100));
-  
+
   // Get donation display mode from overlay settings
   const displayMode = db.overlaySettings?.donationDisplayMode || 'top';
   const displayCount = db.overlaySettings?.donationDisplayCount || 3;
   let displayDonations = [];
-  
+
   if (displayMode === 'hidden') {
     displayDonations = [];
   } else if (displayMode === 'latest') {
@@ -143,7 +161,7 @@ async function getProgress() {
       .sort((a, b) => b.amount - a.amount)
       .slice(0, displayCount);
   }
-  
+
   return {
     title: db.goal.title,
     current,
@@ -167,11 +185,11 @@ async function addDonation({ tradeNo, amount, payer, message }) {
 function formatECPayDate(d = new Date()) {
   const pad = (n) => String(n).padStart(2, '0');
   const yyyy = d.getFullYear();
-  const MM   = pad(d.getMonth() + 1);
-  const dd   = pad(d.getDate());
-  const HH   = pad(d.getHours());
-  const mm   = pad(d.getMinutes());
-  const ss   = pad(d.getSeconds());
+  const MM = pad(d.getMonth() + 1);
+  const dd = pad(d.getDate());
+  const HH = pad(d.getHours());
+  const mm = pad(d.getMinutes());
+  const ss = pad(d.getSeconds());
   return `${yyyy}/${MM}/${dd} ${HH}:${mm}:${ss}`;
 }
 
@@ -236,16 +254,16 @@ async function encryptECPayData(data) {
 
   try {
     const key = Buffer.from(hashKey, 'utf8');
-    const iv  = Buffer.from(hashIV,  'utf8');
-    
+    const iv = Buffer.from(hashIV, 'utf8');
+
     // URL-encode the JSON, then encrypt
     const jsonText = JSON.stringify(data);
     const urlEncoded = encodeURIComponent(jsonText);
-    
+
     const cipher = crypto.createCipheriv('aes-128-cbc', key, iv);
     let encrypted = cipher.update(urlEncoded, 'utf8', 'base64');
     encrypted += cipher.final('base64');
-    
+
     return encrypted;
   } catch (error) {
     console.error('Failed to encrypt ECPay data:', error);
@@ -264,7 +282,7 @@ async function decryptECPayData(encryptedData) {
 
     // AES-128-CBC with PKCS#7 padding (Node's default)
     const key = Buffer.from(hashKey, 'utf8');
-    const iv  = Buffer.from(hashIV,  'utf8');
+    const iv = Buffer.from(hashIV, 'utf8');
     const decipher = crypto.createDecipheriv('aes-128-cbc', key, iv);
 
     let decrypted = decipher.update(encryptedData, 'base64', 'utf8');
@@ -290,12 +308,12 @@ async function decryptECPayData(encryptedData) {
 // Authentication middleware
 function requireAdmin(req, res, next) {
   if (req.session.isAdmin) return next();
-  
+
   // Return JSON error for API requests (AJAX)
   if (req.xhr || req.headers.accept?.includes('application/json')) {
     return res.status(401).json({ error: 'Unauthorized', message: 'Please login first' });
   }
-  
+
   return res.redirect('/login');
 }
 
@@ -306,8 +324,8 @@ app.get('/progress', async (req, res) => {
     res.json(progress);
   } catch (error) {
     console.error('Error in /progress:', error);
-    res.status(500).json({ 
-      error: 'Failed to load progress', 
+    res.status(500).json({
+      error: 'Failed to load progress',
       message: error.message,
       title: '斗內目標',
       current: 0,
@@ -320,9 +338,9 @@ app.get('/progress', async (req, res) => {
 
 // Page routes
 app.get('/overlay', (req, res) => {
-  res.setHeader('Cache-Control','no-cache, no-store, must-revalidate');
-  res.setHeader('Pragma','no-cache');
-  res.setHeader('Expires','0');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(path.join(__dirname, 'public', 'overlay.html'));
 });
 
@@ -341,11 +359,11 @@ app.get('/success', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
-  
+
   if (sandbox === '1') {
     console.log('🧪 SANDBOX: Redirecting to success page');
   }
-  
+
   return res.redirect('/donate?success=1');
 });
 
@@ -353,8 +371,8 @@ app.post('/success', async (req, res) => {
   const p = req.body || {};
   const credentials = await getECPayCredentials();
   const ok = String(p.RtnCode) === '1' &&
-             p.MerchantID === credentials.merchantId &&
-             await verifyCheckMacValue(p);
+    p.MerchantID === credentials.merchantId &&
+    await verifyCheckMacValue(p);
 
   if (ok) {
     // Safe fallback: add donation here too (idempotent via seenTradeNos)
@@ -408,8 +426,8 @@ app.post('/ecpay/return', async (req, res) => {
 
   const credentials = await getECPayCredentials();
   const validMac = await verifyCheckMacValue(p);
-  const success  = p.RtnCode === '1';
-  const mine     = p.MerchantID === credentials.merchantId;
+  const success = p.RtnCode === '1';
+  const mine = p.MerchantID === credentials.merchantId;
 
   if (validMac && success && mine) {
     // （選配）比對金額：找回你建立訂單時的金額再比一次
@@ -441,12 +459,18 @@ app.post('/webhook/ecpay', async (req, res) => {
     const merchantIdOk = String(payload.MerchantID) === String(credentials.merchantId);
 
     if (!merchantIdOk) {
-      console.error('❌ Webhook: Merchant ID mismatch');
-      return res.status(400).send('0|Invalid merchant');
+      console.warn('❌ Webhook: Merchant ID mismatch');
+      broadcastAdminNotification('warning', 'Webhook: Merchant ID 不符', {
+        received: payload.MerchantID,
+        expected: credentials.merchantId
+      });
     }
 
     if (transCode !== 1) {
       console.warn('⚠️ Webhook: TransCode is not 1:', payload.TransCode);
+      broadcastAdminNotification('warning', 'Webhook: TransCode 非 1', {
+        transCode: payload.TransCode
+      });
       return res.send('1|OK'); // Still acknowledge
     }
 
@@ -454,6 +478,9 @@ app.post('/webhook/ecpay', async (req, res) => {
     const decryptedData = await decryptECPayData(payload.Data);
     if (!decryptedData) {
       console.error('❌ Webhook: Failed to decrypt Data field');
+      broadcastAdminNotification('error', 'Webhook: 無法解密 Data 欄位', {
+        hint: '請確認 HashKey 和 HashIV 設定是否正確'
+      });
       return res.status(400).send('0|Decryption failed');
     }
 
@@ -462,12 +489,19 @@ app.post('/webhook/ecpay', async (req, res) => {
     // Check RtnCode (1 = API execution successful) - normalize to number
     if (Number(decryptedData.RtnCode) !== 1) {
       console.warn('⚠️ Webhook: RtnCode is not 1:', decryptedData.RtnCode, decryptedData.RtnMsg);
+      broadcastAdminNotification('warning', 'Webhook: RtnCode 非 1', {
+        rtnCode: decryptedData.RtnCode,
+        rtnMsg: decryptedData.RtnMsg
+      });
       return res.send('1|OK'); // Still acknowledge
     }
 
     // Check if this is a simulated payment - normalize to number
     if (Number(decryptedData.SimulatePaid) === 1) {
       console.warn('⚠️ Webhook: This is a SIMULATED payment, not real. Will not add to database.');
+      broadcastAdminNotification('warning', 'Webhook: 這是模擬付款', {
+        message: '此為測試交易，不會新增到資料庫'
+      });
       return res.send('1|OK');
     }
 
@@ -475,6 +509,10 @@ app.post('/webhook/ecpay', async (req, res) => {
     const orderInfo = decryptedData.OrderInfo;
     if (Number(orderInfo.TradeStatus) !== 1) {
       console.warn('⚠️ Webhook: Trade not paid yet, status:', orderInfo.TradeStatus);
+      broadcastAdminNotification('warning', 'Webhook: 交易尚未付款', {
+        tradeStatus: orderInfo.TradeStatus,
+        tradeNo: orderInfo.MerchantTradeNo
+      });
       return res.send('1|OK');
     }
 
@@ -516,14 +554,14 @@ app.post('/webhook/ecpay', async (req, res) => {
 // Generate encrypted payload for testing the real /webhook/ecpay endpoint
 app.post('/webhook/ecpay/generate-test-payload', async (req, res) => {
   const testSecret = process.env.WEBHOOK_TEST_SECRET;
-  
+
   if (!testSecret) {
-    return res.status(503).json({ 
-      error: 'Test endpoint disabled', 
-      message: 'Set WEBHOOK_TEST_SECRET environment variable to enable' 
+    return res.status(503).json({
+      error: 'Test endpoint disabled',
+      message: 'Set WEBHOOK_TEST_SECRET environment variable to enable'
     });
   }
-  
+
   const providedSecret = req.headers['x-test-secret'];
   if (providedSecret !== testSecret) {
     return res.status(401).json({ error: 'Invalid or missing X-Test-Secret header' });
@@ -532,7 +570,7 @@ app.post('/webhook/ecpay/generate-test-payload', async (req, res) => {
   try {
     const { amount, nickname, message } = req.body;
     const credentials = await getECPayCredentials();
-    
+
     const amt = parseInt(amount, 10) || 100;
     const tradeNo = 'TEST' + Date.now();
     const now = new Date();
@@ -560,7 +598,7 @@ app.post('/webhook/ecpay/generate-test-payload', async (req, res) => {
 
     // Encrypt the data
     const encryptedData = await encryptECPayData(decryptedData);
-    
+
     if (!encryptedData) {
       return res.status(500).json({ error: 'Failed to encrypt test data' });
     }
@@ -599,13 +637,13 @@ app.post('/create-order', async (req, res) => {
     return res.status(400).json({ error: 'Invalid amount' });
   }
 
-  const tradeNo   = 'DONATE' + Date.now();           // 長度 <= 20
+  const tradeNo = 'DONATE' + Date.now();           // 長度 <= 20
   const tradeDate = formatECPayDate(new Date());     // 正確格式
 
   // Sandbox mode: simulate successful payment without ECPay API
   if (process.env.ENVIRONMENT === 'sandbox') {
     console.log(`🧪 SANDBOX MODE: Simulating payment for ${nickname || 'Anonymous'} - NT$${amt}`);
-    
+
     // Add donation directly to database (simulate successful payment)
     const success = await addDonation({
       tradeNo: tradeNo,
@@ -644,10 +682,10 @@ app.post('/create-order', async (req, res) => {
 
   // 產生簽章（最後再放入）
   params.CheckMacValue = await generateCheckMacValue(params);
-  
+
   // Create auto-submit form
   const action = 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5';
-  
+
   const inputs = Object.entries(params)
     .map(([k, v]) => `<input type="hidden" name="${k}" value="${String(v)}">`)
     .join('\n');
@@ -667,16 +705,16 @@ app.post('/create-order', async (req, res) => {
 app.post('/admin/goal', requireAdmin, async (req, res) => {
   const { title, amount, startFrom } = req.body;
   const db = await readDB();
-  
+
   db.goal = {
     title: title || db.goal.title,
     amount: Number(amount) || db.goal.amount,
     startFrom: Number(startFrom) || 0
   };
-  
+
   await writeDB(db);
   await broadcastProgress();
-  
+
   res.json({ success: true, goal: db.goal });
 });
 
@@ -704,22 +742,22 @@ app.get('/admin/ecpay', requireAdmin, async (req, res) => {
 
 app.post('/admin/ecpay', requireAdmin, async (req, res) => {
   const { merchantId, hashKey, hashIV } = req.body;
-  
+
   // Require at least one field to be provided
   if (!merchantId && !hashKey && !hashIV) {
     return res.status(400).json({ error: 'At least one ECPay credential is required' });
   }
-  
+
   const db = await readDB();
   if (!db.ecpay) db.ecpay = {};
-  
+
   // Only update fields that are provided
   if (merchantId) db.ecpay.merchantId = merchantId.trim();
   if (hashKey) db.ecpay.hashKey = hashKey.trim();
   if (hashIV) db.ecpay.hashIV = hashIV.trim();
-  
+
   await writeDB(db);
-  
+
   res.json({ success: true, message: 'ECPay credentials updated successfully' });
 });
 
@@ -732,10 +770,10 @@ app.get('/admin/overlay', requireAdmin, async (req, res) => {
 app.post('/admin/overlay', requireAdmin, async (req, res) => {
   const settings = req.body;
   const db = await readDB();
-  
+
   // Validate and sanitize settings
   if (!db.overlaySettings) db.overlaySettings = {};
-  
+
   // Update settings with validation
   if (typeof settings.showDonationAlert === 'boolean') {
     db.overlaySettings.showDonationAlert = settings.showDonationAlert;
@@ -785,12 +823,12 @@ app.post('/admin/overlay', requireAdmin, async (req, res) => {
   if (typeof settings.donationDisplayCount === 'number' && settings.donationDisplayCount > 0) {
     db.overlaySettings.donationDisplayCount = Math.max(1, Math.min(10, settings.donationDisplayCount));
   }
-  
+
   await writeDB(db);
-  
+
   // Broadcast settings update to all connected overlays
   await broadcastOverlaySettings();
-  
+
   res.json({ success: true, message: 'Overlay settings updated successfully', settings: db.overlaySettings });
 });
 

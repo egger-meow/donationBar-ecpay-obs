@@ -468,6 +468,81 @@
         max-height: 85vh;
       }
     }
+
+    /* Webhook Notification Styles */
+    .webhook-notification {
+      padding: 15px 20px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      animation: slideInDown 0.3s ease-out;
+      border-left: 4px solid;
+    }
+
+    .webhook-notification.warning {
+      background: rgba(255, 193, 7, 0.15);
+      border-left-color: #ffc107;
+      color: #ffc107;
+    }
+
+    .webhook-notification.error {
+      background: rgba(255, 107, 107, 0.15);
+      border-left-color: #ff6b6b;
+      color: #ff6b6b;
+    }
+
+    .webhook-notification.info {
+      background: rgba(52, 152, 219, 0.15);
+      border-left-color: #3498db;
+      color: #3498db;
+    }
+
+    .webhook-notification .icon {
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .webhook-notification .content {
+      flex: 1;
+    }
+
+    .webhook-notification .message {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .webhook-notification .details {
+      font-size: 12px;
+      opacity: 0.85;
+      font-family: monospace;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 6px 10px;
+      border-radius: 5px;
+      margin-top: 6px;
+    }
+
+    .webhook-notification .time {
+      font-size: 11px;
+      opacity: 0.7;
+      margin-top: 4px;
+    }
+
+    .webhook-notification .close-btn {
+      background: none;
+      border: none;
+      color: inherit;
+      opacity: 0.6;
+      cursor: pointer;
+      font-size: 18px;
+      padding: 0;
+      line-height: 1;
+    }
+
+    .webhook-notification .close-btn:hover {
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
@@ -1080,6 +1155,60 @@
         console.error('Error parsing SSE data:', error);
       }
     };
+
+    // Listen for admin notifications (webhook warnings/errors)
+    eventSource.addEventListener('admin-notification', function(event) {
+      try {
+        const notification = JSON.parse(event.data);
+        showWebhookNotification(notification);
+      } catch (error) {
+        console.error('Error parsing admin notification:', error);
+      }
+    });
+
+    // Display webhook notifications
+    function showWebhookNotification(notification) {
+      const { type, message, details, timestamp } = notification;
+      
+      const icons = {
+        warning: '⚠️',
+        error: '❌',
+        info: 'ℹ️'
+      };
+
+      const notifEl = document.createElement('div');
+      notifEl.className = `webhook-notification ${type}`;
+      
+      let detailsHtml = '';
+      if (details) {
+        const detailsText = Object.entries(details)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join('\n');
+        detailsHtml = `<div class="details">${detailsText}</div>`;
+      }
+
+      const time = new Date(timestamp).toLocaleTimeString('zh-TW');
+      
+      notifEl.innerHTML = `
+        <span class="icon">${icons[type] || '📡'}</span>
+        <div class="content">
+          <div class="message">${message}</div>
+          ${detailsHtml}
+          <div class="time">${time}</div>
+        </div>
+        <button class="close-btn" onclick="this.parentElement.remove()">×</button>
+      `;
+      
+      alertContainer.insertBefore(notifEl, alertContainer.firstChild);
+      
+      // Auto-remove after 30 seconds
+      setTimeout(() => {
+        if (notifEl.parentNode) {
+          notifEl.style.animation = 'slideInDown 0.3s ease-out reverse';
+          setTimeout(() => notifEl.remove(), 300);
+        }
+      }, 30000);
+    }
 
     // Logout function
     function logout() {
