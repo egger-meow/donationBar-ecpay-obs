@@ -20,11 +20,11 @@ class Database {
     const isSandbox = process.env.ENVIRONMENT === 'sandbox';
     this.isProduction = !isSandbox && (process.env.ENVIRONMENT === 'production' || process.env.DATABASE_URL);
     this.connected = false;
-    
+
     if (isSandbox) {
       console.log('🧪 Sandbox mode: Using local db.json file');
     }
-    
+
     if (this.isProduction) {
       this.initPostgreSQL();
     }
@@ -39,15 +39,44 @@ class Database {
         return;
       }
 
+      let sslConfig = false;
+      if (databaseUrl.includes('sslmode=require')) {
+        let caCert = process.env.DATABASE_CA;
+
+        // Decode Base64 if the cert doesn't start with -----BEGIN
+        if (caCert && !caCert.startsWith('-----BEGIN')) {
+          try {
+            caCert = Buffer.from(caCert, 'base64').toString('utf-8');
+            console.log('CA length:', caCert.length);
+            console.log(caCert.slice(0, 30));
+          } catch (e) {
+            console.error('Failed to decode DATABASE_CA from Base64:', e.message);
+          }
+        }
+
+        sslConfig = {
+          rejectUnauthorized: true,
+          ca: caCert,
+          servername: 'donationbar-donationbar.j.aivencloud.com',
+        };
+      }
+
+      // Parse DATABASE_URL to extract connection details
+      const dbUrl = new URL(databaseUrl);
+
       pgClient = new Client({
-        connectionString: databaseUrl,
-        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+        user: dbUrl.username,
+        password: dbUrl.password,
+        host: dbUrl.hostname,
+        port: parseInt(dbUrl.port, 10),
+        database: dbUrl.pathname.slice(1), // Remove leading '/'
+        ssl: sslConfig
       });
 
       await pgClient.connect();
       this.connected = true;
       console.log('🐘 Connected to PostgreSQL (Multi-User Mode)');
-      
+
     } catch (error) {
       console.error('❌ PostgreSQL connection failed:', error.message);
       console.log('📝 Falling back to JSON file storage');
@@ -59,7 +88,7 @@ class Database {
   // =============================================
   // JSON FILE HELPERS (SANDBOX MODE)
   // =============================================
-  
+
   async readJSON() {
     try {
       if (!fs.existsSync(DB_PATH)) {
@@ -97,7 +126,7 @@ class Database {
   // =============================================
   // USER METHODS
   // =============================================
-  
+
   /**
    * Create a new user
    * @param {Object} userData - {email, username, passwordHash, displayName, authProvider}
@@ -108,11 +137,11 @@ class Database {
       // Check if any admin exists
       const adminCheck = await pgClient.query('SELECT COUNT(*) FROM users WHERE is_admin = TRUE');
       const hasAdmin = parseInt(adminCheck.rows[0].count) > 0;
-      
+
       // Auto-promote specific user to admin if no admin exists
       const isAdmin = !hasAdmin && userData.email === 'inpire.mg09@nycu.edu.tw';
       const displayName = userData.email === 'inpire.mg09@nycu.edu.tw' ? 'jjmow' : (userData.displayName || userData.username);
-      
+
       const result = await pgClient.query(`
         INSERT INTO users (email, username, password_hash, display_name, auth_provider, oauth_provider_id, is_admin)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -126,22 +155,22 @@ class Database {
         userData.oauthProviderId || null,
         isAdmin
       ]);
-      
+
       if (isAdmin) {
         console.log('👑 Auto-promoted user to admin:', userData.email);
       }
-      
+
       return this.camelCaseKeys(result.rows[0]);
     } else {
       const data = await this.readJSON();
-      
+
       // Check if any admin exists
       const hasAdmin = data.users.some(u => u.isAdmin === true);
-      
+
       // Auto-promote specific user to admin if no admin exists
       const isAdmin = !hasAdmin && userData.email === 'inpire.mg09@nycu.edu.tw';
       const displayName = userData.email === 'inpire.mg09@nycu.edu.tw' ? 'jjmow' : (userData.displayName || userData.username);
-      
+
       const newUser = {
         id: uuidv4(),
         email: userData.email,
@@ -158,11 +187,11 @@ class Database {
         lastLoginAt: null,
         updatedAt: new Date().toISOString()
       };
-      
+
       if (isAdmin) {
         console.log('👑 Auto-promoted user to admin:', userData.email);
       }
-      
+
       data.users.push(newUser);
       await this.writeJSON(data);
       return newUser;
@@ -231,7 +260,7 @@ class Database {
   // =============================================
   // WORKSPACE METHODS
   // =============================================
-  
+
   /**
    * Create a new workspace for a user
    */
@@ -362,7 +391,7 @@ class Database {
   // =============================================
   // WORKSPACE SETTINGS METHODS
   // =============================================
-  
+
   /**
    * Get workspace settings
    */
@@ -429,7 +458,7 @@ class Database {
   // =============================================
   // PAYMENT PROVIDER METHODS
   // =============================================
-  
+
   /**
    * Get payment provider for workspace
    */
@@ -508,7 +537,7 @@ class Database {
   // =============================================
   // DONATION METHODS
   // =============================================
-  
+
   /**
    * Add a new donation
    */
@@ -569,7 +598,7 @@ class Database {
       }
     } else {
       const data = await this.readJSON();
-      
+
       // Check for duplicate
       const existing = data.donations.find(
         d => d.workspaceId === workspaceId && d.tradeNo === donationData.tradeNo
@@ -698,7 +727,7 @@ class Database {
   // =============================================
   // SUBSCRIPTION METHODS
   // =============================================
-  
+
   /**
    * Get user subscription
    */
@@ -751,7 +780,7 @@ class Database {
     } else {
       const data = await this.readJSON();
       if (!data.fraudPrevention) data.fraudPrevention = [];
-      
+
       data.fraudPrevention.push({
         id: uuidv4(),
         userId,
@@ -762,7 +791,7 @@ class Database {
         metadata,
         createdAt: new Date().toISOString()
       });
-      
+
       await this.writeJSON(data);
     }
     console.log(`🛡️ Trial usage recorded for fingerprint: ${fingerprint}`);
@@ -775,7 +804,7 @@ class Database {
     // Calculate trial end date if this is a trial
     let trialEndDate = subscriptionData.trialEndDate || null;
     const isTrial = subscriptionData.isTrial !== undefined ? subscriptionData.isTrial : true; // Default to trial
-    
+
     if (isTrial && !trialEndDate) {
       // Calculate trial end date based on SUBSCRIPTION_TRIAL_DAYS (default 30 days)
       const trialDays = parseInt(process.env.SUBSCRIPTION_TRIAL_DAYS) || 30;
@@ -783,10 +812,10 @@ class Database {
       endDate.setDate(endDate.getDate() + trialDays);
       trialEndDate = endDate.toISOString();
     }
-    
+
     // Calculate billing cycle start date (for paid subscriptions)
     const billingCycleStart = subscriptionData.billingCycleStart || new Date().toISOString();
-    
+
     // Calculate next billing date (for paid subscriptions)
     let nextBillingDate = subscriptionData.nextBillingDate || null;
     if (subscriptionData.planType === 'paid' || subscriptionData.planType === 'pro') {
@@ -794,11 +823,11 @@ class Database {
       nextDate.setMonth(nextDate.getMonth() + 1); // Add 1 month
       nextBillingDate = nextDate.toISOString();
     }
-    
-    const pricePerMonth = subscriptionData.pricePerMonth !== undefined 
-      ? subscriptionData.pricePerMonth 
+
+    const pricePerMonth = subscriptionData.pricePerMonth !== undefined
+      ? subscriptionData.pricePerMonth
       : (subscriptionData.planType === 'free' ? 0 : parseInt(process.env.SUBSCRIPTION_MONTHLY_PRICE) || 70);
-    
+
     if (this.isProduction && this.connected) {
       const result = await pgClient.query(`
         INSERT INTO subscriptions (
@@ -892,7 +921,7 @@ class Database {
     } else {
       const data = await this.readJSON();
       const subscription = data.subscriptions.find(s => s.userId === userId);
-      
+
       if (!subscription) {
         throw new Error('Subscription not found');
       }
@@ -917,7 +946,7 @@ class Database {
    */
   async createPaymentRecord(paymentData) {
     const paymentId = uuidv4();
-    
+
     if (this.isProduction && this.connected) {
       const result = await pgClient.query(`
         INSERT INTO payment_history (
@@ -963,7 +992,7 @@ class Database {
     } else {
       const data = await this.readJSON();
       if (!data.paymentHistory) data.paymentHistory = [];
-      
+
       const newPayment = {
         id: paymentId,
         subscriptionId: paymentData.subscriptionId,
@@ -994,7 +1023,7 @@ class Database {
         paidAt: paymentData.status === 'success' ? (paymentData.paidAt || new Date().toISOString()) : null,
         updatedAt: new Date().toISOString()
       };
-      
+
       data.paymentHistory.push(newPayment);
       await this.writeJSON(data);
       return newPayment;
@@ -1016,7 +1045,7 @@ class Database {
     } else {
       const data = await this.readJSON();
       if (!data.paymentHistory) return [];
-      
+
       return data.paymentHistory
         .filter(p => p.subscriptionId === subscriptionId)
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -1039,7 +1068,7 @@ class Database {
     } else {
       const data = await this.readJSON();
       if (!data.paymentHistory) return [];
-      
+
       return data.paymentHistory
         .filter(p => p.userId === userId)
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -1092,7 +1121,7 @@ class Database {
     } else {
       const data = await this.readJSON();
       if (!data.paymentHistory) return null;
-      
+
       const payment = data.paymentHistory.find(p => p.id === paymentId);
       if (!payment) return null;
 
@@ -1111,7 +1140,7 @@ class Database {
    */
   async getFailedPaymentsForRetry() {
     const now = new Date();
-    
+
     if (this.isProduction && this.connected) {
       const result = await pgClient.query(`
         SELECT * FROM payment_history
@@ -1125,9 +1154,9 @@ class Database {
     } else {
       const data = await this.readJSON();
       if (!data.paymentHistory) return [];
-      
+
       return data.paymentHistory
-        .filter(p => 
+        .filter(p =>
           p.status === 'failed' &&
           (p.retryCount || 0) < 3 &&
           (!p.nextRetryAt || new Date(p.nextRetryAt) <= now)
@@ -1140,7 +1169,7 @@ class Database {
   // =============================================
   // FEEDBACK METHODS
   // =============================================
-  
+
   /**
    * Create feedback
    * @param {Object} feedbackData - {userId, type, message, email, metadata}
@@ -1161,12 +1190,12 @@ class Database {
       return this.camelCaseKeys(result.rows[0]);
     } else {
       const data = await this.readJSON();
-      
+
       // Ensure feedback array exists (backward compatibility)
       if (!data.feedback) {
         data.feedback = [];
       }
-      
+
       const newFeedback = {
         id: uuidv4(),
         userId: feedbackData.userId || null,
@@ -1190,29 +1219,29 @@ class Database {
    */
   async getFeedback(options = {}) {
     const { limit = 100, status = null } = options;
-    
+
     if (this.isProduction && this.connected) {
       let query = 'SELECT * FROM feedback';
       const params = [];
-      
+
       if (status) {
         query += ' WHERE status = $1';
         params.push(status);
       }
-      
+
       query += ' ORDER BY created_at DESC LIMIT $' + (params.length + 1);
       params.push(limit);
-      
+
       const result = await pgClient.query(query, params);
       return result.rows.map(row => this.camelCaseKeys(row));
     } else {
       const data = await this.readJSON();
       let feedback = data.feedback || [];
-      
+
       if (status) {
         feedback = feedback.filter(f => f.status === status);
       }
-      
+
       return feedback
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
         .slice(0, limit);
@@ -1251,7 +1280,7 @@ class Database {
   // =============================================
   // UTILITY METHODS
   // =============================================
-  
+
   /**
    * Convert snake_case keys to camelCase
    */
