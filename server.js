@@ -464,6 +464,7 @@ app.post('/webhook/ecpay', async (req, res) => {
         received: payload.MerchantID,
         expected: credentials.merchantId
       });
+      return res.status(400).send('0|Invalid merchant');
     }
 
     if (transCode !== 1) {
