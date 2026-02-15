@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="utf-8">
   <title>Donation Goal Overlay</title>
   <style>
-    html, body {
+    html,
+    body {
       margin: 0;
       padding: 0;
       background: transparent;
@@ -32,7 +34,7 @@
       font-weight: 700;
       margin-bottom: 12px;
       color: var(--fg);
-      text-shadow: 0 0 8px rgba(0,0,0,0.5);
+      text-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
       text-align: center;
       opacity: 1;
       animation: fadeInUp 1s ease forwards;
@@ -55,9 +57,9 @@
       background: var(--bg);
       border-radius: 30px;
       overflow: hidden;
-      box-shadow: 
-        inset 0 0 0 3px rgba(255,255,255,0.1),
-        0 4px 20px rgba(0,0,0,0.3);
+      box-shadow:
+        inset 0 0 0 3px rgba(255, 255, 255, 0.1),
+        0 4px 20px rgba(0, 0, 0, 0.3);
       position: relative;
     }
 
@@ -77,7 +79,7 @@
       left: -100%;
       width: 100%;
       height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
       animation: shimmer 2s infinite;
     }
 
@@ -93,7 +95,7 @@
       border-radius: 50%;
       background: rgba(0, 0, 0, 0.3);
       border: 4px solid rgba(255, 255, 255, 0.2);
-      box-shadow: 
+      box-shadow:
         0 4px 15px rgba(0, 0, 0, 0.3),
         inset 0 2px 5px rgba(0, 0, 0, 0.5);
       overflow: hidden;
@@ -119,7 +121,7 @@
       left: -50%;
       width: 200%;
       height: 20px;
-      background: radial-gradient(ellipse at center, rgba(255,255,255,0.3) 0%, transparent 70%);
+      background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
       border-radius: 45%;
       animation: wave 3s ease-in-out infinite;
     }
@@ -131,15 +133,18 @@
       left: -30%;
       width: 200%;
       height: 18px;
-      background: radial-gradient(ellipse at center, rgba(255,255,255,0.2) 0%, transparent 70%);
+      background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.2) 0%, transparent 70%);
       border-radius: 48%;
       animation: wave 3.5s ease-in-out infinite reverse;
     }
 
     @keyframes wave {
-      0%, 100% {
+
+      0%,
+      100% {
         transform: translateX(0) translateY(0);
       }
+
       50% {
         transform: translateX(-50%) translateY(-3px);
       }
@@ -165,13 +170,16 @@
     }
 
     @keyframes circleShimmer {
-      0%, 100% {
-        box-shadow: 
+
+      0%,
+      100% {
+        box-shadow:
           0 4px 15px rgba(0, 0, 0, 0.3),
           inset 0 2px 5px rgba(0, 0, 0, 0.5);
       }
+
       50% {
-        box-shadow: 
+        box-shadow:
           0 4px 20px var(--bar),
           inset 0 2px 5px rgba(0, 0, 0, 0.5),
           0 0 20px var(--bar);
@@ -184,7 +192,7 @@
       color: var(--fg);
       font-size: 20px;
       font-weight: 500;
-      text-shadow: 0 0 6px rgba(0,0,0,0.5);
+      text-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
       opacity: 0;
       animation: fadeInUp 1s ease 0.4s forwards;
     }
@@ -202,24 +210,27 @@
     }
 
     .donation-item {
-      background: rgba(0,0,0,0.3);
+      background: rgba(0, 0, 0, 0.75);
       border-radius: 15px;
-      padding: 8px 15px;
-      margin: 5px 0;
+      padding: 10px 20px;
+      margin: 8px 0;
       color: var(--fg);
-      font-size: 14px;
+      font-size: 16px;
       backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
       animation: slideInRight 0.5s ease;
       text-align: center;
       display: inline-block;
       max-width: 90%;
       box-sizing: border-box;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
     }
 
     .donation-amount {
       color: var(--bar);
-      font-weight: 700;
+      font-weight: 800;
+      text-shadow: 0 0 10px rgba(0, 0, 0, 0.5), 1px 1px 2px rgba(0, 0, 0, 0.8);
     }
 
     @keyframes fadeInUp {
@@ -227,6 +238,7 @@
         opacity: 0;
         transform: translateY(20px);
       }
+
       to {
         opacity: 1;
         transform: translateY(0);
@@ -238,6 +250,7 @@
         opacity: 0;
         transform: translateX(50px);
       }
+
       to {
         opacity: 1;
         transform: translateX(0);
@@ -245,13 +258,25 @@
     }
 
     @keyframes shimmer {
-      0% { left: -100%; }
-      100% { left: 100%; }
+      0% {
+        left: -100%;
+      }
+
+      100% {
+        left: 100%;
+      }
     }
 
     @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.02); }
+
+      0%,
+      100% {
+        transform: scale(1);
+      }
+
+      50% {
+        transform: scale(1.02);
+      }
     }
 
     .progress-container.new-donation {
@@ -260,15 +285,35 @@
 
     /* Goal Completion Celebration */
     @keyframes goalCompleteShake {
-      0%, 100% { transform: translateX(0); }
-      10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
-      20%, 40%, 60%, 80% { transform: translateX(10px); }
+
+      0%,
+      100% {
+        transform: translateX(0);
+      }
+
+      10%,
+      30%,
+      50%,
+      70%,
+      90% {
+        transform: translateX(-10px);
+      }
+
+      20%,
+      40%,
+      60%,
+      80% {
+        transform: translateX(10px);
+      }
     }
 
     @keyframes goalCompleteGlow {
-      0%, 100% {
+
+      0%,
+      100% {
         box-shadow: 0 0 5px var(--bar), 0 0 10px var(--bar), 0 0 15px var(--bar);
       }
+
       50% {
         box-shadow: 0 0 20px var(--bar), 0 0 30px var(--bar), 0 0 40px var(--bar);
       }
@@ -279,9 +324,11 @@
         transform: translateY(-100vh) rotate(0deg);
         opacity: 1;
       }
+
       25% {
         opacity: 1;
       }
+
       100% {
         transform: translateY(100vh) rotate(720deg);
         opacity: 1;
@@ -289,10 +336,23 @@
     }
 
     @keyframes celebration {
-      0%, 100% { transform: scale(1) rotate(0deg); }
-      25% { transform: scale(1.1) rotate(-5deg); }
-      50% { transform: scale(1.2) rotate(5deg); }
-      75% { transform: scale(1.1) rotate(-3deg); }
+
+      0%,
+      100% {
+        transform: scale(1) rotate(0deg);
+      }
+
+      25% {
+        transform: scale(1.1) rotate(-5deg);
+      }
+
+      50% {
+        transform: scale(1.2) rotate(5deg);
+      }
+
+      75% {
+        transform: scale(1.1) rotate(-3deg);
+      }
     }
 
     .goal-completed {
@@ -364,7 +424,7 @@
       color: white;
       padding: 25px 35px;
       border-radius: 20px;
-      box-shadow: 
+      box-shadow:
         0 20px 40px rgba(255, 71, 87, 0.4),
         0 0 0 3px rgba(255, 255, 255, 0.3),
         inset 0 1px 0 rgba(255, 255, 255, 0.2);
@@ -417,7 +477,7 @@
       font-size: 36px;
       font-weight: 900;
       color: #fff200;
-      text-shadow: 
+      text-shadow:
         0 2px 4px rgba(0, 0, 0, 0.5),
         0 0 20px rgba(255, 242, 0, 0.5);
       margin-bottom: 8px;
@@ -440,14 +500,17 @@
     }
 
     @keyframes alertPulse {
-      0%, 100% {
-        box-shadow: 
+
+      0%,
+      100% {
+        box-shadow:
           0 20px 40px rgba(255, 71, 87, 0.4),
           0 0 0 3px rgba(255, 255, 255, 0.3),
           inset 0 1px 0 rgba(255, 255, 255, 0.2);
       }
+
       50% {
-        box-shadow: 
+        box-shadow:
           0 25px 50px rgba(255, 71, 87, 0.6),
           0 0 0 5px rgba(255, 255, 255, 0.5),
           inset 0 1px 0 rgba(255, 255, 255, 0.3);
@@ -460,18 +523,37 @@
 
     /* Responsive design */
     @media (max-width: 600px) {
-      #wrap { width: 100%; padding: 15px; }
-      .title { font-size: 24px; }
-      .progress-wrapper { gap: 10px; }
-      .percentage-circle { 
-        width: 60px; 
+      #wrap {
+        width: 100%;
+        padding: 15px;
+      }
+
+      .title {
+        font-size: 24px;
+      }
+
+      .progress-wrapper {
+        gap: 10px;
+      }
+
+      .percentage-circle {
+        width: 60px;
         height: 60px;
         border: 3px solid rgba(255, 255, 255, 0.2);
       }
-      .percentage { font-size: 16px; }
-      .progress-container { height: 45px; }
-      .amount-info { font-size: 16px; }
-      
+
+      .percentage {
+        font-size: 16px;
+      }
+
+      .progress-container {
+        height: 45px;
+      }
+
+      .amount-info {
+        font-size: 16px;
+      }
+
       .donation-alert {
         top: 10px;
         left: 50vw;
@@ -480,16 +562,22 @@
         padding: 20px;
         max-width: calc(100vw - 40px);
       }
-      
+
       body {
         padding-top: 20px;
       }
-      
-      .alert-donor { font-size: 24px; }
-      .alert-amount { font-size: 28px; }
+
+      .alert-donor {
+        font-size: 24px;
+      }
+
+      .alert-amount {
+        font-size: 28px;
+      }
     }
   </style>
 </head>
+
 <body>
   <div id="wrap">
     <div class="title" id="title">Loading...</div>
@@ -517,12 +605,16 @@
 
   <!-- Audio for donation sound -->
   <audio id="donationSound" preload="auto">
-    <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFAlGn+DyvWMeB0CU3fPPfS8GJXzJ8+GSRQ4PVafh82YYDE2n3fDGgSEQRH7H8+KVQA0PU6Xd8W+YDA9XqOzm4F8kF1efxOTts2hCKUF+vOPz6pNhIzVpqdvo2YnU3T0ZNbc6ZmJJMEZaVGZbOGVGT1BJWzu" type="audio/wav">
+    <source
+      src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFAlGn+DyvWMeB0CU3fPPfS8GJXzJ8+GSRQ4PVafh82YYDE2n3fDGgSEQRH7H8+KVQA0PU6Xd8W+YDA9XqOzm4F8kF1efxOTts2hCKUF+vOPz6pNhIzVpqdvo2YnU3T0ZNbc6ZmJJMEZaVGZbOGVGT1BJWzu"
+      type="audio/wav">
   </audio>
 
   <!-- Audio for goal completion celebration -->
   <audio id="goalCompleteSound" preload="auto">
-    <source src="data:audio/wav;base64,UklGRvIBAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFAlGn+DyvWMeB0CU3fPPfS8GJXzJ8+GSRQ4PVafh82YYDE2n3fDGgSEQRH7H8+KVQA0PU6Xd8W+YDA9XqOzm4F8kF1efxOTts2hCKUF+vOPz6pNhIzVpqdvo2YnU3T0ZNbc6ZmJJMEc=" type="audio/wav">
+    <source
+      src="data:audio/wav;base64,UklGRvIBAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFAlGn+DyvWMeB0CU3fPPfS8GJXzJ8+GSRQ4PVafh82YYDE2n3fDGgSEQRH7H8+KVQA0PU6Xd8W+YDA9XqOzm4F8kF1efxOTts2hCKUF+vOPz6pNhIzVpqdvo2YnU3T0ZNbc6ZmJJMEc="
+      type="audio/wav">
   </audio>
 
   <!-- Confetti Container -->
@@ -569,12 +661,12 @@
       // Apply position styling
       const wrap = document.getElementById('wrap');
       const body = document.body;
-      
+
       // Reset positioning classes
       body.className = '';
-      
+
       // Apply position-specific styling
-      switch(overlaySettings.position) {
+      switch (overlaySettings.position) {
         case 'top-left':
           body.style.justifyContent = 'flex-start';
           body.style.alignItems = 'flex-start';
@@ -616,18 +708,18 @@
           body.style.paddingRight = '20px';
           break;
       }
-      
+
       // Apply width
       if (wrap) {
         wrap.style.width = `${overlaySettings.width}px`;
       }
-      
+
       // Apply font size to title
       const title = document.getElementById('title');
       if (title) {
         title.style.fontSize = `${Math.max(overlaySettings.fontSize * 2, 24)}px`;
       }
-      
+
       // Apply progress bar height and corner radius
       const progressContainer = document.getElementById('progressContainer');
       if (progressContainer) {
@@ -650,7 +742,7 @@
     let alertQueue = [];
     let isShowingAlert = false;
     let currentGoal = 1000; // Default goal amount
-    
+
     // New tracking variables for reliable donation detection
     let initialized = false;
     let lastSeenTradeNo = null;
@@ -672,8 +764,8 @@
       const goalAudio = document.getElementById('goalCompleteSound');
       donationAudio.muted = false;
       goalAudio.muted = false;
-      donationAudio.play().then(() => donationAudio.pause()).catch(()=>{});
-      goalAudio.play().then(() => goalAudio.pause()).catch(()=>{});
+      donationAudio.play().then(() => donationAudio.pause()).catch(() => { });
+      goalAudio.play().then(() => goalAudio.pause()).catch(() => { });
     }, { once: true });
 
     // Audio functions
@@ -719,7 +811,7 @@
       // Update content
       donorEl.textContent = donor || '匿名';
       amountEl.textContent = `NT$ ${formatNumber(amount)}`;
-      
+
       // Display message if it exists
       if (message && message.trim()) {
         messageEl.textContent = message;
@@ -736,26 +828,26 @@
 
       // Force a reflow to ensure CSS is applied
       alertEl.offsetHeight;
-      
+
       // Show alert with animation
       alertEl.classList.remove('hide');
       alertEl.classList.add('show', 'pulse');
-      
+
       // Debug log
       console.log('Showing donation alert for:', donor, amount);
 
       // Use configured duration or calculate dynamic duration
-      const duration =  calculateAlertDuration(amount) || overlaySettings.alertDuration;
-      
+      const duration = calculateAlertDuration(amount) || overlaySettings.alertDuration;
+
       // Hide after calculated duration
       setTimeout(() => {
         alertEl.classList.remove('show', 'pulse');
         alertEl.classList.add('hide');
-        
+
         // Reset after hide animation
         setTimeout(() => {
           isShowingAlert = false;
-          
+
           // Show next alert in queue
           if (alertQueue.length > 0) {
             const next = alertQueue.shift();
@@ -769,10 +861,10 @@
     function createConfetti() {
       const container = document.getElementById('confettiContainer');
       const confettiCount = 50;
-      
+
       // Clear existing confetti
       container.innerHTML = '';
-      
+
       for (let i = 0; i < confettiCount; i++) {
         const confetti = document.createElement('div');
         confetti.className = 'confetti';
@@ -781,7 +873,7 @@
         confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
         container.appendChild(confetti);
       }
-      
+
       // Remove confetti after animation
       setTimeout(() => {
         container.innerHTML = '';
@@ -790,23 +882,23 @@
 
     function celebrateGoalComplete(goalTitle) {
       if (celebrationPlayed) return;
-      
+
       celebrationPlayed = true;
       console.log('🎉 Goal completed! Starting celebration...');
-      
+
       // Play celebration sound
       playGoalCompleteSound();
-      
+
       // Create confetti animation
       createConfetti();
-      
+
       // Add celebration classes
       progressContainerEl.classList.add('goal-completed');
       titleEl.classList.add('celebration-text');
-      
+
       // Change title text using the actual goal title
       titleEl.textContent = '🎉 ' + (goalTitle || '我愛jjmow') + ' 🎉';
-      
+
       // Optional: Remove celebration effects after some time
       setTimeout(() => {
         progressContainerEl.classList.remove('goal-completed');
@@ -820,24 +912,24 @@
 
     // Calculate donation amount color intensity (more money = more red)
     function getDonationAmountColor(amount) {
-      // Normalize amount to 0-1 range based on half the current goal (for better color scaling)
+      // Normalize amount to 0-1 range based on half the current goal
       const normalizedAmount = Math.min(amount / (currentGoal * 0.5), 1);
-      // Create red intensity gradient
-      const redIntensity = Math.floor(100 + (155 * normalizedAmount)); // 100-255 range
-      const green = Math.max(0, 100 - (100 * normalizedAmount)); // Decrease green as amount increases
-      const blue = Math.max(0, 100 - (100 * normalizedAmount)); // Decrease blue as amount increases
-      return `rgb(${redIntensity}, ${green}, ${blue})`;
+      // Create vibrant gradient: starts from light green/yellow and goes to bright red
+      const red = Math.floor(150 + (105 * normalizedAmount)); // 150-255 range
+      const green = Math.floor(200 * (1 - normalizedAmount)); // 200-0 range
+      const blue = Math.floor(100 * (1 - normalizedAmount));  // 100-0 range
+      return `rgb(${red}, ${green}, ${blue})`;
     }
 
 
     function renderProgress(data) {
       const { title, current, goal, percent, donations, actualDonations, startFrom } = data;
-      
+
       // Update current goal for normalization calculations
       if (goal) {
         currentGoal = goal;
       }
-      
+
       // Check for goal completion
       const isGoalComplete = percent >= 100;
       if (isGoalComplete && !goalCompleted) {
@@ -849,22 +941,22 @@
         celebrationPlayed = false;
         titleEl.classList.remove('celebration-text');
       }
-      
+
       // Update title (only if not celebrating)
       if (!goalCompleted) {
         titleEl.textContent = title || '斗內目標';
       }
-      
+
       // Update progress bar with animation
       const clampedPercent = Math.min(100, Math.max(0, percent || 0));
       progressFillEl.style.width = `${clampedPercent}%`;
       percentageEl.textContent = `${clampedPercent}%`;
-      
+
       // Update liquid fill in circle (0-100% fills the circle from bottom to top)
       if (liquidFillEl) {
         liquidFillEl.style.height = `${clampedPercent}%`;
       }
-      
+
       // Add shimmer effect to circle on progress update
       if (percentageCircleEl && current > lastTotal && lastTotal > 0) {
         percentageCircleEl.classList.add('update');
@@ -872,69 +964,64 @@
           percentageCircleEl.classList.remove('update');
         }, 600);
       }
-      
+
       // Update amount info - show total (including startFrom) vs goal
       if (isGoalComplete) {
         amountInfoEl.innerHTML = `🎉 <strong>目標達成！</strong> NT$ ${formatNumber(current)} / NT$ ${formatNumber(goal)} 🎉`;
       } else {
         amountInfoEl.textContent = `NT$ ${formatNumber(current)} / NT$ ${formatNumber(goal)}`;
       }
-      
+
       // Check for new donation (animate if total increased)
       if (current > lastTotal && lastTotal > 0) {
         progressContainerEl.classList.add('new-donation');
         progressFillEl.classList.add('animate');
-        
+
         setTimeout(() => {
           progressContainerEl.classList.remove('new-donation');
           progressFillEl.classList.remove('animate');
         }, 600);
       }
       lastTotal = current;
-      
-      // Check for new donations and show alerts (fixed detection)
-      if (donations && donations.length) {
-        // newest donation is the last item in the (last 5) list
-        const newest = donations[donations.length - 1];
 
-        if (initialized) {
-          if (newest.tradeNo && newest.tradeNo !== lastSeenTradeNo) {
-            // Try to show all unseen donations that are still within the last-5 window
-            const startIdx = donations.findIndex(d => d.tradeNo === lastSeenTradeNo);
-            const newOnes = startIdx === -1 ? [newest] : donations.slice(startIdx + 1);
-            newOnes.forEach(d => showDonationAlert(d.payer, d.amount, d.message));
+      // Check for new donations and show alerts using server-provided latestTradeNo
+      if (initialized) {
+        if (data.latestTradeNo && data.latestTradeNo !== lastSeenTradeNo) {
+          // Use the server-provided latest donation details for the alert
+          const d = data.latestDonation;
+          if (d) {
+            showDonationAlert(d.payer, d.amount, d.message);
           }
-        } else {
-          // don't alert on initial load
-          initialized = true;
         }
-
-        lastSeenTradeNo = newest.tradeNo || lastSeenTradeNo;
+      } else if (data.latestTradeNo) {
+        // don't alert on initial load, just record the current state
+        initialized = true;
       }
-      
+
+      lastSeenTradeNo = data.latestTradeNo || lastSeenTradeNo;
+
       // Render donations (server handles filtering based on donationDisplayMode)
       if (donations && donations.length > 0) {
         const donationHTML = donations
           .map(donation => {
             const amountColor = getDonationAmountColor(donation.amount);
-            const messageHTML = donation.message && donation.message.trim() 
-              ? `<div style="font-size: 13px; margin-top: 4px; opacity: 0.9;">${donation.message}</div>` 
+            const messageHTML = donation.message && donation.message.trim()
+              ? `<div style="font-size: 13px; margin-top: 4px; opacity: 0.9;">${donation.message}</div>`
               : '';
             return `
             <div class="donation-item">
               <div>
-                <strong>${donation.payer}</strong> 斗內了 
-                <span class="donation-amount" style="color: ${amountColor}; font-weight: bold;">NT$ ${formatNumber(donation.amount)}</span>！！
+                <strong style="color: #64b5f6;">${donation.payer}</strong> 斗內了 
+                <span class="donation-amount" style="color: ${amountColor};">NT$ ${formatNumber(donation.amount)}</span>！！
               </div>
               ${messageHTML}
             </div>
           `}).join('');
-        
+
         recentDonationsEl.innerHTML = donationHTML;
       } else {
-        // Clear UI and internal trackers when no donations to display
+        // Clear UI when no donations to display (e.g., 'hidden' mode)
         recentDonationsEl.innerHTML = '';
-        lastSeenTradeNo = null;     // so next donation will trigger alert
         initialized = true;         // avoids "first-load" alert
         lastTotal = current || 0;   // keep total consistent for animation check
       }
@@ -955,8 +1042,8 @@
     // Server-Sent Events for real-time updates
     function setupSSE() {
       const eventSource = new EventSource('/events');
-      
-      eventSource.onmessage = function(event) {
+
+      eventSource.onmessage = function (event) {
         try {
           const data = JSON.parse(event.data);
           renderProgress(data);
@@ -966,7 +1053,7 @@
       };
 
       // Listen for overlay settings updates
-      eventSource.addEventListener('overlay-settings', function(event) {
+      eventSource.addEventListener('overlay-settings', function (event) {
         try {
           const newSettings = JSON.parse(event.data);
           console.log('Received overlay settings update:', newSettings);
@@ -976,8 +1063,8 @@
           console.error('Error parsing overlay settings update:', error);
         }
       });
-      
-      eventSource.onerror = function(error) {
+
+      eventSource.onerror = function (error) {
         console.error('SSE connection error:', error);
         // Try to reconnect after 5 seconds
         setTimeout(() => {
@@ -986,7 +1073,7 @@
           }
         }, 5000);
       };
-      
+
       return eventSource;
     }
 
@@ -1023,4 +1110,5 @@
     }
   </script>
 </body>
+
 </html>

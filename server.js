@@ -154,13 +154,17 @@ async function getProgress() {
     displayDonations = [];
   } else if (displayMode === 'latest') {
     // Latest N donations by time (most recent first)
-    displayDonations = db.donations.slice(-displayCount).reverse();
+    // DB returns donations in DESC order (newest first), so take the first N
+    displayDonations = db.donations.slice(0, displayCount);
   } else {
     // Default: top N by amount (highest first)
     displayDonations = [...db.donations]
       .sort((a, b) => b.amount - a.amount)
       .slice(0, displayCount);
   }
+
+  // The newest donation is always the first item (DB returns DESC order)
+  const latestDonation = db.donations.length > 0 ? db.donations[0] : null;
 
   return {
     title: db.goal.title,
@@ -169,7 +173,9 @@ async function getProgress() {
     startFrom,
     goal,
     percent,
-    donations: displayDonations
+    donations: displayDonations,
+    latestTradeNo: latestDonation ? latestDonation.tradeNo : null,
+    latestDonation: latestDonation
   };
 }
 
