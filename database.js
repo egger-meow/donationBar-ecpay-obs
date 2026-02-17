@@ -67,7 +67,14 @@ class Database {
         host: dbUrl.hostname,
         port: parseInt(dbUrl.port, 10),
         database: dbUrl.pathname.slice(1), // Remove leading '/'
-        ssl: sslConfig
+        ssl: sslConfig,
+        connectionTimeoutMillis: 5000, // 5 second timeout
+      });
+
+      // Handle client errors
+      pgClient.on('error', (err) => {
+        console.error('🐘 PostgreSQL client error:', err.message);
+        this.connected = false;
       });
 
       await pgClient.connect();
@@ -80,11 +87,85 @@ class Database {
       // Migrate data from JSON file if it exists and database is empty
       await this.migrateFromJSON();
 
+      // After successful connection, sync any data from JSON fallback
+      await this.syncFromJSONToPG();
+
     } catch (error) {
       console.error('❌ PostgreSQL connection failed:', error.message);
       console.log('📝 Falling back to JSON file storage');
-      this.isProduction = false;
+      // Keep isProduction true so we can attempt reconnection later
       this.connected = false;
+    }
+  }
+
+  /**
+   * Ensures the PostgreSQL connection is active if in production mode.
+   * Attempts to reconnect if disconnected.
+   */
+  async ensureConnected() {
+    if (!this.isProduction) return;
+
+    if (!this.connected) {
+      console.log('🔄 PostgreSQL disconnected, attempting to reconnect...');
+      await this.initPostgreSQL();
+    }
+  }
+
+  /**
+   * Synchronizes donations from local db.json to PostgreSQL.
+   * Called immediately after a successful reconnection.
+   */
+  async syncFromJSONToPG() {
+    if (!this.connected) return;
+
+    try {
+      if (!fs.existsSync(DB_PATH)) return;
+
+      const jsonData = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
+      if (!jsonData.donations || jsonData.donations.length === 0) return;
+
+      console.log(`🔄 Syncing ${jsonData.donations.length} donations from JSON to PostgreSQL...`);
+
+      let syncedCount = 0;
+      for (const donation of jsonData.donations) {
+        try {
+          // 1. Insert donation if not exists
+          const res = await pgClient.query(`
+            INSERT INTO donations (trade_no, amount, payer, message, created_at)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (trade_no) DO NOTHING
+            RETURNING id
+          `, [
+            donation.tradeNo,
+            donation.amount,
+            donation.payer || 'Anonymous',
+            donation.message || '',
+            new Date(donation.at)
+          ]);
+
+          // If a row was inserted, update app_data totals and seen_trade_nos
+          if (res.rowCount > 0) {
+            await pgClient.query(`
+              UPDATE app_data SET 
+                total = total + $1,
+                seen_trade_nos = array_append(seen_trade_nos, $2),
+                updated_at = NOW()
+              WHERE id = 'main' AND NOT ($2 = ANY(seen_trade_nos))
+            `, [donation.amount, donation.tradeNo]);
+            syncedCount++;
+          }
+        } catch (err) {
+          console.error(`Error syncing donation ${donation.tradeNo}:`, err.message);
+        }
+      }
+
+      if (syncedCount > 0) {
+        console.log(`✅ Successfully synced ${syncedCount} new donations to PostgreSQL`);
+      } else {
+        console.log('ℹ️ No new donations to sync');
+      }
+    } catch (error) {
+      console.error('❌ Failed to sync from JSON to PG:', error.message);
     }
   }
 
@@ -225,6 +306,7 @@ class Database {
 
   // Read database
   async readDB() {
+    await this.ensureConnected();
     if (this.isProduction && this.connected) {
       try {
         // Get app data
@@ -281,6 +363,7 @@ class Database {
 
   // Write database
   async writeDB(data) {
+    await this.ensureConnected();
     if (this.isProduction && this.connected) {
       try {
         await pgClient.query(`
@@ -322,6 +405,7 @@ class Database {
 
   // Add donation
   async addDonation({ tradeNo, amount, payer, message }) {
+    await this.ensureConnected();
     if (this.isProduction && this.connected) {
       try {
         // Begin transaction

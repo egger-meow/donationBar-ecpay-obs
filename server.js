@@ -175,7 +175,8 @@ async function getProgress() {
     percent,
     donations: displayDonations,
     latestTradeNo: latestDonation ? latestDonation.tradeNo : null,
-    latestDonation: latestDonation
+    latestDonation: latestDonation,
+    dbConnected: database.connected
   };
 }
 
