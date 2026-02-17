@@ -232,6 +232,36 @@
       margin-bottom: 30px;
     }
 
+    .db-warning-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: #ff6b6b;
+      color: white;
+      padding: 10px 20px;
+      text-align: center;
+      z-index: 10000;
+      font-weight: bold;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+      display: none;
+      animation: slideInDown 0.3s ease-out;
+    }
+
+    .alert-container-fixed {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 350px;
+      z-index: 9999;
+      pointer-events: none;
+    }
+
+    .alert-container-fixed>* {
+      pointer-events: auto;
+      margin-bottom: 10px;
+    }
+
     .alert {
       padding: 15px;
       border-radius: 8px;
@@ -578,7 +608,11 @@
       <button class="btn btn-danger" onclick="logout()">🚪 登出</button>
     </div>
 
-    <div id="alertContainer"></div>
+    <div id="dbWarningBanner" class="db-warning-banner">
+      🛑 資料庫連線失敗，請通知工程師 jjmow 修復。這通常是因為免費版資料庫在一段時間沒人連線後會自動關機，此時請稍候片刻並重新整理。
+    </div>
+
+    <div id="alertContainer" class="alert-container-fixed"></div>
 
     <div class="dashboard">
       <!-- Current Progress -->
@@ -1057,7 +1091,18 @@
     }
 
     function renderProgress(data) {
-      const { title, current, goal, percent, donations, actualDonations, startFrom } = data;
+      const { title, current, goal, percent, donations, actualDonations, startFrom, dbConnected } = data;
+
+      // Update DB connection warning
+      const dbBanner = document.getElementById('dbWarningBanner');
+      if (dbBanner) {
+        dbBanner.style.display = dbConnected === false ? 'block' : 'none';
+        if (dbConnected === false) {
+          document.body.style.paddingTop = '60px';
+        } else {
+          document.body.style.paddingTop = '20px';
+        }
+      }
 
       // Update stats - show total including startFrom
       currentTotal.textContent = `NT$ ${formatNumber(current)}`;
