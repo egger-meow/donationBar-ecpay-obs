@@ -1,3 +1,7 @@
 node_modules/
 .env
+.env.*
+!.env.example
 db.json
+DATABASE_CA_VALUE.txt
+*.log

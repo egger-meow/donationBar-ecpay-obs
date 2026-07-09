@@ -54,12 +54,15 @@ class Database {
         sslConfig = {
           rejectUnauthorized: true,
           ca: caCert,
-          servername: 'your-service.aivencloud.com',
         };
       }
 
       // Parse DATABASE_URL to extract connection details
       const dbUrl = new URL(databaseUrl);
+
+      if (sslConfig) {
+        sslConfig.servername = dbUrl.hostname;
+      }
 
       pgClient = new Client({
         user: dbUrl.username,
