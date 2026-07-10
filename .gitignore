@@ -1,4 +1,9 @@
 node_modules/
 .env
+.env.*
+!.env.example
 db.json
 .windsurf/
+.codex/
+DATABASE_CA_VALUE.txt
+*.log

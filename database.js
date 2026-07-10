@@ -39,6 +39,9 @@ class Database {
         return;
       }
 
+      // Parse DATABASE_URL to extract connection details
+      const dbUrl = new URL(databaseUrl);
+
       let sslConfig = false;
       if (databaseUrl.includes('sslmode=require')) {
         let caCert = process.env.DATABASE_CA;
@@ -57,12 +60,9 @@ class Database {
         sslConfig = {
           rejectUnauthorized: true,
           ca: caCert,
-          servername: 'your-service.aivencloud.com',
+          servername: dbUrl.hostname,
         };
       }
-
-      // Parse DATABASE_URL to extract connection details
-      const dbUrl = new URL(databaseUrl);
 
       pgClient = new Client({
         user: dbUrl.username,
@@ -70,7 +70,13 @@ class Database {
         host: dbUrl.hostname,
         port: parseInt(dbUrl.port, 10),
         database: dbUrl.pathname.slice(1), // Remove leading '/'
-        ssl: sslConfig
+        ssl: sslConfig,
+        connectionTimeoutMillis: 5000,
+      });
+
+      pgClient.on('error', (error) => {
+        console.error('PostgreSQL client error:', error.message);
+        this.connected = false;
       });
 
       await pgClient.connect();
