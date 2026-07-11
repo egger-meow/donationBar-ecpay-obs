@@ -84,39 +84,39 @@ Claude updates only this subsection while lane B is active.
 - Cycle: `002`
 - Integration branch: `multiuser`
 - Baseline commit: `706625c`
-- State: `awaiting Claude start in shared directory`
+- State: `complete`
 
 ### Codex lane A
 
 - Task: add safe request correlation and structured operational error logging, including removal of known payment/donor PII from process logs.
 - Owned files: `server.js`, `security.js`, `test/security.test.js`, and new focused logging module/tests if needed.
-- Status: active.
-- Commit: pending.
+- Status: done.
+- Commit: `a281db2 feat: add safe request observability`; `5e6dadf fix: prevent migration credential logging`; `5fb4640 fix: remove hidden subscription upgrade`.
 
 ### Claude lane B
 
 - Task: replace the stale migration guide with a UTF-8 production staging migration-and-restore rehearsal runbook grounded in the current `npm run migrate`, encrypted backup/restore commands, and actual migration scripts.
 - Owned files: `docs/migration/` only. Do not edit code, package scripts, `.env.example`, or any other documentation.
-- Definition of done: clear preflight, backup, migration, verification, restore/rollback decision path, failure stop conditions, evidence checklist, and explicit limitations. Never print or document example real credentials; call out that current migration output exposes admin credentials as an open code issue for Codex lane A or a later cycle.
-- Status: queued.
+- Definition of done: clear preflight, backup, migration, verification, restore/rollback decision path, failure stop conditions, evidence checklist, and explicit limitations.
+- Status: done.
 
 ### Claude handoff
 
 Claude updates only this subsection while lane B is active.
 
-- Status: queued
-- Summary:
-- Changed files:
-- Verification:
-- Risks or blockers:
-- Commit SHA:
+- Status: done
+- Summary: Replaced the stale migration guide with a staging migration-and-restore rehearsal runbook and marked the historical summary as archive-only.
+- Changed files: `docs/migration/MIGRATION_GUIDE.md`, `docs/migration/MIGRATION_SUMMARY.md`.
+- Verification: Reviewed against current migration, backup/restore, configuration, and health-check code; `npm.cmd test` passed 26/26 during Codex review.
+- Risks or blockers: Real staging migration and restore evidence remains required; sandbox migration idempotency and dead feedback migration SQL remain open follow-ups.
+- Commit SHA: `56fa213 docs: add staging migration rehearsal runbook`.
 
 ### Integration result
 
-- Claude commit reviewed: pending.
-- Cherry-picked as: pending.
-- Combined verification: pending.
-- Next cycle: pending.
+- Claude commit reviewed: shared-directory handoff reviewed and committed by Codex as `56fa213`.
+- Cherry-picked as: not applicable (shared working directory).
+- Combined verification: `npm.cmd test` — 26 passed, 0 failed; `npm.cmd audit --omit=dev --json` — 0 production vulnerabilities.
+- Next cycle: select two non-overlapping P0 implementation slices after compaction.
 
 ## Prompt for Claude Code
 
