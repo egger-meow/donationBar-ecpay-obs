@@ -436,7 +436,7 @@ async function migratePostgreSQL() {
     `, [adminEmail, adminUsername, passwordHash, adminDisplayName]);
 
     const adminUserId = userResult.rows[0].id;
-    console.log(`✅ Created admin user: ${adminUsername} (${adminEmail})`);
+    console.log('Admin user created.');
 
     // Create free subscription
     await client.query(`
@@ -552,11 +552,7 @@ async function migratePostgreSQL() {
     await client.query('COMMIT');
     console.log('✅ Migration completed successfully!\n');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📝 Admin credentials:');
-    console.log(`   Email: ${adminEmail}`);
-    console.log(`   Username: ${adminUsername}`);
-    console.log(`   Password: ${adminPassword}`);
-    console.log('   ⚠️  CHANGE THE PASSWORD AFTER FIRST LOGIN!');
+    console.log('Admin user created. Sign in with the credentials stored in your secret manager.');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
     await client.end();
@@ -700,11 +696,7 @@ async function migrateSandbox() {
       fs.writeFileSync(DB_PATH, JSON.stringify(newData, null, 2));
       console.log('✅ Migrated db.json to multi-user format\n');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('📝 Admin credentials:');
-      console.log(`   Email: ${adminEmail}`);
-      console.log(`   Username: ${adminUsername}`);
-      console.log(`   Password: ${adminPassword}`);
-      console.log('   ⚠️  CHANGE THE PASSWORD AFTER FIRST LOGIN!');
+      console.log('Admin user created. Sign in with the credentials stored in your secret manager.');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     } else {
       console.log('⚠️  No existing db.json found. Creating new multi-user structure...\n');
