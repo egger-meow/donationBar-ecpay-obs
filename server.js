@@ -1489,7 +1489,7 @@ function escapeHtmlAttribute(value) {
 }
 
 // Create ECPay order - supports slug in request body for multi-user
-app.post('/create-order', async (req, res) => {
+app.post('/create-order', requireSameOrigin, async (req, res) => {
   const { amount, nickname, message, slug } = req.body;
 
   const amountText = String(amount ?? '').trim();

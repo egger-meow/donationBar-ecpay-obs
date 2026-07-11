@@ -14,6 +14,23 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-11 — Same-origin protection for public donation order creation (P0)
+
+Closed a CSRF gap on the public donation checkout entry point:
+
+- `POST /create-order` now runs the existing `requireSameOrigin` middleware before its
+  order-creation handler, matching other browser-initiated mutations. Provider callback
+  routes remain separate and are not subjected to browser-origin checks.
+- Added a source-level regression test ensuring the middleware remains ahead of the
+  async handler.
+- Local sandbox smoke evidence: a request with `Origin: https://attacker.example` was
+  rejected with HTTP 403; a request using the configured local origin reached the normal
+  handler path. No further order requests were run.
+
+Verification: `npm.cmd test` passes **65/65** tests and `git diff --check` passes.
+Current Express middleware chaining guidance was consulted for the route configuration.
+Real ECPay checkout/callback remains a staging evidence gate.
+
 ## 2026-07-11 — Production dependency audit clean (P0 evidence)
 
 Ran the roadmap-required production dependency scan against the current npm lockfile:
