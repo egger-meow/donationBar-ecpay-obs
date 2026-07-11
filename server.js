@@ -1095,13 +1095,14 @@ app.post('/logout', requireSameOrigin, (req, res) => {
 // Google OAuth - Initiate authentication
 app.get('/api/auth/google',
   passport.authenticate('google', {
-    scope: ['profile', 'email']
+    scope: ['profile', 'email'],
+    state: true
   })
 );
 
 // Google OAuth - Callback
 app.get('/api/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login?error=oauth_failed' }),
+  passport.authenticate('google', { failureRedirect: '/login?error=oauth_failed', state: true }),
   async (req, res) => {
     // Successful authentication - properly set session with user data
     req.session.userId = req.user.id;
