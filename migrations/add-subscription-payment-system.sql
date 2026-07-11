@@ -72,8 +72,9 @@ CREATE TABLE IF NOT EXISTS payment_history (
   paid_at TIMESTAMP WITH TIME ZONE,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   
-  -- Ensure unique ECPay trade numbers
-  UNIQUE(ecpay_merchant_trade_no)
+  -- MerchantTradeNo identifies the recurring agreement and repeats each month.
+  -- Individual authorization callbacks are deduplicated by ECPay TradeNo below.
+  UNIQUE(ecpay_trade_no)
 );
 
 -- Add indexes for efficient queries

@@ -2,6 +2,7 @@ import pg from 'pg';
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { isPlatformAdminEmail } from './config.js';
 
 const { Client } = pg;
 
@@ -34,6 +35,9 @@ class Database {
     try {
       const databaseUrl = process.env.DATABASE_URL;
       if (!databaseUrl) {
+        if (process.env.NODE_ENV === 'production' || process.env.ENVIRONMENT === 'production') {
+          throw new Error('DATABASE_URL is required in production; JSON fallback is disabled');
+        }
         console.log('📝 No DATABASE_URL found, falling back to JSON file');
         this.isProduction = false;
         return;
@@ -84,6 +88,10 @@ class Database {
       console.log('🐘 Connected to PostgreSQL (Multi-User Mode)');
 
     } catch (error) {
+      if (process.env.NODE_ENV === 'production' || process.env.ENVIRONMENT === 'production') {
+        process.nextTick(() => { throw error; });
+        return;
+      }
       console.error('❌ PostgreSQL connection failed:', error.message);
       console.log('📝 Falling back to JSON file storage');
       this.isProduction = false;
@@ -140,13 +148,8 @@ class Database {
    */
   async createUser(userData) {
     if (this.isProduction && this.connected) {
-      // Check if any admin exists
-      const adminCheck = await pgClient.query('SELECT COUNT(*) FROM users WHERE is_admin = TRUE');
-      const hasAdmin = parseInt(adminCheck.rows[0].count) > 0;
-
-      // Auto-promote specific user to admin if no admin exists
-      const isAdmin = !hasAdmin && userData.email === 'inpire.mg09@nycu.edu.tw';
-      const displayName = userData.email === 'inpire.mg09@nycu.edu.tw' ? 'jjmow' : (userData.displayName || userData.username);
+      const isAdmin = isPlatformAdminEmail(userData.email);
+      const displayName = userData.displayName || userData.username;
 
       const result = await pgClient.query(`
         INSERT INTO users (email, username, password_hash, display_name, auth_provider, oauth_provider_id, is_admin)
@@ -170,12 +173,8 @@ class Database {
     } else {
       const data = await this.readJSON();
 
-      // Check if any admin exists
-      const hasAdmin = data.users.some(u => u.isAdmin === true);
-
-      // Auto-promote specific user to admin if no admin exists
-      const isAdmin = !hasAdmin && userData.email === 'inpire.mg09@nycu.edu.tw';
-      const displayName = userData.email === 'inpire.mg09@nycu.edu.tw' ? 'jjmow' : (userData.displayName || userData.username);
+      const isAdmin = isPlatformAdminEmail(userData.email);
+      const displayName = userData.displayName || userData.username;
 
       const newUser = {
         id: uuidv4(),
@@ -886,30 +885,18 @@ class Database {
       const values = [];
       let paramIndex = 1;
 
-      // Build dynamic UPDATE query
-      if (updateData.planType !== undefined) {
-        fields.push(`plan_type = $${paramIndex++}`);
-        values.push(updateData.planType);
-      }
-      if (updateData.status !== undefined) {
-        fields.push(`status = $${paramIndex++}`);
-        values.push(updateData.status);
-      }
-      if (updateData.isTrial !== undefined) {
-        fields.push(`is_trial = $${paramIndex++}`);
-        values.push(updateData.isTrial);
-      }
-      if (updateData.trialEndDate !== undefined) {
-        fields.push(`trial_end_date = $${paramIndex++}`);
-        values.push(updateData.trialEndDate);
-      }
-      if (updateData.pricePerMonth !== undefined) {
-        fields.push(`price_per_month = $${paramIndex++}`);
-        values.push(updateData.pricePerMonth);
-      }
-      if (updateData.nextBillingDate !== undefined) {
-        fields.push(`next_billing_date = $${paramIndex++}`);
-        values.push(updateData.nextBillingDate);
+      const allowedFields = {
+        planType: 'plan_type', status: 'status', isTrial: 'is_trial', trialEndDate: 'trial_end_date',
+        pricePerMonth: 'price_per_month', billingCycleStart: 'billing_cycle_start', nextBillingDate: 'next_billing_date',
+        ecpayMerchantTradeNo: 'ecpay_merchant_trade_no', ecpayTradeNo: 'ecpay_trade_no',
+        lastPaymentDate: 'last_payment_date', lastPaymentStatus: 'last_payment_status', failedPaymentCount: 'failed_payment_count',
+        lastFailedAt: 'last_failed_at', pausedAt: 'paused_at', gracePeriodEndAt: 'grace_period_end_at', canceledAt: 'canceled_at'
+      };
+      for (const [key, column] of Object.entries(allowedFields)) {
+        if (updateData[key] !== undefined) {
+          fields.push(`${column} = $${paramIndex++}`);
+          values.push(updateData[key]);
+        }
       }
 
       fields.push(`updated_at = NOW()`);
@@ -965,6 +952,7 @@ class Database {
           paid_at
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+        ON CONFLICT (ecpay_trade_no) WHERE ecpay_trade_no IS NOT NULL DO NOTHING
         RETURNING *
       `, [
         paymentId,
@@ -994,10 +982,15 @@ class Database {
         paymentData.totalSuccessAmount || null,
         paymentData.status === 'success' ? (paymentData.paidAt || new Date()) : null
       ]);
-      return this.camelCaseKeys(result.rows[0]);
+      if (result.rows[0]) return { ...this.camelCaseKeys(result.rows[0]), wasDuplicate: false };
+      const existing = await pgClient.query('SELECT * FROM payment_history WHERE ecpay_trade_no = $1', [paymentData.ecpayTradeNo]);
+      return existing.rows[0] ? { ...this.camelCaseKeys(existing.rows[0]), wasDuplicate: true } : null;
     } else {
       const data = await this.readJSON();
       if (!data.paymentHistory) data.paymentHistory = [];
+
+      const existing = data.paymentHistory.find(payment => paymentData.ecpayTradeNo && payment.ecpayTradeNo === paymentData.ecpayTradeNo);
+      if (existing) return { ...existing, wasDuplicate: true };
 
       const newPayment = {
         id: paymentId,
@@ -1032,7 +1025,7 @@ class Database {
 
       data.paymentHistory.push(newPayment);
       await this.writeJSON(data);
-      return newPayment;
+      return { ...newPayment, wasDuplicate: false };
     }
   }
 

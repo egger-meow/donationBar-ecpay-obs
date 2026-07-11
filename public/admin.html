@@ -2153,6 +2153,12 @@
 
     // Subscription Management Functions
     function upgradePlan() {
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/subscription/checkout';
+      document.body.appendChild(form);
+      form.submit();
+      return;
       // TODO: Redirect to ECPay subscription payment page
       showAlert('💎 即將前往 ECPay 付款頁面（待串接）', 'info');
       // Future: window.location.href = '/subscription/checkout';
@@ -2167,7 +2173,18 @@
       showAlert('💳 付款方式管理功能（待串接 ECPay）', 'info');
     }
 
-    function cancelSubscription() {
+    async function cancelSubscription() {
+      if (!confirm('Cancel your subscription? Access continues until the end of the paid period.')) return;
+      try {
+        const response = await fetch('/subscription/cancel', { method: 'POST', headers: { Accept: 'application/json' } });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Cancellation failed');
+        showAlert('Subscription cancelled. Your paid access remains available until the displayed end date.', 'success');
+        await loadUserInfo();
+      } catch (error) {
+        showAlert(error.message, 'error');
+      }
+      return;
       if (confirm('確定要取消訂閱嗎？\n\n取消後：\n- 本期結束後將無法使用付費功能\n- 斗內條和捐款頁面將被停用\n- 可隨時重新訂閱')) {
         // TODO: Call API to cancel subscription
         // POST /api/subscription/cancel
@@ -2178,7 +2195,19 @@
       }
     }
 
-    function pauseSubscription() {
+    async function pauseSubscription() {
+      showAlert('ECPay cannot safely pause recurring billing. Cancel the subscription to stop future charges.', 'info');
+      return;
+      try {
+        const response = await fetch('/subscription/pause', { method: 'POST', headers: { Accept: 'application/json' } });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Pause failed');
+        showAlert('Subscription paused.', 'success');
+        await loadUserInfo();
+      } catch (error) {
+        showAlert(error.message, 'error');
+      }
+      return;
       if (confirm('確定要暫停訂閱嗎？\n\n暫停期間：\n- 不會扣款\n- 無法使用付費功能\n- 可隨時恢復訂閱')) {
         // TODO: Call API to pause subscription
         // POST /api/subscription/pause
@@ -2188,7 +2217,19 @@
       }
     }
 
-    function viewPaymentHistory() {
+    async function viewPaymentHistory() {
+      try {
+        const response = await fetch('/api/subscription/payment-history', { headers: { Accept: 'application/json' } });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Could not load payment history');
+        const rows = result.payments.length
+          ? result.payments.map(payment => `${new Date(payment.date).toLocaleDateString()} · ${payment.currency} ${payment.amount} · ${payment.status}`).join('\n')
+          : 'No payments yet.';
+        alert(rows);
+      } catch (error) {
+        showAlert(error.message, 'error');
+      }
+      return;
       // TODO: Show payment history modal
       // Should display:
       // - Date of payment

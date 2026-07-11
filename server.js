@@ -5,13 +5,26 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import crypto from 'crypto';
 import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import database from './database.js';
 import * as emailService from './email.js';
+import { getBillingECPayCredentials, getECPayCheckoutUrl, getECPayPeriodActionUrl, isProduction, validateProductionConfig } from './config.js';
+import { generateCheckMacValueForCredentials, verifyCheckMacValueForCredentials } from './ecpay.js';
+import { requireSameOrigin } from './security.js';
 
 const app = express();
 const __dirname = path.resolve();
+const production = isProduction();
+
+validateProductionConfig();
+if (production) app.set('trust proxy', 1);
+app.disable('x-powered-by');
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+app.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: 'draft-7', legacyHeaders: false }));
 
 // Middleware
 app.use(express.static(path.join(__dirname, 'public')));
@@ -19,11 +32,14 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
 // Session middleware
+const PgSession = connectPgSimple(session);
 app.use(session({
+  store: production ? new PgSession({ conString: process.env.DATABASE_URL, createTableIfMissing: true }) : undefined,
   secret: process.env.SESSION_SECRET || 'super-secret',
   resave: false,
-  saveUninitialized: true,
-  cookie: { secure: false } // Set to true if using HTTPS
+  saveUninitialized: false,
+  name: 'donationbar.sid',
+  cookie: { secure: production, httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 }
 }));
 
 // Initialize Passport
@@ -581,6 +597,93 @@ async function verifyCheckMacValue(params, workspaceId = null) {
   return mac === params.CheckMacValue;
 }
 
+function generateCheckMacValueWithCredentials(params, credentials) {
+  return generateCheckMacValueForCredentials(params, credentials);
+}
+
+function verifyCheckMacValueWithCredentials(params, credentials) {
+  return verifyCheckMacValueForCredentials(params, credentials);
+}
+
+function nextMonthlyBillingDate(from = new Date()) {
+  const next = new Date(from);
+  next.setUTCMonth(next.getUTCMonth() + 1);
+  return next;
+}
+
+async function processSubscriptionPaymentCallback(payload) {
+  const credentials = getBillingECPayCredentials();
+  if (String(payload?.MerchantID) !== String(credentials.merchantId)) return { ok: false, status: 400, message: '0|Invalid merchant' };
+  if (!verifyCheckMacValueWithCredentials(payload, credentials)) return { ok: false, status: 400, message: '0|Invalid checksum' };
+  if (String(payload.SimulatePaid || '0') === '1') return { ok: true, simulated: true };
+
+  const userId = String(payload.CustomField1 || '').trim();
+  const tradeNo = String(payload.TradeNo || '').trim();
+  const merchantTradeNo = String(payload.MerchantTradeNo || '').trim();
+  const amount = Number.parseInt(payload.PeriodAmount || payload.TradeAmt, 10);
+  const expectedAmount = Number.parseInt(process.env.SUBSCRIPTION_MONTHLY_PRICE || '70', 10);
+  if (!userId || !tradeNo || !merchantTradeNo || !Number.isSafeInteger(amount) || amount !== expectedAmount) {
+    return { ok: false, status: 400, message: '0|Invalid payment data' };
+  }
+
+  const subscription = await database.getUserSubscription(userId);
+  if (!subscription || (subscription.ecpayMerchantTradeNo && subscription.ecpayMerchantTradeNo !== merchantTradeNo)) {
+    return { ok: false, status: 404, message: '0|Subscription not found' };
+  }
+
+  const success = String(payload.RtnCode) === '1';
+  const payment = await database.createPaymentRecord({
+    subscriptionId: subscription.id, userId, amount, currency: 'TWD', status: success ? 'success' : 'failed',
+    ecpayTradeNo: tradeNo, ecpayMerchantTradeNo: merchantTradeNo, ecpayPaymentDate: payload.PaymentDate || null,
+    paymentMethod: payload.PaymentType || 'Credit', paymentMethodType: payload.PaymentType || 'Credit',
+    cardAuthCode: payload.AuthCode || null, cardFirst6: payload.card6no || payload.Card6No || null,
+    cardLast4: payload.card4no || payload.Card4No || null, periodType: payload.PeriodType || 'M',
+    frequency: Number.parseInt(payload.Frequency || '1', 10), execTimes: Number.parseInt(payload.ExecTimes || '0', 10) || null,
+    totalSuccessTimes: Number.parseInt(payload.TotalSuccessTimes || '0', 10),
+    totalSuccessAmount: Number.parseInt(payload.TotalSuccessAmount || '0', 10), errorMessage: success ? null : String(payload.RtnMsg || 'Payment failed')
+  });
+  if (!payment) throw new Error('Payment could not be persisted');
+  if (payment.wasDuplicate) return { ok: true, success, duplicate: true };
+
+  if (success) {
+    const paidAt = payload.PaymentDate ? new Date(payload.PaymentDate.replace(/\//g, '-')) : new Date();
+    await database.updateSubscription(userId, {
+      planType: 'pro', status: 'active', isTrial: false, pricePerMonth: expectedAmount,
+      ecpayMerchantTradeNo: merchantTradeNo, ecpayTradeNo: tradeNo,
+      lastPaymentDate: Number.isNaN(paidAt.getTime()) ? new Date() : paidAt,
+      lastPaymentStatus: 'success', failedPaymentCount: 0, lastFailedAt: null, gracePeriodEndAt: null,
+      nextBillingDate: nextMonthlyBillingDate(Number.isNaN(paidAt.getTime()) ? new Date() : paidAt).toISOString()
+    });
+  } else {
+    await database.updateSubscription(userId, {
+      lastPaymentStatus: 'failed', failedPaymentCount: (subscription.failedPaymentCount || 0) + 1, lastFailedAt: new Date()
+    });
+  }
+  return { ok: true, success };
+}
+
+async function cancelECPaySubscription(merchantTradeNo) {
+  if (process.env.ENVIRONMENT === 'sandbox') return;
+  const credentials = getBillingECPayCredentials();
+  const params = {
+    MerchantID: credentials.merchantId,
+    MerchantTradeNo: merchantTradeNo,
+    Action: 'Cancel',
+    TimeStamp: Math.floor(Date.now() / 1000)
+  };
+  params.CheckMacValue = generateCheckMacValueWithCredentials(params, credentials);
+  const response = await fetch(getECPayPeriodActionUrl(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'text/html' },
+    body: new URLSearchParams(params),
+    signal: AbortSignal.timeout(10_000)
+  });
+  if (!response.ok) throw new Error(`ECPay cancellation returned HTTP ${response.status}`);
+  const result = Object.fromEntries(new URLSearchParams(await response.text()));
+  if (String(result.RtnCode) !== '1') throw new Error(`ECPay cancellation failed: ${String(result.RtnMsg || 'unknown error').slice(0, 120)}`);
+  if (result.CheckMacValue && !verifyCheckMacValueWithCredentials(result, credentials)) throw new Error('ECPay cancellation response checksum was invalid');
+}
+
 // Helper to decode ECPay's URL-encoded JSON
 function decodeECPayJsonLike(str) {
   // ECPay encodes spaces as '+', and uses percent-encoding with lowercased hex
@@ -589,8 +692,8 @@ function decodeECPayJsonLike(str) {
 }
 
 // ECPay Data decryption for webhook (AES-CBC)
-async function decryptECPayData(encryptedData, workspaceId = null) {
-  const { hashKey, hashIV } = await getECPayCredentials(workspaceId);
+async function decryptECPayData(encryptedData, workspaceId = null, credentialOverride = null) {
+  const { hashKey, hashIV } = credentialOverride || await getECPayCredentials(workspaceId);
 
   try {
     if (typeof encryptedData !== 'string' || !encryptedData.trim()) {
@@ -700,7 +803,9 @@ async function requireActiveSubscription(req, res, next) {
 
     // Check if subscription allows access
     const allowedPlans = ['trial', 'free_pass', 'basic', 'pro', 'enterprise'];
-    const isActive = subscription.status === 'active';
+    const gracePeriodEnd = subscription.gracePeriodEndAt ? new Date(subscription.gracePeriodEndAt) : null;
+    const hasCancellationGrace = subscription.status === 'cancelled' && gracePeriodEnd && gracePeriodEnd > new Date();
+    const isActive = subscription.status === 'active' || hasCancellationGrace;
     const hasValidPlan = allowedPlans.includes(subscription.planType);
 
     // Check if trial has expired
@@ -818,7 +923,7 @@ app.post('/success', async (req, res) => {
     return res.redirect(303, redirectUrl);
   }
 
-  console.warn('OrderResultURL POST not valid or failed:', p);
+  console.warn('OrderResultURL POST was invalid or reported a failed payment');
   const errorUrl = workspaceSlug ? `/donate/${workspaceSlug}?error=1` : '/donate?error=1';
   return res.redirect(303, errorUrl);
 });
@@ -876,7 +981,6 @@ app.post('/webhook/:slug', async (req, res) => {
       return res.status(400).send('0|Decryption failed');
     }
 
-    console.log('📦 Decrypted data:', JSON.stringify(decryptedData, null, 2));
 
     // Check RtnCode (1 = API execution successful) - normalize to number
     if (Number(decryptedData.RtnCode) !== 1) {
@@ -944,7 +1048,7 @@ app.get('/login', (req, res) => {
 });
 
 // Logout
-app.post('/logout', (req, res) => {
+app.post('/logout', requireSameOrigin, (req, res) => {
   const userId = req.session?.userId;
   const userEmail = req.session?.passport?.user?.email;
 
@@ -1076,7 +1180,7 @@ app.get('/api/workspace/urls', requireAdmin, async (req, res) => {
 });
 
 // Get feedback (admin only)
-app.get('/api/feedback', requireAdmin, async (req, res) => {
+app.get('/api/feedback', requireAdmin, requirePlatformAdmin, async (req, res) => {
   try {
     const { status, limit = 100 } = req.query;
     const feedback = await database.getFeedback({
@@ -1091,7 +1195,7 @@ app.get('/api/feedback', requireAdmin, async (req, res) => {
 });
 
 // Update feedback status (admin only)
-app.patch('/api/feedback/:id', requireAdmin, async (req, res) => {
+app.patch('/api/feedback/:id', requireAdmin, requirePlatformAdmin, requireSameOrigin, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -1114,7 +1218,7 @@ app.patch('/api/feedback/:id', requireAdmin, async (req, res) => {
 });
 
 // Submit feedback (protected)
-app.post('/api/feedback', requireAdmin, async (req, res) => {
+app.post('/api/feedback', requireAdmin, requireSameOrigin, async (req, res) => {
   try {
     const { type, message, email } = req.body;
 
@@ -1211,7 +1315,16 @@ app.get('/admin', requireAdmin, (req, res) => {
 // ECPay callback endpoint
 app.post('/ecpay/return', async (req, res) => {
   const p = req.body;
-  console.log('ECPay callback:', p);
+
+  if (String(p?.MerchantID) === String(getBillingECPayCredentials().merchantId)) {
+    try {
+      const result = await processSubscriptionPaymentCallback(p);
+      return res.status(result.status || 200).send(result.ok ? '1|OK' : result.message);
+    } catch (error) {
+      console.error('Subscription initial payment callback failed:', error.message);
+      return res.status(500).send('0|Server error');
+    }
+  }
 
   // Extract workspace slug from CustomField3
   const workspaceSlug = p.CustomField3 || null;
@@ -1258,7 +1371,7 @@ app.post('/ecpay/return', async (req, res) => {
 // Merchants can set this URL in ECPay's "付款完成通知回傳網址" (ReturnURL)
 // Reference: https://developers.ecpay.com.tw/?p=41030
 // Multi-user: Use /webhook/:slug for workspace-specific webhooks
-app.post('/webhook/:slug', async (req, res) => {
+async function legacyDuplicateWebhookHandler(req, res) {
   const { slug } = req.params;
   console.log(`📨 ECPay webhook received for workspace: ${slug}`);
 
@@ -1294,7 +1407,6 @@ app.post('/webhook/:slug', async (req, res) => {
       return res.status(400).send('0|Decryption failed');
     }
 
-    console.log('📦 Decrypted data:', JSON.stringify(decryptedData, null, 2));
 
     // Check RtnCode (1 = API execution successful) - normalize to number
     if (Number(decryptedData.RtnCode) !== 1) {
@@ -1342,23 +1454,37 @@ app.post('/webhook/:slug', async (req, res) => {
     console.error('❌ Webhook error:', error);
     return res.status(500).send('0|Server error');
   }
-});
+}
+
+function requirePlatformAdmin(req, res, next) {
+  if (req.session?.userId && req.session?.isAdmin === true) return next();
+  return res.status(403).json({ error: 'Forbidden' });
+}
 
 // Legacy webhook endpoint (backward compatibility - routes to default workspace)
-app.post('/webhook/ecpay', async (req, res) => {
+async function legacyDefaultWebhookHandler(req, res) {
   console.log('📨 Legacy webhook endpoint called, routing to default workspace');
   req.params = { slug: DEFAULT_WORKSPACE_SLUG };
   return app._router.handle(req, res);
-});
+}
+
+function escapeHtmlAttribute(value) {
+  return String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+}
 
 // Create ECPay order - supports slug in request body for multi-user
 app.post('/create-order', async (req, res) => {
   const { amount, nickname, message, slug } = req.body;
 
-  const amt = parseInt(amount, 10);
-  if (!amt || amt < 1) {
+  const amountText = String(amount ?? '').trim();
+  const amt = /^\d{1,7}$/.test(amountText) ? Number(amountText) : NaN;
+  const normalizedNickname = String(nickname || 'Anonymous').trim().slice(0, 80) || 'Anonymous';
+  const normalizedMessage = String(message || '').trim().slice(0, 300);
+  const normalizedSlug = String(slug || '').trim();
+  if (!Number.isSafeInteger(amt) || amt < 1 || amt > 1_000_000) {
     return res.status(400).json({ error: 'Invalid amount' });
   }
+  if (normalizedSlug && !/^[a-z0-9-]{1,100}$/.test(normalizedSlug)) return res.status(400).json({ error: 'Invalid workspace' });
 
   const tradeNo = 'DONATE' + Date.now();           // 長度 <= 20
   const tradeDate = formatECPayDate(new Date());     // 正確格式
@@ -1368,7 +1494,7 @@ app.post('/create-order', async (req, res) => {
     console.log(`🧪 SANDBOX MODE: Simulating payment for ${nickname || 'Anonymous'} - NT$${amt}`);
 
     // Get workspace from slug or use default
-    const workspace = await getWorkspaceFromSlug(slug);
+    const workspace = await getWorkspaceFromSlug(normalizedSlug);
 
     if (!workspace) {
       console.error(`❌ SANDBOX: Workspace not found for slug: ${slug}`);
@@ -1381,24 +1507,24 @@ app.post('/create-order', async (req, res) => {
     const success = await addDonation(workspace.id, {
       tradeNo: tradeNo,
       amount: amt,
-      payer: nickname || 'Anonymous',
-      message: message || '',
+      payer: normalizedNickname,
+      message: normalizedMessage,
       paymentProviderId: provider?.id
     });
 
     if (success) {
       console.log(`✅ SANDBOX: Payment simulation successful for workspace ${workspace.slug}`);
-      const redirectUrl = slug ? `/success?sandbox=1&slug=${slug}` : '/success?sandbox=1';
+      const redirectUrl = normalizedSlug ? `/success?sandbox=1&slug=${normalizedSlug}` : '/success?sandbox=1';
       return res.redirect(redirectUrl);
     } else {
       console.log(`❌ SANDBOX: Payment simulation failed (duplicate)`);
-      const errorUrl = slug ? `/donate/${slug}?error=1` : '/donate?error=1';
+      const errorUrl = normalizedSlug ? `/donate/${normalizedSlug}?error=1` : '/donate?error=1';
       return res.redirect(errorUrl);
     }
   }
 
   // Production mode: redirect to actual ECPay
-  const workspace = await getWorkspaceFromSlug(slug);
+  const workspace = await getWorkspaceFromSlug(normalizedSlug);
 
   if (!workspace) {
     console.error(`❌ Create Order: Workspace not found for slug: ${slug}`);
@@ -1415,12 +1541,12 @@ app.post('/create-order', async (req, res) => {
     TradeDesc: 'Stream Donation',
     ItemName: 'Stream Support x1',
     ReturnURL: `${process.env.BASE_URL}/ecpay/return`,
-    ClientBackURL: `${process.env.BASE_URL}/success${slug ? `?slug=${slug}` : ''}`,
+    ClientBackURL: `${process.env.BASE_URL}/success${normalizedSlug ? `?slug=${encodeURIComponent(normalizedSlug)}` : ''}`,
     OrderResultURL: `${process.env.BASE_URL}/success`,
     ChoosePayment: 'Credit',
     EncryptType: 1,
-    CustomField1: nickname || 'Anonymous',
-    CustomField2: message || '',
+    CustomField1: normalizedNickname,
+    CustomField2: normalizedMessage,
     CustomField3: workspace.slug  // Pass workspace slug for return callback
   };
 
@@ -1428,10 +1554,10 @@ app.post('/create-order', async (req, res) => {
   params.CheckMacValue = await generateCheckMacValue(params, workspace.id);
 
   // Create auto-submit form
-  const action = 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5';
+  const action = getECPayCheckoutUrl();
 
   const inputs = Object.entries(params)
-    .map(([k, v]) => `<input type="hidden" name="${k}" value="${String(v)}">`)
+    .map(([k, v]) => `<input type="hidden" name="${escapeHtmlAttribute(k)}" value="${escapeHtmlAttribute(v)}">`)
     .join('\n');
 
   res.send(`
@@ -1473,7 +1599,7 @@ app.get('/admin/progress', requireAdmin, async (req, res) => {
 });
 
 // Admin API for goal management (protected routes)
-app.post('/admin/goal', requireAdmin, async (req, res) => {
+app.post('/admin/goal', requireAdmin, requireSameOrigin, async (req, res) => {
   console.log('🎯 POST /admin/goal called with:', req.body);
   try {
     const { title, amount, startFrom } = req.body;
@@ -1515,7 +1641,7 @@ app.post('/admin/goal', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/admin/reset', requireAdmin, async (req, res) => {
+app.post('/admin/reset', requireAdmin, requireSameOrigin, async (req, res) => {
   try {
     const workspace = await getUserWorkspaceFromSession(req);
 
@@ -1552,7 +1678,7 @@ app.get('/admin/ecpay', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/admin/ecpay', requireAdmin, async (req, res) => {
+app.post('/admin/ecpay', requireAdmin, requireSameOrigin, async (req, res) => {
   try {
     const { merchantId, hashKey, hashIV } = req.body;
 
@@ -1603,7 +1729,7 @@ app.get('/admin/overlay', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/admin/overlay', requireAdmin, async (req, res) => {
+app.post('/admin/overlay', requireAdmin, requireSameOrigin, async (req, res) => {
   try {
     const settings = req.body;
     const workspace = await getUserWorkspaceFromSession(req);
@@ -1723,7 +1849,7 @@ app.get('/api/schema', async (req, res) => {
  * Create ECPay periodic payment (subscription)
  * This initiates a recurring payment authorization
  */
-app.post('/subscription/checkout', requireAuth, async (req, res) => {
+app.post('/subscription/checkout', requireAuth, requireSameOrigin, async (req, res) => {
   try {
     const user = await database.findUserById(req.session.userId);
     if (!user) {
@@ -1737,12 +1863,13 @@ app.post('/subscription/checkout', requireAuth, async (req, res) => {
     }
 
     // Get user's workspace
-    const workspace = await database.getUserWorkspace(user.id);
+    const workspaces = await database.getUserWorkspaces(user.id);
+    const workspace = workspaces[0];
     if (!workspace) {
       return res.status(404).json({ error: 'Workspace not found' });
     }
 
-    const credentials = await getECPayCredentials(workspace.id);
+    const credentials = getBillingECPayCredentials();
 
     // Subscription parameters
     const monthlyPrice = parseInt(process.env.SUBSCRIPTION_MONTHLY_PRICE) || 70;
@@ -1773,11 +1900,12 @@ app.post('/subscription/checkout', requireAuth, async (req, res) => {
       // Custom fields to track user and subscription
       CustomField1: user.id,
       CustomField2: workspace.id,
-      CustomField3: existingSubscription?.id || 'new'
+      CustomField3: existingSubscription?.id || 'new',
+      CustomField4: 'donationbar_subscription'
     };
 
     // Generate CheckMacValue
-    params.CheckMacValue = await generateCheckMacValue(params, workspace.id);
+    params.CheckMacValue = generateCheckMacValueWithCredentials(params, credentials);
 
     console.log('💳 Creating subscription checkout for user:', user.email);
     console.log('📝 Subscription params:', {
@@ -1791,8 +1919,6 @@ app.post('/subscription/checkout', requireAuth, async (req, res) => {
     if (existingSubscription) {
       await database.updateSubscription(user.id, {
         ecpayMerchantTradeNo: tradeNo,
-        status: 'pending',
-        planType: 'pro',
         pricePerMonth: monthlyPrice
       });
     } else {
@@ -1806,7 +1932,7 @@ app.post('/subscription/checkout', requireAuth, async (req, res) => {
     }
 
     // Create auto-submit form HTML
-    const action = 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5'; // Use stage for testing
+    const action = getECPayCheckoutUrl();
     const inputs = Object.entries(params)
       .map(([k, v]) => `<input type="hidden" name="${k}" value="${String(v)}">`)
       .join('\n');
@@ -1849,24 +1975,38 @@ app.post('/subscription/checkout', requireAuth, async (req, res) => {
  * MUST respond with "1|OK"
  */
 app.post('/ecpay/period/callback', async (req, res) => {
+  try {
+    const result = await processSubscriptionPaymentCallback(req.body || {});
+    return res.status(result.status || 200).send(result.ok ? '1|OK' : result.message);
+  } catch (error) {
+    console.error('Subscription recurring payment callback failed:', error.message);
+    return res.status(500).send('0|Server error');
+  }
+});
+
+// Retained temporarily for reference while migrating old encrypted callback deployments.
+// This route is intentionally unreachable by ECPay and must be removed after migration verification.
+async function legacyEncryptedSubscriptionCallback(req, res) {
   console.log('💰 ECPay Period Callback received');
-  console.log('📦 Payload:', JSON.stringify(req.body, null, 2));
 
   try {
     const payload = req.body;
+    const billingCredentials = getBillingECPayCredentials();
 
     // Verify merchant ID
-    const merchantId = payload.MerchantID;
+    if (String(payload.MerchantID) !== String(billingCredentials.merchantId)) {
+      console.warn('Rejected subscription callback with an invalid merchant ID');
+      return res.status(400).send('0|Invalid merchant');
+    }
 
     // Decrypt the Data field (ECPay sends encrypted JSON)
-    const decryptedData = await decryptECPayData(payload.Data);
+    const decryptedData = await decryptECPayData(payload.Data, null, billingCredentials);
 
     if (!decryptedData) {
       console.error('❌ Failed to decrypt period callback data');
       return res.send('0|Decryption failed');
     }
 
-    console.log('✅ Decrypted period callback data:', JSON.stringify(decryptedData, null, 2));
 
     // Extract order info
     const orderInfo = decryptedData.OrderInfo || {};
@@ -1874,7 +2014,7 @@ app.post('/ecpay/period/callback', async (req, res) => {
     const rtnCode = Number(decryptedData.RtnCode);
 
     // Get subscription from CustomField or MerchantTradeNo
-    const userId = decryptedData.CustomField || orderInfo.CustomField;
+    const userId = decryptedData.CustomField1 || orderInfo.CustomField1 || decryptedData.CustomField || orderInfo.CustomField;
     const subscription = await database.getUserSubscription(userId);
 
     if (!subscription) {
@@ -1987,7 +2127,7 @@ app.post('/ecpay/period/callback', async (req, res) => {
     // Still return 1|OK to avoid ECPay retrying indefinitely
     return res.send('1|OK');
   }
-});
+}
 
 /**
  * GET /api/subscription/payment-history
@@ -2027,7 +2167,7 @@ app.get('/api/subscription/payment-history', requireAuth, async (req, res) => {
  * POST /subscription/cancel
  * Cancel user's subscription
  */
-app.post('/subscription/cancel', requireAuth, async (req, res) => {
+app.post('/subscription/cancel', requireAuth, requireSameOrigin, async (req, res) => {
   try {
     const user = await database.findUserById(req.session.userId);
     if (!user) {
@@ -2042,6 +2182,12 @@ app.post('/subscription/cancel', requireAuth, async (req, res) => {
     if (subscription.status === 'cancelled') {
       return res.status(400).json({ error: 'Subscription already cancelled' });
     }
+
+    if (!subscription.ecpayMerchantTradeNo) {
+      return res.status(409).json({ error: 'Subscription has no ECPay recurring agreement to cancel' });
+    }
+
+    await cancelECPaySubscription(subscription.ecpayMerchantTradeNo);
 
     // Calculate grace period (until end of current billing cycle)
     const gracePeriodEnd = subscription.nextBillingDate || new Date();
@@ -2082,7 +2228,9 @@ app.post('/subscription/cancel', requireAuth, async (req, res) => {
  * POST /subscription/pause
  * Pause user's subscription temporarily
  */
-app.post('/subscription/pause', requireAuth, async (req, res) => {
+app.post('/subscription/pause', requireAuth, requireSameOrigin, async (req, res) => {
+  return res.status(409).json({ error: 'ECPay does not support safely pausing this recurring plan. Cancel it instead to stop future charges.' });
+  /* Legacy local-only pause logic retained temporarily for migration reference.
   try {
     const user = await database.findUserById(req.session.userId);
     if (!user) {
@@ -2124,13 +2272,14 @@ app.post('/subscription/pause', requireAuth, async (req, res) => {
     console.error('❌ Pause subscription error:', error);
     res.status(500).json({ error: 'Failed to pause subscription' });
   }
+  */
 });
 
 /**
  * POST /subscription/resume
  * Resume a paused subscription
  */
-app.post('/subscription/resume', requireAuth, async (req, res) => {
+app.post('/subscription/resume', requireAuth, requireSameOrigin, async (req, res) => {
   try {
     const user = await database.findUserById(req.session.userId);
     if (!user) {
