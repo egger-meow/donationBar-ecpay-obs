@@ -42,21 +42,21 @@ Run Codex in `C:\IDEA\donationBar-ecpay-obs` and Claude Code in `C:\IDEA\donatio
 - Cycle: `001`
 - Integration branch: `multiuser`
 - Baseline commit: `fc871f9`
-- State: `awaiting Claude start`
+- State: `complete`
 
 ### Codex lane A
 
 - Task: implement and verify encrypted PostgreSQL backup/restore operations.
 - Owned files: `operations/`, `test/postgres-operations.test.js`, `package.json`, `.env.example`, `docs/setup/DEPLOYMENT.md`.
-- Status: active.
-- Commit: pending.
+- Status: done.
+- Commit: `7487724 feat: add encrypted PostgreSQL recovery tooling`.
 
 ### Claude lane B
 
 - Task: create an actionable monitoring and incident-response baseline for production staging, based on current health routes and safe logging behavior.
 - Owned files: `docs/operations/` only (new directory/files). Do not edit application code in this cycle.
 - Definition of done: document liveness/readiness probes, redacted alert signals for readiness failures/callback failures/5xx spikes, severity and ownership, first-response steps, and an alert exercise evidence template. Verify every named route or behavior against current code.
-- Status: queued.
+- Status: done.
 
 ### Claude handoff
 
@@ -70,14 +70,14 @@ Claude updates only this subsection while lane B is active.
   - `docs/collaboration/CLAUDE_CODE_COWORK.md` (Claude handoff subsection only)
 - Verification: Read `server.js` end-to-end for route definitions, health checks (lines 55-62), the donation webhook (957-1059) and subscription callback (2026-2034), `broadcastAdminNotification`/SSE (402-436), and confirmed no global Express error handler or `process.on('uncaughtException'|'unhandledRejection')` exists (grep, no matches). Read `database.js:105-118` for `healthCheck()` semantics (Postgres `SELECT 1` vs. always-ok JSON mode). Read `config.js:9-26` for `validateProductionConfig()`. Grepped `package.json` for monitoring/logging vendors (none) and read `.env.example` (no monitoring env vars). Confirmed `legacyEncryptedSubscriptionCallback` (server.js:2038) is defined but never mounted as a route — dead code, not a live duplicate webhook, so it is described that way rather than as an active alert source. Ran `npm test`: 19/19 pass (baseline unaffected, docs-only change). No lint script exists in this repo (per AGENTS.md/CLAUDE.md), so none was run.
 - Risks or blockers: None blocking. Two follow-ups intentionally left as open gaps rather than resolved unilaterally (both require decisions/infrastructure outside `docs/operations/` scope): (1) no on-call rotation/owner names exist in the repo — the severity table uses explicit placeholders; (2) no alert-delivery channel (email/Slack/PagerDuty/etc.) or monitoring vendor is wired up, so today these signals are only visible by watching logs/polling the health endpoints directly, which the doc states rather than assumes away.
-- Commit SHA: pending (recorded after commit below)
+- Commit SHA: `a795c1ae00c6837df83fa9574d7ac27eeb64053f`.
 
 ### Integration result
 
-- Claude commit reviewed: pending.
-- Cherry-picked as: pending.
-- Combined verification: pending.
-- Next cycle: pending.
+- Claude commit reviewed: `a795c1ae00c6837df83fa9574d7ac27eeb64053f` (no conflicts; documentation scope and code claims reviewed).
+- Cherry-picked as: `1ca9d24 docs: add monitoring and incident-response operations baseline`.
+- Combined verification: `npm.cmd test` — 22 passed, 0 failed on 2026-07-11.
+- Next cycle: select two non-overlapping P0 implementation slices after this integration baseline.
 
 ## Prompt for Claude Code
 
