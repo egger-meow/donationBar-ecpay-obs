@@ -825,7 +825,9 @@ class Database {
       },
       total: settings.totalAmount,
       donations: donations.map(d => ({
-        tradeNo: d.tradeNo,
+        // The overlay needs a stable opaque ID for alert deduplication, not the
+        // provider transaction reference. This payload is visible to public clients.
+        alertId: d.id,
         amount: d.amount,
         payer: d.payerName,
         message: d.message,

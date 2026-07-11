@@ -14,6 +14,22 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-11 — Public progress payload minimization and overlay console redaction (P0)
+
+Removed provider transaction references from browser-visible donation progress:
+
+- `getWorkspaceProgress()` now emits an opaque donation `alertId` for overlay alert
+  deduplication instead of ECPay `tradeNo`. The provider trade number stays server-side
+  for payment idempotency and is not exposed through public SSE/progress payloads.
+- `overlay.html` now deduplicates on `alertId`, names its state accordingly, and no longer
+  logs donor name/amount to the browser console. Donor-rendering paths were inspected:
+  alert fields use `textContent`; recent-donation HTML escapes payer/message values.
+- Added regression tests asserting the public payload contains `alertId` rather than
+  `tradeNo`, and that the overlay does not use that provider field or log donor values.
+
+Verification: `npm.cmd test` passes **67/67** tests and `git diff --check` passes.
+Real OBS/browser viewport validation remains a staging evidence requirement.
+
 ## 2026-07-11 — Same-origin protection for public donation order creation (P0)
 
 Closed a CSRF gap on the public donation checkout entry point:

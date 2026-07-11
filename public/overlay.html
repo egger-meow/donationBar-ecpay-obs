@@ -667,7 +667,7 @@
     
     // New tracking variables for reliable donation detection
     let initialized = false;
-    let lastSeenTradeNo = null;
+    let lastSeenAlertId = null;
     let goalCompleted = false;
     let celebrationPlayed = false;
 
@@ -756,7 +756,7 @@
       alertEl.classList.add('show', 'pulse');
       
       // Debug log
-      console.log('Showing donation alert for:', donor, amount);
+      console.log('Showing donation alert');
 
       // Use configured duration or calculate dynamic duration
       const duration =  calculateAlertDuration(amount) || overlaySettings.alertDuration;
@@ -922,7 +922,7 @@
       // Check for new donations and show alerts (fixed detection)
       if (latestDonation) {
         if (initialized) {
-          if (latestDonation.tradeNo && latestDonation.tradeNo !== lastSeenTradeNo) {
+          if (latestDonation.alertId && latestDonation.alertId !== lastSeenAlertId) {
             showDonationAlert(latestDonation.payer, latestDonation.amount, latestDonation.message);
           }
         } else {
@@ -930,7 +930,7 @@
           initialized = true;
         }
 
-        lastSeenTradeNo = latestDonation.tradeNo || lastSeenTradeNo;
+        lastSeenAlertId = latestDonation.alertId || lastSeenAlertId;
       }
       
       // Render donations (server handles filtering based on donationDisplayMode)
@@ -955,7 +955,7 @@
       } else {
         // Clear UI and internal trackers when no donations to display
         recentDonationsEl.innerHTML = '';
-        lastSeenTradeNo = null;     // so next donation will trigger alert
+        lastSeenAlertId = null;     // so next donation will trigger alert
         initialized = true;         // avoids "first-load" alert
         lastTotal = current || 0;   // keep total consistent for animation check
       }
