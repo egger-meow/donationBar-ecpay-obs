@@ -1,506 +1,124 @@
-# 🚀 Complete Multi-User Setup Guide
+# Complete Setup Guide
 
-## Quick Start (5 Minutes)
+This guide covers two separate paths:
 
-### 1. Install Dependencies
-```bash
-npm install
-```
+- **Local sandbox** — run the app on your own machine against a local JSON file, for development and testing.
+- **Production / staging** — run the app against PostgreSQL on a real domain, for a live streamer to actually use.
 
-This installs all new packages:
-- `bcrypt` - Password hashing
-- `nodemailer` - Email functionality  
-- `passport` - OAuth support
-- `uuid` - ID generation
-- And more...
+Do not mix the two: sandbox configuration (`ENVIRONMENT=sandbox`, no `DATABASE_URL`) is never appropriate for real donations or real viewer data.
 
-### 2. Configure Environment
-Copy `.env.example` to `.env` or update your existing `.env`:
+Authentication in this codebase is **Google OAuth only**. There is no local username/password signup, login, or password-reset flow — those pages do not exist in [public/](../../public/). This is true in sandbox mode too: `ENVIRONMENT=sandbox` only changes the storage backend (JSON file vs. PostgreSQL), not how you sign in. You need a working Google OAuth client even for local development.
 
-```bash
-# Minimal for local testing
-ENVIRONMENT=sandbox
-ADMIN_EMAIL=admin@localhost
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=admin123
-SESSION_SECRET=dev-secret-key
-ENCRYPTION_KEY=dev-encryption-key-32-chars!!
-```
+## Prerequisites
 
-**Optional** - Add email (for password reset):
-```bash
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-gmail-app-password
-EMAIL_FROM=noreply@yourdomain.com
-```
+- Node.js 18+ (CI uses Node 20).
+- A Google Cloud project with an OAuth 2.0 client — see [GOOGLE_OAUTH_SETUP.md](GOOGLE_OAUTH_SETUP.md). **This is an external prerequisite you must complete yourself in Google Cloud Console; nothing in this repo can create it for you.**
+- For sandbox/local work: nothing else. Donations can be exercised against ECPay's sandbox endpoints once you have a workspace.
+- For production/staging: a hosted PostgreSQL database, an HTTPS domain, and ECPay merchant credentials (both a workspace-level donation-collection account and, if you plan to charge for DonationBar itself, a separate billing merchant account). **ECPay merchant approval is an external process with ECPay and is not something this repository can verify or guarantee — treat any given merchant ID as unverified until you have confirmed it directly with ECPay.**
 
-### 3. Run Migration
-```bash
-npm run migrate
-```
+## Path A: Local sandbox setup
 
-Output:
-```
-🔄 Starting migration to multi-user schema...
-🧪 Running migration in SANDBOX mode (JSON file)
-✅ Migrated db.json to multi-user format
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📝 Admin credentials:
-   Email: admin@localhost
-   Username: admin
-   Password: admin123
-✨ Migration completed successfully!
-```
+1. Clone the repo and install dependencies:
 
-### 4. Start Server
-```bash
-npm start
-```
-
-Output:
-```
-🧪 Sandbox mode: Using local db.json file
-🚀 DonationBar server running on port 3000
-📊 Overlay URL: http://localhost:3000/overlay
-💰 Donation page: http://localhost:3000/donate
-⚙️  Admin panel: http://localhost:3000/admin
-```
-
-### 5. Test It Out!
-
-#### Try Registration
-1. Visit: http://localhost:3000/signup
-2. Create a new account
-3. Check email (if configured) or check logs
-
-#### Try Login
-1. Visit: http://localhost:3000/login
-2. Login with ENV credentials:
-   - Username: `admin`
-   - Password: `admin123`
-
-#### Try Password Reset
-1. Visit: http://localhost:3000/forgot-password
-2. Enter your email
-3. Check email for reset link
-
----
-
-## 📁 What You Have Now
-
-### New Files Created
-
-**Authentication Pages:**
-- `public/signup.html` - User registration
-- `public/forgot-password.html` - Password reset request
-- `public/reset-password.html` - Set new password
-- `public/login.html` - Updated with new links
-
-**Backend:**
-- `email.js` - Email service module
-- `database-multiuser.js` - New database class (→ database.js)
-- `migrations/migrate.js` - Multi-user migration script
-
-**Documentation:**
-- `AUTH_FEATURES_SUMMARY.md` - Authentication features
-- `MIGRATION_GUIDE.md` - Migration instructions
-- `SCHEMA_MULTIUSER.md` - Database schema reference
-- `API_METHODS_REFERENCE.md` - API documentation
-- `SERVER_UPDATE_SUMMARY.md` - Server changes
-- `ENV_VARIABLES.md` - Environment variables
-- `COMPLETE_SETUP_GUIDE.md` - This file
-
-### Modified Files
-- `package.json` - Added dependencies
-- `server.js` - Added auth routes
-- `database.js` - Multi-user version
-- `.env.example` - Updated with new variables
-
----
-
-## 🎯 Available Features
-
-### ✅ Working Now
-- [x] User registration with email
-- [x] Email verification links
-- [x] Password reset via email
-- [x] Secure password hashing (bcrypt)
-- [x] Multi-user support
-- [x] Multi-workspace support
-- [x] Subscription management
-- [x] Workspace-scoped donations
-- [x] ECPay integration per workspace
-- [x] Backward compatible with old setup
-
-### ⏳ Coming Soon (TODO)
-- [ ] Database token storage (currently session-based)
-- [ ] OAuth login (Google, GitHub)
-- [ ] 2FA support
-- [ ] Rate limiting on auth endpoints
-- [ ] Account management UI
-- [ ] Email preferences
-
----
-
-## 🗺️ URL Structure
-
-### Authentication
-```
-/signup                 - Registration page
-/login                  - Login page
-/forgot-password        - Password reset request
-/reset-password         - Set new password (with token)
-/verify-email           - Email verification (with token)
-```
-
-### API Endpoints
-```
-POST /api/auth/signup           - Register new user
-POST /api/auth/forgot-password  - Request password reset
-POST /api/auth/reset-password   - Update password
-POST /login                     - Login (form submission)
-POST /logout                    - Logout
-```
-
-### Main App
-```
-/admin                  - Admin panel (protected)
-/overlay                - Overlay for OBS (default workspace)
-/overlay/:slug          - Workspace-specific overlay
-/donate                 - Donation page (default workspace)
-/donate/:slug           - Workspace-specific donation
-/webhook/:slug          - Workspace-specific webhook
-```
-
----
-
-## 📧 Email Setup (Optional)
-
-### Gmail Configuration
-
-1. **Enable 2FA on Gmail**
-   ```
-   Google Account → Security → 2-Step Verification
-   ```
-
-2. **Create App Password**
-   ```
-   Google Account → Security → App passwords
-   Select "Mail" and generate password
-   ```
-
-3. **Add to .env**
    ```bash
-   SMTP_HOST=smtp.gmail.com
-   SMTP_PORT=587
-   SMTP_SECURE=false
-   SMTP_USER=your-email@gmail.com
-   SMTP_PASS=abcd efgh ijkl mnop  # Your app password
-   EMAIL_FROM=noreply@yourdomain.com
+   npm install
    ```
 
-### Test Email Sending
+2. Copy the environment template and fill in local values:
 
-```bash
-# Start server
-npm start
-
-# Visit signup page
-http://localhost:3000/signup
-
-# Register - check console logs
-# You should see: "📧 Verification email sent to: xxx@xxx.com"
-```
-
-### Without Email (Sandbox Mode)
-
-Emails will be logged to console instead:
-```
-📧 Email would be sent to: user@example.com (SMTP not configured)
-```
-
-Everything else works normally!
-
----
-
-## 🔐 Security Checklist
-
-### Development (Current)
-- [x] Passwords hashed with bcrypt
-- [x] Secure token generation
-- [x] Session-based authentication
-- [x] Password strength requirements
-- [x] HTTPS-ready URLs
-
-### Production (Recommended)
-- [ ] Enable HTTPS
-- [ ] Add rate limiting
-- [ ] Store tokens in database
-- [ ] Add CSRF protection
-- [ ] Enable Helmet security headers
-- [ ] Require email verification
-- [ ] Add account lockout
-- [ ] Use production-grade session store (Redis)
-- [ ] Enable secure cookies
-- [ ] Add logging and monitoring
-
----
-
-## 🧪 Testing Guide
-
-### Test Registration Flow
-
-1. **Go to Signup**
-   ```
-   http://localhost:3000/signup
-   ```
-
-2. **Fill Form**
-   - Email: test@example.com
-   - Username: testuser
-   - Display Name: Test User
-   - Password: Test1234 (must meet requirements)
-   - Confirm Password: Test1234
-   - Check terms checkbox
-
-3. **Submit**
-   - Should see success message
-   - Check console for email log
-   - Redirects to login page
-
-4. **Check Database**
    ```bash
-   # View db.json
-   cat db.json | jq .users
-   
-   # Should see new user with hashed password
+   cp .env.example .env
    ```
 
-### Test Password Reset
+3. Set at least the following in `.env` for sandbox use:
 
-1. **Go to Forgot Password**
-   ```
-   http://localhost:3000/forgot-password
-   ```
+   | Variable | Purpose |
+   |---|---|
+   | `ENVIRONMENT=sandbox` | Uses local `db.json` instead of PostgreSQL. Leave `DATABASE_URL` empty. |
+   | `ECPAY_ENVIRONMENT=stage` | Talks to ECPay's sandbox endpoints, not live payment rails. |
+   | `SESSION_SECRET` | Any local random string is fine for sandbox; it does not need to meet the production strength check. |
+   | `CREDENTIAL_ENCRYPTION_KEY` | Required even in sandbox — workspace ECPay credentials are encrypted at rest. Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. |
+   | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_CALLBACK_URL` | From your Google OAuth client. Callback URL should be `http://localhost:3000/api/auth/google/callback` for local work. |
+   | `ADMIN_EMAIL` | **Set this to your own real Google account email**, not a placeholder. See step 5. |
 
-2. **Enter Email**
-   - Email: test@example.com
+4. Run the bundled migrations, which build the schema and bootstrap an initial workspace and admin user from the `ADMIN_*` variables:
 
-3. **Check Console/Email**
-   - Look for reset link
-   - Copy token from URL
-
-4. **Visit Reset Page**
-   ```
-   http://localhost:3000/reset-password?token=xxx
+   ```bash
+   npm run migrate
    ```
 
-5. **Set New Password**
-   - Password: NewPass123
-   - Confirm: NewPass123
-   - Submit
+5. Start the server and sign in with Google, using the **same Google account email as `ADMIN_EMAIL`**. There is no separate password: the bootstrap admin record is matched by email at OAuth login time, not by a credential you type in.
 
-6. **Login with New Password**
-   ```
-   http://localhost:3000/login
+   ```bash
+   npm start
+   # or, for auto-restart on file changes:
+   npm run dev
    ```
 
----
+   Visit `http://localhost:3000/login` and continue through Google sign-in.
 
-## 📊 Database Structure
+6. Confirm the server is healthy:
 
-### Multi-User Tables
+   ```bash
+   curl http://localhost:3000/health/live
+   curl http://localhost:3000/health/ready
+   ```
 
-```
-users                  - User accounts
-subscriptions          - Plan management
-user_workspaces        - Donation workspaces
-workspace_settings     - Goals, overlay settings
-payment_providers      - ECPay credentials
-donations              - Workspace donations
-api_keys               - API access
-audit_logs             - Activity tracking
-```
+7. From the admin dashboard, configure workspace-level ECPay sandbox credentials under `/admin/ecpay` (or the equivalent in-app settings screen). These are per-workspace `MERCHANT_ID`/`HASH_KEY`/`HASH_IV` values entered through the UI and encrypted at rest with `CREDENTIAL_ENCRYPTION_KEY` — they are separate from any `MERCHANT_ID`/`HASH_KEY`/`HASH_IV` you set in `.env`, which only acts as a legacy fallback, and are also separate from `BILLING_ECPAY_*` (see below).
 
-### Example: Find User's Workspace
+8. Open the OBS overlay page for your workspace slug (`/overlay/<slug>`) as a Browser Source to confirm real-time updates work, or append `?test=1` for demo mode without a live donation.
 
-```javascript
-import database from './database.js';
+## Path B: Production / staging setup
 
-// Get user
-const user = await database.findUserByEmail('test@example.com');
+Production and staging setup — provisioning PostgreSQL, an HTTPS domain, secrets, encrypted backups, migration rehearsal, and the full launch checklist — is documented in detail in [DEPLOYMENT.md](DEPLOYMENT.md). Do not duplicate that process here; follow it directly, including its backup/restore rehearsal and rollback guidance.
 
-// Get workspaces
-const workspaces = await database.getUserWorkspaces(user.id);
+Before relying on a deployed environment, run the read-only reachability check described in [STAGING_PREFLIGHT.md](../operations/STAGING_PREFLIGHT.md) (`npm run preflight:staging`). It only confirms `/health/live` and `/health/ready` (and optionally your alert webhook) are reachable — it is not a substitute for the payment and callback exercises in DEPLOYMENT.md.
 
-// Get workspace settings
-const settings = await database.getWorkspaceSettings(workspaces[0].id);
+Once an environment is live, verify alerting is actually wired up by following [MONITORING_AND_INCIDENT_RESPONSE.md](../operations/MONITORING_AND_INCIDENT_RESPONSE.md), including a real alert exercise from [ALERT_EXERCISE_TEMPLATE.md](../operations/ALERT_EXERCISE_TEMPLATE.md).
 
-console.log('Workspace:', workspaces[0]);
-console.log('Settings:', settings);
-```
+**External/legal prerequisites for production** (not verifiable from this repository — treat as open items until you have your own confirmation):
+- ECPay merchant approval for both workspace donation collection and, separately, platform recurring billing if you intend to charge for DonationBar itself (`BILLING_ECPAY_*`).
+- A production Google OAuth client authorized for your real domain (see [GOOGLE_OAUTH_SETUP.md](GOOGLE_OAUTH_SETUP.md)).
+- Terms of service, privacy policy, data retention, and tax/e-invoice review appropriate to your jurisdiction.
 
----
+## Environment variable reference
 
-## 🐛 Common Issues
+This mirrors [.env.example](../../.env.example); treat that file as the source of truth if the two ever disagree.
 
-### Issue: "Cannot find module 'bcrypt'"
-```bash
-# Solution: Install dependencies
-npm install
-```
+| Variable | Sandbox | Production | Notes |
+|---|---|---|---|
+| `ENVIRONMENT` | `sandbox` | `production` | Selects JSON (`db.json`) vs. PostgreSQL storage. |
+| `DATABASE_URL` | empty | required | Missing in production is a hard startup failure by design. |
+| `ECPAY_ENVIRONMENT` | `stage` | `stage` or `production` | Independent from `ENVIRONMENT`/`NODE_ENV`. |
+| `BASE_URL` | `http://localhost:3000` | your HTTPS domain | Used to build ECPay callback URLs. |
+| `SESSION_SECRET` | any string | 32+ char strong secret | Production start fails on a weak/placeholder value. |
+| `CREDENTIAL_ENCRYPTION_KEY` | required | required | Base64 32-byte key encrypting per-workspace ECPay credentials ([credentials.js](../../credentials.js)). |
+| `BACKUP_ENCRYPTION_KEY` | optional | required for `npm run backup`/`restore` | Keep separate from the backup files it protects. |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_CALLBACK_URL` | required | required | Google OAuth is the only sign-in method; see [GOOGLE_OAUTH_SETUP.md](GOOGLE_OAUTH_SETUP.md). |
+| `MERCHANT_ID` / `HASH_KEY` / `HASH_IV` | optional | optional | Legacy fallback only; normal workspace donation credentials are entered per-workspace in the admin UI, not here. |
+| `BILLING_ECPAY_MERCHANT_ID` / `_HASH_KEY` / `_HASH_IV` | not applicable | required to charge for DonationBar itself | DonationBar's own recurring subscription billing — a distinct merchant account from any workspace's donation-collection credentials. |
+| `SUBSCRIPTION_TRIAL_DAYS` / `SUBSCRIPTION_MONTHLY_PRICE` | optional | set to real values | Controls the platform subscription trial/paywall. |
+| `PLATFORM_ADMIN_EMAILS` | optional but recommended | required | Comma-separated emails granted platform-wide admin (`requirePlatformAdmin`), independent from the bootstrap `ADMIN_EMAIL` workspace owner. |
+| `ALERT_WEBHOOK_URL` / `ALERT_WEBHOOK_TIMEOUT_MS` | optional | recommended | Redacted operational alerts for readiness/webhook/5xx failures; see [MONITORING_AND_INCIDENT_RESPONSE.md](../operations/MONITORING_AND_INCIDENT_RESPONSE.md). Must be HTTPS in production. |
+| `STAGING_BASE_URL` / `STAGING_PREFLIGHT_CHECK_ALERT_WEBHOOK` / `STAGING_PREFLIGHT_TIMEOUT_MS` | not used by the app | used only by `npm run preflight:staging` | See [STAGING_PREFLIGHT.md](../operations/STAGING_PREFLIGHT.md). |
+| `ADMIN_EMAIL` / `ADMIN_USERNAME` / `ADMIN_PASSWORD` / `ADMIN_DISPLAY_NAME` | required for bootstrap | required for bootstrap | Read once by `npm run migrate` to create the initial `'default'`-slug workspace and its owner user record, matched to that Google account's email at OAuth login. `ADMIN_PASSWORD` is stored but unused for sign-in since there is no local-password login route. |
+| `SMTP_*` / `EMAIL_FROM` | optional | optional | Only used if email notifications are enabled; leave empty to disable. |
 
-### Issue: "Default workspace not found"
-```bash
-# Solution: Run migration
-npm run migrate
-```
+## URL structure
 
-### Issue: Email not sending
-```bash
-# Check .env file has SMTP settings
-# Verify Gmail app password is correct
-# Check console logs for errors
-# Emails are optional - app works without them
-```
+Routes are workspace-scoped by `slug`, resolved via `getWorkspaceFromSlug()` in [server.js](../../server.js):
 
-### Issue: "User already exists"
-```bash
-# Solution: Either use different email/username
-# Or reset database: rm db.json and npm run migrate
-```
+- `/overlay/:slug` — OBS Browser Source page. Also accepts `?fg=`, `?bg=`, `?bar=`, `?bar_light=` color overrides and `?test=1` demo mode.
+- `/donate/:slug` — viewer-facing donation page.
+- `/webhook/:slug` — ECPay asynchronous payment notification endpoint.
+- Routes without a slug fall back to the `'default'` workspace created by `npm run migrate`.
 
----
+`admin.html`, `donate.html`, and `overlay.html` are only reachable through these authenticated/slugged Express routes; requesting them directly as static files returns 404 by design.
 
-## 🚀 Deployment Checklist
+## Troubleshooting
 
-### Before Deploy
-
-- [ ] Set `ENVIRONMENT=production`
-- [ ] Set `DATABASE_URL` (PostgreSQL)
-- [ ] Generate secure keys for:
-  - [ ] `SESSION_SECRET`
-  - [ ] `ENCRYPTION_KEY`
-  - [ ] `JWT_SECRET`
-- [ ] Configure SMTP for emails
-- [ ] Set strong `ADMIN_PASSWORD`
-- [ ] Update `BASE_URL` to production URL
-- [ ] Enable HTTPS
-- [ ] Add rate limiting
-- [ ] Test all auth flows
-- [ ] Backup database
-
-### Generate Secure Keys
-```bash
-# Generate random keys
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-
-### Deploy to Render/Heroku
-```bash
-# All environment variables needed:
-DATABASE_URL=postgresql://...
-ENVIRONMENT=production
-SESSION_SECRET=xxx
-ENCRYPTION_KEY=xxx
-JWT_SECRET=xxx
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=xxx
-SMTP_PASS=xxx
-EMAIL_FROM=noreply@yourdomain.com
-BASE_URL=https://yourdomain.com
-```
-
----
-
-## 💡 Tips & Tricks
-
-### Quickly Test Without Email
-
-Set environment to sandbox and emails will just log:
-```bash
-ENVIRONMENT=sandbox
-# No SMTP configuration needed!
-```
-
-### Reset Everything
-
-```bash
-# Remove database
-rm db.json db.json.backup
-
-# Run migration
-npm run migrate
-
-# Fresh start!
-```
-
-### View Current Users
-
-```bash
-# View db.json (sandbox mode)
-cat db.json | jq .users
-
-# Or use Node
-node -e "import('./database.js').then(db => { /* queries */ })"
-```
-
-### Check Server Health
-
-```bash
-# Visit schema endpoint
-curl http://localhost:3000/api/schema | jq
-```
-
----
-
-## 📚 Documentation Index
-
-- **Migration**: `MIGRATION_GUIDE.md`
-- **Schema**: `SCHEMA_MULTIUSER.md`
-- **API**: `API_METHODS_REFERENCE.md`
-- **Server**: `SERVER_UPDATE_SUMMARY.md`
-- **Auth**: `AUTH_FEATURES_SUMMARY.md`
-- **Env**: `ENV_VARIABLES.md`
-- **This Guide**: `COMPLETE_SETUP_GUIDE.md`
-
----
-
-## ✅ Success Checklist
-
-- [x] Dependencies installed (`npm install`)
-- [x] Environment configured (`.env`)
-- [x] Migration run (`npm run migrate`)
-- [x] Server starts (`npm start`)
-- [x] Can access signup page
-- [x] Can register new user
-- [x] Can login
-- [x] Can reset password
-- [x] Existing features still work
-
----
-
-## 🎉 You're Done!
-
-Your DonationBar is now a **fully-featured multi-user platform** with:
-- User authentication
-- Email integration
-- Multi-workspace support
-- Subscription management
-- Secure password handling
-- Beautiful UI
-
-**Next Steps:**
-1. Test all features locally
-2. Configure email (optional)
-3. Deploy to production
-4. Invite users to sign up!
-
----
-
-**Questions?** Check the documentation files or review the code comments!
-
-**Happy Streaming!** 🎮📺💰
+- **Can't sign in**: confirm `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`/`GOOGLE_CALLBACK_URL` are set and the callback URL is registered in Google Cloud Console exactly as configured. There is no password to reset — access is entirely determined by which Google account you use.
+- **Bootstrap admin login doesn't work**: `ADMIN_EMAIL` in `.env` must exactly match the Google account email you sign in with; the match happens after migration, not before.
+- **`/health/ready` returns a non-`ok` status**: check `database.healthCheck()` — in sandbox this means `db.json` is unreadable/corrupt; in production it means PostgreSQL is unreachable.
+- **Webhook/callback failures**: verify the workspace's ECPay `HashKey`/`HashIV` in `/admin/ecpay` match what was registered with ECPay for that merchant, and that `BASE_URL` matches the domain ECPay is configured to call back to.
+- **Encrypted credential errors on startup**: `CREDENTIAL_ENCRYPTION_KEY` must be the same key used when the credentials were originally encrypted; a changed key cannot decrypt previously stored values. If migrating from an earlier unencrypted state, run the `encrypt-provider-credentials.js` step of `npm run migrate`.
