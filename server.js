@@ -29,7 +29,8 @@ app.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: 'draft-7', le
 // Middleware
 const protectedStaticPages = new Set(['/admin.html', '/overlay.html', '/donate.html']);
 app.use((req, res, next) => {
-  if (protectedStaticPages.has(req.path)) return res.status(404).send('Not found');
+  const normalizedPath = req.path.replace(/\/+$/, '') || '/';
+  if (protectedStaticPages.has(normalizedPath)) return res.status(404).send('Not found');
   return next();
 });
 app.use(express.static(path.join(__dirname, 'public')));
