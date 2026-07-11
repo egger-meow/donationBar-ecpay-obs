@@ -148,7 +148,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
               pricePerMonth: 0
             });
 
-            console.log('Trial was withheld by abuse-prevention policy');
+            logInfo('trial_abuse_fallback_applied');
           } else {
             // Normal flow - create user with trial
             user = await database.createUser({
@@ -187,14 +187,14 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             slug: isFirstWorkspace ? 'default' : user.username.toLowerCase().replace(/[^a-z0-9-]/g, '')
           });
 
-          console.log('New user created via Google OAuth');
+          logInfo('oauth_user_created');
         } else {
           // Existing user - check if they have a workspace
-          console.log('Existing user login');
+          logInfo('oauth_existing_user_login');
 
           const userWorkspaces = await database.getUserWorkspaces(user.id);
           if (!userWorkspaces || userWorkspaces.length === 0) {
-            console.log('Authenticated user has no workspace; creating one');
+            logInfo('oauth_workspace_missing_creating');
 
             // Check if any workspaces exist in the system
             const allWorkspaces = await database.getAllWorkspaces();
@@ -206,7 +206,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
               slug: isFirstWorkspace ? 'default' : user.username.toLowerCase().replace(/[^a-z0-9-]/g, '')
             });
 
-            console.log('Workspace created for existing user');
+            logInfo('oauth_workspace_created_for_existing_user');
           }
         }
 
@@ -217,9 +217,9 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       }
     }
   ));
-  console.log('✅ Google OAuth strategy configured');
+  logInfo('google_oauth_configured');
 } else {
-  console.log('⚠️  Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env');
+  logWarn('google_oauth_not_configured');
 }
 
 const DB_PATH = path.join(__dirname, 'db.json');
@@ -229,7 +229,7 @@ const DEFAULT_WORKSPACE_SLUG = 'default';
 async function getDefaultWorkspace() {
   const workspace = await database.getWorkspaceBySlug(DEFAULT_WORKSPACE_SLUG);
   if (!workspace) {
-    console.warn('⚠️  No default workspace found. Will be created when first user signs up.');
+    logWarn('default_workspace_missing');
     return null;
   }
   return workspace;
@@ -246,20 +246,20 @@ async function getWorkspaceFromSlug(slug = null) {
 // Helper: Get logged-in user's workspace from session
 async function getUserWorkspaceFromSession(req) {
   if (!req.session || !req.session.userId) {
-    console.error('❌ No user session found');
+    logWarn('workspace_resolution_no_session');
     return null;
   }
 
-  console.log('Resolving workspace for authenticated user');
+  logInfo('workspace_resolution_started');
 
   const workspaces = await database.getUserWorkspaces(req.session.userId);
 
   if (!workspaces || workspaces.length === 0) {
-    console.error('❌ No workspace found for user:', req.session.userId);
+    logWarn('workspace_resolution_not_found');
     return null;
   }
 
-  console.log('✅ Found workspace:', workspaces[0].id, workspaces[0].slug);
+  logInfo('workspace_resolution_completed');
 
   // Return the first workspace (users typically have one)
   return workspaces[0];
@@ -306,7 +306,7 @@ async function getECPayCredentials(workspaceId = null) {
       hashIV: envCredentials.hashIV,
       isActive: true
     });
-    console.log('💾 ECPay credentials migrated from .env to database');
+    logInfo('ecpay_credentials_migrated_from_env');
     return envCredentials;
   }
 
@@ -322,7 +322,7 @@ async function broadcastProgress(workspaceId = null) {
     if (!workspaceId) {
       const workspace = await getDefaultWorkspace();
       if (!workspace) {
-        console.warn('⚠️ No workspace provided and no default workspace found');
+        logWarn('broadcast_progress_no_workspace');
         return;
       }
       workspaceId = workspace.id;
@@ -330,7 +330,7 @@ async function broadcastProgress(workspaceId = null) {
 
     const data = await getProgress(workspaceId);
     if (!data) {
-      console.error('❌ Failed to get progress data for workspace:', workspaceId);
+      logError('sse_progress_data_unavailable');
       return;
     }
 
@@ -351,20 +351,16 @@ async function broadcastProgress(workspaceId = null) {
             errorCount++;
           }
         } catch (error) {
-          console.error('❌ Failed to write to SSE client:', error.message);
+          logWarn('sse_progress_write_failed');
           sseClients.delete(res);
           errorCount++;
         }
       }
     }
 
-    console.log(`📡 Broadcast complete: ${successCount} success, ${errorCount} failed for workspace ${workspaceId}`, {
-      current: data.current,
-      goal: data.goal,
-      donationCount: data.donations?.length || 0
-    });
+    logInfo('sse_progress_broadcast_completed', { successCount, errorCount, donationCount: data.donations?.length || 0 });
   } catch (error) {
-    console.error('❌ Critical error in broadcastProgress:', error);
+    logError('sse_progress_broadcast_failed');
   }
 }
 
@@ -373,7 +369,7 @@ async function broadcastOverlaySettings(workspaceId = null) {
     if (!workspaceId) {
       const workspace = await getDefaultWorkspace();
       if (!workspace) {
-        console.warn('⚠️ No workspace provided and no default workspace found');
+        logWarn('broadcast_overlay_settings_no_workspace');
         return;
       }
       workspaceId = workspace.id;
@@ -392,15 +388,15 @@ async function broadcastOverlaySettings(workspaceId = null) {
             sseClients.delete(res);
           }
         } catch (error) {
-          console.error('❌ Failed to write overlay settings to SSE client:', error.message);
+          logWarn('sse_overlay_settings_write_failed');
           sseClients.delete(res);
         }
       }
     }
 
-    console.log(`🎨 Broadcast overlay settings to workspace ${workspaceId}`);
+    logInfo('overlay_settings_broadcast_completed');
   } catch (error) {
-    console.error('❌ Critical error in broadcastOverlaySettings:', error);
+    logError('sse_overlay_settings_broadcast_failed');
   }
 }
 
@@ -424,13 +420,13 @@ function broadcastAdminNotification(workspaceId, type, message, details = null) 
           sseClients.delete(res);
         }
       } catch (error) {
-        console.error('❌ Failed to write admin notification to SSE client:', error.message);
+        logWarn('sse_admin_notification_write_failed');
         sseClients.delete(res);
       }
     }
   }
 
-  console.log(`🔔 Admin notification broadcast to workspace ${workspaceId}: [${type}] ${message}`);
+  logInfo('admin_notification_broadcast', { type });
 }
 
 // SSE endpoint - supports slug query parameter for workspace-specific updates
@@ -447,20 +443,20 @@ app.get('/events', requireActiveSubscription, async (req, res) => {
   if (slug) {
     workspace = await getWorkspaceFromSlug(slug);
     if (!workspace) {
-      console.error(`❌ SSE: Workspace not found for slug: ${slug}`);
+      logWarn('sse_workspace_not_found');
       res.write(`data: ${JSON.stringify({ error: 'Workspace not found' })}\n\n`);
       return res.end();
     }
   } else {
     workspace = await getDefaultWorkspace();
     if (!workspace) {
-      console.error('❌ SSE: No default workspace found');
+      logError('sse_default_workspace_missing');
       res.write(`data: ${JSON.stringify({ error: 'No workspace found' })}\n\n`);
       return res.end();
     }
   }
 
-  console.log(`🔌 SSE client connected to workspace: ${workspace.slug} (${workspace.id})`);
+  logInfo('sse_client_connected');
 
   // Send initial data for the specified workspace
   res.write(`data: ${JSON.stringify(await getProgress(workspace.id))}\n\n`);
@@ -476,7 +472,7 @@ app.get('/events', requireActiveSubscription, async (req, res) => {
   req.on('close', () => {
     clearInterval(keepAlive);
     sseClients.delete(res);
-    console.log(`🔌 SSE client disconnected from workspace: ${workspace.slug}`);
+    logInfo('sse_client_disconnected');
   });
 });
 
@@ -685,7 +681,7 @@ async function decryptECPayData(encryptedData, workspaceId = null, credentialOve
     const jsonText = decodeECPayJsonLike(decrypted);
 
     const obj = JSON.parse(jsonText);
-    console.log('✅ Decryption + decode + parse OK');
+    logInfo('ecpay_decryption_succeeded');
     return obj;
   } catch (error) {
     logWarn('ecpay_decryption_failed');
@@ -733,10 +729,9 @@ app.get('/progress', requireActiveSubscription, async (req, res) => {
     const progress = await getProgress(workspace?.id);
     res.json(progress);
   } catch (error) {
-    console.error('Error in /progress:', error);
+    logError('progress_fetch_failed', { request_id: req.requestId });
     res.status(500).json({
       error: 'Failed to load progress',
-      message: error.message,
       title: '斗內目標',
       current: 0,
       goal: 1000,
@@ -757,7 +752,7 @@ async function requireActiveSubscription(req, res, next) {
     const workspace = await getWorkspaceFromSlug(slug);
 
     if (!workspace) {
-      console.warn(`⚠️ Workspace not found: ${slug}`);
+      logWarn('subscription_check_workspace_not_found');
       return res.redirect('/subscription-required.html?from=' + (req.path.includes('overlay') ? 'overlay' : 'donate'));
     }
 
@@ -765,7 +760,7 @@ async function requireActiveSubscription(req, res, next) {
     const subscription = await database.getUserSubscription(workspace.userId);
 
     if (!subscription) {
-      console.warn(`⚠️ No subscription found for workspace owner: ${workspace.userId}`);
+      logWarn('subscription_check_no_subscription');
       return res.redirect('/subscription-required.html?from=' + (req.path.includes('overlay') ? 'overlay' : 'donate'));
     }
 
@@ -780,20 +775,20 @@ async function requireActiveSubscription(req, res, next) {
     if (subscription.isTrial && subscription.trialEndDate) {
       const trialEnd = new Date(subscription.trialEndDate);
       if (new Date() > trialEnd) {
-        console.warn(`⚠️ Trial expired for workspace: ${slug}`);
+        logWarn('subscription_check_trial_expired');
         return res.redirect('/subscription-required.html?from=' + (req.path.includes('overlay') ? 'overlay' : 'donate'));
       }
     }
 
     if (!isActive || !hasValidPlan) {
-      console.warn(`⚠️ Invalid subscription for workspace ${slug}: ${subscription.planType} (${subscription.status})`);
+      logWarn('subscription_check_invalid_plan', { planType: subscription.planType, status: subscription.status });
       return res.redirect('/subscription-required.html?from=' + (req.path.includes('overlay') ? 'overlay' : 'donate'));
     }
 
     // Subscription is valid, allow access
     next();
   } catch (error) {
-    console.error('Error checking subscription:', error);
+    logError('subscription_check_failed');
     return res.redirect('/subscription-required.html');
   }
 }
@@ -839,7 +834,7 @@ app.get('/success', (req, res) => {
   res.setHeader('Expires', '0');
 
   if (sandbox === '1') {
-    console.log('🧪 SANDBOX: Redirecting to success page');
+    logInfo('sandbox_success_redirect');
   }
 
   // Redirect to workspace-specific donate page if slug provided
@@ -856,16 +851,16 @@ app.post('/success', async (req, res) => {
 
   if (workspaceSlug) {
     workspace = await database.getWorkspaceBySlug(workspaceSlug);
-    console.log(`💳 Success POST: Using workspace from slug: ${workspaceSlug}`);
+    logInfo('success_post_workspace_resolved_from_slug');
   }
 
   if (!workspace) {
     workspace = await getDefaultWorkspace();
-    console.log('⚠️ Success POST: No slug provided or workspace not found, using default workspace');
+    logInfo('success_post_using_default_workspace');
   }
 
   if (!workspace) {
-    console.error('❌ Success POST: No workspace found');
+    logError('success_post_workspace_not_found');
     return res.redirect(303, '/donate?error=1');
   }
 
@@ -884,14 +879,14 @@ app.post('/success', async (req, res) => {
       message: p.CustomField2 || '',
       paymentProviderId: provider?.id
     });
-    console.log(`✅ Success POST: Donation added to workspace ${workspace.slug}`);
+    logInfo('success_post_donation_added');
 
     // Redirect to workspace-specific donate page
     const redirectUrl = workspaceSlug ? `/donate/${workspaceSlug}?success=1` : '/donate?success=1';
     return res.redirect(303, redirectUrl);
   }
 
-  console.warn('OrderResultURL POST was invalid or reported a failed payment');
+  logWarn('success_post_invalid_or_failed');
   const errorUrl = workspaceSlug ? `/donate/${workspaceSlug}?error=1` : '/donate?error=1';
   return res.redirect(303, errorUrl);
 });
@@ -1020,13 +1015,13 @@ app.post('/logout', requireSameOrigin, (req, res) => {
   const userId = 'authenticated';
   const userEmail = null;
 
-  console.log('User logout requested');
+  logInfo('logout_requested');
 
   req.session.destroy((err) => {
     if (err) {
-      console.error('❌ Session destroy error:', err);
+      logError('session_destroy_failed');
     } else {
-      console.log('✅ Session destroyed successfully');
+      logInfo('session_destroyed');
     }
     res.redirect('/login');
   });
@@ -1063,7 +1058,7 @@ app.get('/api/auth/google/callback',
     // Update last login time
     await database.updateUserLastLogin(req.user.id);
 
-    console.log('OAuth login successful');
+    logInfo('oauth_login_success');
     /* Session fields are intentionally not logged. */
     /*
       userId: req.session.userId,
@@ -1110,7 +1105,7 @@ app.get('/api/user/info', requireAdmin, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get user info error:', error);
+    logError('user_info_fetch_failed', { request_id: req.requestId });
     res.status(500).json({ error: 'Failed to get user info' });
   }
 });
@@ -1144,7 +1139,7 @@ app.get('/api/workspace/urls', requireAdmin, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get workspace URLs error:', error);
+    logError('workspace_urls_fetch_failed', { request_id: req.requestId });
     res.status(500).json({ error: 'Failed to get workspace URLs' });
   }
 });
@@ -1159,7 +1154,7 @@ app.get('/api/feedback', requireAdmin, requirePlatformAdmin, async (req, res) =>
     });
     res.json({ success: true, feedback });
   } catch (error) {
-    console.error('Get feedback error:', error);
+    logError('feedback_list_fetch_failed', { request_id: req.requestId });
     res.status(500).json({ error: 'Failed to retrieve feedback' });
   }
 });
@@ -1179,10 +1174,10 @@ app.patch('/api/feedback/:id', requireAdmin, requirePlatformAdmin, requireSameOr
       return res.status(404).json({ error: 'Feedback not found' });
     }
 
-    console.log(`✅ Feedback ${id} status updated to: ${status}`);
+    logInfo('feedback_status_updated', { status });
     res.json({ success: true, feedback });
   } catch (error) {
-    console.error('Update feedback status error:', error);
+    logError('feedback_status_update_failed', { request_id: req.requestId });
     res.status(500).json({ error: 'Failed to update feedback status' });
   }
 });
@@ -1209,12 +1204,7 @@ app.post('/api/feedback', requireAdmin, requireSameOrigin, async (req, res) => {
       }
     });
 
-    console.log(`📝 Feedback received and stored:`, {
-      id: feedback.id,
-      type: feedback.type,
-      messageLength: message.length,
-      timestamp: feedback.createdAt
-    });
+    logInfo('feedback_submitted', { type: feedback.type, messageLength: message.length });
 
     // Easter egg: Secret free pass activation 🎁
     const easterEggActivated = false;
@@ -1280,16 +1270,16 @@ app.post('/ecpay/return', async (req, res) => {
 
   if (workspaceSlug) {
     workspace = await database.getWorkspaceBySlug(workspaceSlug);
-    console.log(`💳 ECPay Return: Using workspace from slug: ${workspaceSlug}`);
+    logInfo('ecpay_return_workspace_resolved_from_slug');
   }
 
   if (!workspace) {
     workspace = await getDefaultWorkspace();
-    console.log('⚠️ ECPay Return: No slug provided or workspace not found, using default workspace');
+    logInfo('ecpay_return_using_default_workspace');
   }
 
   if (!workspace) {
-    console.error('❌ ECPay Return: No workspace found');
+    logError('ecpay_return_workspace_not_found');
     return res.status(400).send('0|FAIL');
   }
 
@@ -1307,11 +1297,11 @@ app.post('/ecpay/return', async (req, res) => {
       message: p.CustomField2 || '',
       paymentProviderId: provider?.id
     });
-    console.log(`✅ ECPay Return: Donation added to workspace ${workspace.slug}`);
+    logInfo('ecpay_return_donation_added');
     return res.send('1|OK');
   }
 
-  console.error('Return verify failed.', { success, validMac, mine });
+  logWarn('ecpay_return_verification_failed', { success, validMac, mine });
   return res.status(400).send('0|FAIL');
 });
 
@@ -1321,13 +1311,13 @@ app.post('/ecpay/return', async (req, res) => {
 // Multi-user: Use /webhook/:slug for workspace-specific webhooks
 async function legacyDuplicateWebhookHandler(req, res) {
   const { slug } = req.params;
-  console.log(`📨 ECPay webhook received for workspace: ${slug}`);
+  logInfo('legacy_webhook_received');
 
   try {
     // Get workspace
     const workspace = await database.getWorkspaceBySlug(slug);
     if (!workspace) {
-      console.error(`❌ Webhook: Workspace not found: ${slug}`);
+      logWarn('legacy_webhook_workspace_not_found');
       return res.status(404).send('0|Workspace not found');
     }
 
@@ -1339,39 +1329,39 @@ async function legacyDuplicateWebhookHandler(req, res) {
     const merchantIdOk = String(payload.MerchantID) === String(credentials.merchantId);
 
     if (!merchantIdOk) {
-      console.error('❌ Webhook: Merchant ID mismatch');
+      logWarn('legacy_webhook_merchant_mismatch');
       return res.status(400).send('0|Invalid merchant');
     }
 
     if (transCode !== 1) {
-      console.warn('⚠️ Webhook: TransCode is not 1:', payload.TransCode);
+      logWarn('legacy_webhook_transcode_rejected');
       return res.send('1|OK'); // Still acknowledge
     }
 
     // Decrypt the Data field using workspace-specific credentials
     const decryptedData = await decryptECPayData(payload.Data, workspace.id);
     if (!decryptedData) {
-      console.error('❌ Webhook: Failed to decrypt Data field');
+      logWarn('legacy_webhook_decryption_failed');
       return res.status(400).send('0|Decryption failed');
     }
 
 
     // Check RtnCode (1 = API execution successful) - normalize to number
     if (Number(decryptedData.RtnCode) !== 1) {
-      console.warn('⚠️ Webhook: RtnCode is not 1:', decryptedData.RtnCode, decryptedData.RtnMsg);
+      logWarn('legacy_webhook_rtncode_not_success');
       return res.send('1|OK'); // Still acknowledge
     }
 
     // Check if this is a simulated payment - normalize to number
     if (Number(decryptedData.SimulatePaid) === 1) {
-      console.warn('⚠️ Webhook: This is a SIMULATED payment, not real. Will not add to database.');
+      logInfo('legacy_webhook_simulated');
       return res.send('1|OK');
     }
 
     // Check trade status (1 = paid) - normalize to number
     const orderInfo = decryptedData.OrderInfo;
     if (Number(orderInfo.TradeStatus) !== 1) {
-      console.warn('⚠️ Webhook: Trade not paid yet, status:', orderInfo.TradeStatus);
+      logInfo('legacy_webhook_not_paid');
       return res.send('1|OK');
     }
 
@@ -1388,18 +1378,16 @@ async function legacyDuplicateWebhookHandler(req, res) {
     });
 
     if (donationAdded) {
-      console.log(`✅ Webhook: Donation processed - ${decryptedData.PatronName || 'Anonymous'} donated NT$${orderInfo.TradeAmt}`);
-      console.log(`   Trade No: ${orderInfo.MerchantTradeNo}, ECPay No: ${orderInfo.TradeNo}`);
-      console.log(`   Payment: ${orderInfo.PaymentType} at ${orderInfo.PaymentDate}`);
+      logInfo('legacy_webhook_donation_processed');
     } else {
-      console.log(`ℹ️ Webhook: Duplicate donation - ${orderInfo.MerchantTradeNo}`);
+      logInfo('legacy_webhook_duplicate_donation');
     }
 
     // Always return 1|OK to ECPay
     return res.send('1|OK');
 
   } catch (error) {
-    console.error('❌ Webhook error:', error);
+    logError('legacy_webhook_unexpected_error');
     return res.status(500).send('0|Server error');
   }
 }
@@ -1411,7 +1399,7 @@ function requirePlatformAdmin(req, res, next) {
 
 // Legacy webhook endpoint (backward compatibility - routes to default workspace)
 async function legacyDefaultWebhookHandler(req, res) {
-  console.log('📨 Legacy webhook endpoint called, routing to default workspace');
+  logInfo('legacy_default_webhook_routed');
   req.params = { slug: DEFAULT_WORKSPACE_SLUG };
   return app._router.handle(req, res);
 }
@@ -1439,13 +1427,13 @@ app.post('/create-order', async (req, res) => {
 
   // Sandbox mode: simulate successful payment without ECPay API
   if (process.env.ENVIRONMENT === 'sandbox') {
-    console.log(`🧪 SANDBOX MODE: Simulating payment for ${nickname || 'Anonymous'} - NT$${amt}`);
+    logInfo('sandbox_payment_simulation_started');
 
     // Get workspace from slug or use default
     const workspace = await getWorkspaceFromSlug(normalizedSlug);
 
     if (!workspace) {
-      console.error(`❌ SANDBOX: Workspace not found for slug: ${slug}`);
+      logWarn('sandbox_workspace_not_found');
       return res.status(404).json({ error: 'Workspace not found' });
     }
 
@@ -1461,11 +1449,11 @@ app.post('/create-order', async (req, res) => {
     });
 
     if (success) {
-      console.log(`✅ SANDBOX: Payment simulation successful for workspace ${workspace.slug}`);
+      logInfo('sandbox_payment_simulation_succeeded');
       const redirectUrl = normalizedSlug ? `/success?sandbox=1&slug=${normalizedSlug}` : '/success?sandbox=1';
       return res.redirect(redirectUrl);
     } else {
-      console.log(`❌ SANDBOX: Payment simulation failed (duplicate)`);
+      logInfo('sandbox_payment_simulation_duplicate');
       const errorUrl = normalizedSlug ? `/donate/${normalizedSlug}?error=1` : '/donate?error=1';
       return res.redirect(errorUrl);
     }
@@ -1475,7 +1463,7 @@ app.post('/create-order', async (req, res) => {
   const workspace = await getWorkspaceFromSlug(normalizedSlug);
 
   if (!workspace) {
-    console.error(`❌ Create Order: Workspace not found for slug: ${slug}`);
+    logWarn('create_order_workspace_not_found');
     return res.status(404).json({ error: 'Workspace not found' });
   }
 
@@ -1528,15 +1516,14 @@ app.get('/admin/progress', requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Workspace not found' });
     }
 
-    console.log('📊 Loading progress for workspace:', workspace.id, workspace.slug);
+    logInfo('admin_progress_requested');
 
     const progress = await getProgress(workspace.id);
     res.json(progress);
   } catch (error) {
-    console.error('Admin progress error:', error);
+    logError('admin_progress_fetch_failed', { request_id: req.requestId });
     res.status(500).json({
       error: 'Failed to load progress',
-      message: error.message,
       title: '斗內目標',
       current: 0,
       goal: 1000,
@@ -1548,7 +1535,7 @@ app.get('/admin/progress', requireAdmin, async (req, res) => {
 
 // Admin API for goal management (protected routes)
 app.post('/admin/goal', requireAdmin, requireSameOrigin, async (req, res) => {
-  console.log('🎯 POST /admin/goal called with:', req.body);
+  logInfo('admin_goal_update_requested');
   try {
     const { title, amount, startFrom } = req.body;
     const workspace = await getUserWorkspaceFromSession(req);
@@ -1563,11 +1550,11 @@ app.post('/admin/goal', requireAdmin, requireSameOrigin, async (req, res) => {
     }
 
     if (!workspace) {
-      console.error('❌ No workspace found for goal update');
+      logWarn('admin_goal_update_workspace_not_found');
       return res.status(404).json({ success: false, error: 'Workspace not found' });
     }
 
-    console.log(`🎯 Updating goal for workspace ${workspace.slug}:`, { title, amount, startFrom });
+    logInfo('admin_goal_update_validated');
 
     await database.updateWorkspaceSettings(workspace.id, {
       goalTitle: normalizedTitle,
@@ -1575,7 +1562,7 @@ app.post('/admin/goal', requireAdmin, requireSameOrigin, async (req, res) => {
       goalStartFrom: normalizedStart
     });
 
-    console.log('✅ Goal settings updated in database');
+    logInfo('admin_goal_update_persisted');
 
     // Broadcast progress update (with error handling)
     await broadcastProgress(workspace.id);
@@ -1590,11 +1577,11 @@ app.post('/admin/goal', requireAdmin, requireSameOrigin, async (req, res) => {
       }
     };
 
-    console.log('✅ Goal update complete, sending response:', response);
+    logInfo('admin_goal_update_completed');
     res.json(response);
   } catch (error) {
-    console.error('❌ Goal update error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    logError('admin_goal_update_failed', { request_id: req.requestId });
+    res.status(500).json({ success: false, error: 'internal_error' });
   }
 });
 
@@ -1609,14 +1596,14 @@ app.post('/admin/reset', requireAdmin, requireSameOrigin, async (req, res) => {
     await broadcastProgress(workspace.id);
     res.json({ success: true });
   } catch (error) {
-    console.error('Reset error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    logError('admin_reset_failed', { request_id: req.requestId });
+    res.status(500).json({ success: false, error: 'internal_error' });
   }
 });
 
 // ECPay credentials management
 app.get('/admin/ecpay', requireAdmin, async (req, res) => {
-  console.log('🔑 GET /admin/ecpay called');
+  logInfo('admin_ecpay_credentials_requested');
   try {
     const workspace = await getUserWorkspaceFromSession(req);
 
@@ -1630,8 +1617,8 @@ app.get('/admin/ecpay', requireAdmin, async (req, res) => {
       hashIV: credentials.hashIV ? '••••••••' : ''
     });
   } catch (error) {
-    console.error('Get ECPay credentials error:', error);
-    res.status(500).json({ error: error.message });
+    logError('admin_ecpay_credentials_fetch_failed', { request_id: req.requestId });
+    res.status(500).json({ error: 'internal_error' });
   }
 });
 
@@ -1672,14 +1659,14 @@ app.post('/admin/ecpay', requireAdmin, requireSameOrigin, async (req, res) => {
 
     res.json({ success: true, message: 'ECPay credentials updated successfully' });
   } catch (error) {
-    console.error('Update ECPay credentials error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    logError('admin_ecpay_credentials_update_failed', { request_id: req.requestId });
+    res.status(500).json({ success: false, error: 'internal_error' });
   }
 });
 
 // Overlay settings management
 app.get('/admin/overlay', requireAdmin, async (req, res) => {
-  console.log('🎨 GET /admin/overlay called');
+  logInfo('admin_overlay_settings_requested');
   try {
     const workspace = await getUserWorkspaceFromSession(req);
 
@@ -1689,8 +1676,8 @@ app.get('/admin/overlay', requireAdmin, async (req, res) => {
     const settings = await database.getWorkspaceSettings(workspace.id);
     res.json(settings?.overlaySettings || {});
   } catch (error) {
-    console.error('Get overlay settings error:', error);
-    res.status(500).json({ error: error.message });
+    logError('admin_overlay_settings_fetch_failed', { request_id: req.requestId });
+    res.status(500).json({ error: 'internal_error' });
   }
 });
 
@@ -1765,8 +1752,8 @@ app.post('/admin/overlay', requireAdmin, requireSameOrigin, async (req, res) => 
 
     res.json({ success: true, message: 'Overlay settings updated successfully', settings: overlaySettings });
   } catch (error) {
-    console.error('Update overlay settings error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    logError('admin_overlay_settings_update_failed', { request_id: req.requestId });
+    res.status(500).json({ success: false, error: 'internal_error' });
   }
 });
 
@@ -1778,7 +1765,7 @@ app.get('/overlay-settings', requireActiveSubscription, async (req, res) => {
     const settings = await database.getWorkspaceSettings(workspace?.id);
     res.json(settings?.overlaySettings || {});
   } catch (error) {
-    console.error('Get overlay settings error:', error);
+    logError('overlay_settings_fetch_failed', { request_id: req.requestId });
     res.json({});
   }
 });
@@ -1798,9 +1785,10 @@ app.get('/api/schema', requirePlatformAdmin, async (req, res) => {
       }
     });
   } catch (error) {
+    logError('schema_fetch_failed', { request_id: req.requestId });
     res.status(500).json({
       success: false,
-      error: error.message
+      error: 'internal_error'
     });
   }
 });
@@ -1872,13 +1860,8 @@ app.post('/subscription/checkout', requireAuth, requireSameOrigin, async (req, r
     // Generate CheckMacValue
     params.CheckMacValue = generateCheckMacValueWithCredentials(params, credentials);
 
-    console.log('💳 Creating subscription checkout for user:', user.email);
-    console.log('📝 Subscription params:', {
-      tradeNo,
-      amount: monthlyPrice,
-      periodType: params.PeriodType,
-      frequency: params.Frequency
-    });
+    logInfo('subscription_checkout_started');
+    logInfo('subscription_checkout_params_prepared', { periodType: params.PeriodType, frequency: params.Frequency });
 
     // Update or create subscription record
     if (existingSubscription) {
@@ -1928,8 +1911,8 @@ app.post('/subscription/checkout', requireAuth, requireSameOrigin, async (req, r
       </html>
     `);
   } catch (error) {
-    console.error('❌ Subscription checkout error:', error);
-    res.status(500).json({ error: 'Failed to create subscription', message: error.message });
+    logError('subscription_checkout_failed', { request_id: req.requestId });
+    res.status(500).json({ error: 'Failed to create subscription' });
   }
 });
 
@@ -1953,7 +1936,7 @@ app.post('/ecpay/period/callback', async (req, res) => {
 // Retained temporarily for reference while migrating old encrypted callback deployments.
 // This route is intentionally unreachable by ECPay and must be removed after migration verification.
 async function legacyEncryptedSubscriptionCallback(req, res) {
-  console.log('💰 ECPay Period Callback received');
+  logInfo('legacy_period_callback_received');
 
   try {
     const payload = req.body;
@@ -1961,7 +1944,7 @@ async function legacyEncryptedSubscriptionCallback(req, res) {
 
     // Verify merchant ID
     if (String(payload.MerchantID) !== String(billingCredentials.merchantId)) {
-      console.warn('Rejected subscription callback with an invalid merchant ID');
+      logWarn('legacy_period_callback_invalid_merchant');
       return res.status(400).send('0|Invalid merchant');
     }
 
@@ -1969,7 +1952,7 @@ async function legacyEncryptedSubscriptionCallback(req, res) {
     const decryptedData = await decryptECPayData(payload.Data, null, billingCredentials);
 
     if (!decryptedData) {
-      console.error('❌ Failed to decrypt period callback data');
+      logWarn('legacy_period_callback_decryption_failed');
       return res.send('0|Decryption failed');
     }
 
@@ -1984,7 +1967,7 @@ async function legacyEncryptedSubscriptionCallback(req, res) {
     const subscription = await database.getUserSubscription(userId);
 
     if (!subscription) {
-      console.error('❌ Subscription not found for userId:', userId);
+      logWarn('legacy_period_callback_subscription_not_found');
       return res.send('1|OK'); // Still acknowledge to avoid ECPay retry
     }
 
@@ -2017,7 +2000,7 @@ async function legacyEncryptedSubscriptionCallback(req, res) {
       errorMessage: paymentSuccess ? null : decryptedData.RtnMsg
     });
 
-    console.log(`📝 Payment record created: ${paymentRecord.id} (${paymentStatus})`);
+    logInfo('legacy_payment_record_created', { paymentStatus });
 
     // Update subscription based on payment result
     if (paymentSuccess) {
@@ -2035,9 +2018,7 @@ async function legacyEncryptedSubscriptionCallback(req, res) {
         ecpayTradeNo: orderInfo.TradeNo
       });
 
-      console.log('Subscription payment successful');
-      console.log(`   Amount: NT$${orderInfo.TradeAmt}`);
-      console.log(`   Next billing: ${nextBillingDate.toISOString()}`);
+      logInfo('legacy_subscription_payment_succeeded');
 
       // Optional: send a success email when SMTP notification templates are configured.
     } else {
@@ -2054,9 +2035,7 @@ async function legacyEncryptedSubscriptionCallback(req, res) {
         gracePeriodEndAt: gracePeriodEnd.toISOString()
       });
 
-      console.warn('Subscription payment failed');
-      console.warn(`   Failed count: ${failedCount}`);
-      console.warn(`   Grace period until: ${gracePeriodEnd.toISOString()}`);
+      logWarn('legacy_subscription_payment_failed', { failedCount });
 
       // If failed 6 times, ECPay automatically stops (per their docs)
       if (failedCount >= 6) {
@@ -2064,7 +2043,7 @@ async function legacyEncryptedSubscriptionCallback(req, res) {
           status: 'cancelled',
           canceledAt: new Date()
         });
-        console.error(`❌ Subscription cancelled after 6 failed payments`);
+        logError('legacy_subscription_cancelled_after_failures');
       }
 
       // Optional: send a failed-payment email when SMTP notification templates are configured.
@@ -2123,7 +2102,7 @@ app.get('/api/subscription/payment-history', requireAuth, async (req, res) => {
       }))
     });
   } catch (error) {
-    console.error('❌ Get payment history error:', error);
+    logError('payment_history_fetch_failed', { request_id: req.requestId });
     res.status(500).json({ error: 'Failed to retrieve payment history' });
   }
 });
@@ -2173,8 +2152,7 @@ app.post('/subscription/cancel', requireAuth, requireSameOrigin, async (req, res
       metadata: { gracePeriodEnd }
     });
 
-    console.log('Subscription cancelled');
-    console.log(`   Access until: ${gracePeriodEnd}`);
+    logInfo('subscription_cancelled');
 
     res.json({
       success: true,
@@ -2184,7 +2162,7 @@ app.post('/subscription/cancel', requireAuth, requireSameOrigin, async (req, res
 
     // Optional: send a cancellation confirmation email when SMTP is configured.
   } catch (error) {
-    console.error('❌ Cancel subscription error:', error);
+    logError('subscription_cancel_failed', { request_id: req.requestId });
     res.status(500).json({ error: 'Failed to cancel subscription' });
   }
 });
@@ -2274,14 +2252,14 @@ app.post('/subscription/resume', requireAuth, requireSameOrigin, async (req, res
       status: 'success'
     });
 
-    console.log('Subscription resumed');
+    logInfo('subscription_resumed');
 
     res.json({
       success: true,
       message: 'Subscription resumed successfully'
     });
   } catch (error) {
-    console.error('❌ Resume subscription error:', error);
+    logError('subscription_resume_failed', { request_id: req.requestId });
     res.status(500).json({ error: 'Failed to resume subscription' });
   }
 });
@@ -2328,7 +2306,7 @@ app.get('/api/subscription/status', requireAuth, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Get subscription status error:', error);
+    logError('subscription_status_fetch_failed', { request_id: req.requestId });
     res.status(500).json({ error: 'Failed to retrieve subscription status' });
   }
 });
@@ -2355,7 +2333,7 @@ let shuttingDown = false;
 async function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
-  console.log(`Received ${signal}; shutting down`);
+  logInfo('shutdown_initiated', { signal });
   for (const client of sseClients.keys()) client.end();
   const forceExit = setTimeout(() => process.exit(1), 10_000);
   forceExit.unref();
@@ -2365,7 +2343,7 @@ async function shutdown(signal) {
       clearTimeout(forceExit);
       process.exit(error ? 1 : 0);
     } catch (closeError) {
-      console.error('Shutdown failed:', closeError.message);
+      logError('shutdown_failed');
       process.exit(1);
     }
   });
