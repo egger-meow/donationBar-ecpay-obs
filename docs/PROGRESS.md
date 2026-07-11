@@ -14,6 +14,30 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-11 — Authenticated creator data export, privacy-operation boundaries (P0 support)
+
+Shipped a tenant-safe self-service data-export capability that supports, but does not
+complete, the P0 Legal/data baseline:
+
+- `GET /account/export` is authentication-gated and exports only workspaces owned by the
+  logged-in creator. It downloads a no-store JSON attachment from an allowlist-based
+  builder rather than serializing database rows.
+- The export includes useful account/workspace/settings/donation data while excluding
+  ECPay credentials, provider/payment references, password/OAuth fields, sessions,
+  fraud/audit data, and other internal records. It exposes only a boolean for ECPay
+  configuration.
+- Added an admin-page export link and [DATA_RIGHTS_RUNBOOK.md](operations/DATA_RIGHTS_RUNBOOK.md),
+  which documents the feature and explicitly keeps account deletion manual pending
+  legal, retention, billing, and identity-verification decisions.
+- Also removed the final duplicate subscription trial/price fallback: database-created
+  subscriptions now use the validated shared subscription-plan configuration used by
+  checkout and callbacks.
+
+Verification: `npm.cmd test` passes **58/58** tests, including secret/payment-reference
+redaction in the export shape. A sandbox local-server smoke check confirms an
+unauthenticated `/account/export` request redirects to login. Full authenticated
+PostgreSQL export and legal data-rights handling remain unproven.
+
 ## 2026-07-11 — Beta operations runbook prepared (P1)
 
 Prepared the operating process required by ROADMAP.md P1 Beta Operations:

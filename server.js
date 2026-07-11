@@ -18,6 +18,7 @@ import { requireSameOrigin } from './security.js';
 import { logError, logInfo, logWarn, requestObservability, sendAlert } from './observability.js';
 import { processSubscriptionPaymentCallback as processSubscriptionPaymentCallbackCore } from './subscription-callback.js';
 import { computeActivationSteps } from './activation.js';
+import { buildAccountExport } from './privacy-export.js';
 
 const app = express();
 const __dirname = path.resolve();
@@ -725,6 +726,42 @@ function requireAdmin(req, res, next) {
 
 // Alias for requireAdmin (used by subscription routes)
 const requireAuth = requireAdmin;
+
+// Workspace-owner self-service data export. The pure allowlist in privacy-export.js
+// prevents credentials, payment references, and internal authentication fields from
+// being included even though this is an authenticated download.
+app.get('/account/export', requireAuth, async (req, res) => {
+  try {
+    const account = await database.findUserById(req.session.userId);
+    if (!account) return res.status(401).json({ error: 'Unauthorized' });
+
+    const [subscription, ownedWorkspaces] = await Promise.all([
+      database.getUserSubscription(account.id),
+      database.getUserWorkspaces(account.id)
+    ]);
+    const workspaces = await Promise.all(ownedWorkspaces.map(async workspace => {
+      const [settings, provider, donations] = await Promise.all([
+        database.getWorkspaceSettings(workspace.id),
+        database.getPaymentProvider(workspace.id, 'ecpay'),
+        database.getAllWorkspaceDonations(workspace.id)
+      ]);
+      return { workspace, settings, provider, donations };
+    }));
+
+    const filenameDate = new Date().toISOString().slice(0, 10);
+    res.set({
+      'Cache-Control': 'no-store, private',
+      'Content-Disposition': `attachment; filename="donationbar-data-export-${filenameDate}.json"`,
+      'Content-Type': 'application/json; charset=utf-8',
+      'X-Content-Type-Options': 'nosniff'
+    });
+    logInfo('account_export_completed', { workspaceCount: workspaces.length });
+    return res.send(JSON.stringify(buildAccountExport({ account, subscription, workspaces })));
+  } catch (error) {
+    logError('account_export_failed', { request_id: req.requestId });
+    return res.status(500).json({ error: 'internal_error' });
+  }
+});
 
 // =============================================
 // ROOT ROUTE - Redirect based on auth status

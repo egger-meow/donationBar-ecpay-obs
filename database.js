@@ -2,7 +2,7 @@ import pg from 'pg';
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { isPlatformAdminEmail } from './config.js';
+import { getSubscriptionPlan, isPlatformAdminEmail } from './config.js';
 import { decryptCredential, encryptCredential } from './credentials.js';
 import { databaseSsl } from './database-ssl.js';
 import { computeActivationFunnel } from './activation.js';
@@ -791,6 +791,24 @@ class Database {
   }
 
   /**
+   * Return every donation for one workspace. Intended only for an authenticated
+   * workspace-owner export, never for a public or cross-tenant listing.
+   */
+  async getAllWorkspaceDonations(workspaceId) {
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query(
+        'SELECT * FROM donations WHERE workspace_id = $1 ORDER BY created_at ASC',
+        [workspaceId]
+      );
+      return result.rows.map(row => this.camelCaseKeys(row));
+    }
+    const data = await this.readJSON();
+    return data.donations
+      .filter(donation => donation.workspaceId === workspaceId)
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  }
+
+  /**
    * Get donation progress for a workspace
    */
   async getWorkspaceProgress(workspaceId) {
@@ -938,7 +956,7 @@ class Database {
 
     if (isTrial && !trialEndDate) {
       // Calculate trial end date based on SUBSCRIPTION_TRIAL_DAYS (default 30 days)
-      const trialDays = parseInt(process.env.SUBSCRIPTION_TRIAL_DAYS) || 30;
+      const trialDays = getSubscriptionPlan().trialDays;
       const endDate = new Date();
       endDate.setDate(endDate.getDate() + trialDays);
       trialEndDate = endDate.toISOString();
@@ -957,7 +975,7 @@ class Database {
 
     const pricePerMonth = subscriptionData.pricePerMonth !== undefined
       ? subscriptionData.pricePerMonth
-      : (subscriptionData.planType === 'free' ? 0 : parseInt(process.env.SUBSCRIPTION_MONTHLY_PRICE) || 70);
+      : (subscriptionData.planType === 'free' ? 0 : getSubscriptionPlan().monthlyPrice);
 
     if (this.isProduction && this.connected) {
       const result = await pgClient.query(`

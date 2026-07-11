@@ -12,6 +12,11 @@ P1 "Beta operations" now has a prepared support/interview/weekly-review/exit run
 but it has not operated with a real cohort; the required four weeks of support and
 retention evidence remain open.
 
+The P0 Legal/data baseline now has a self-service creator workspace export and a
+deletion-request operating boundary, but legal/accounting approval of retention,
+subprocessors, tax/e-invoice, identity verification, and deletion handling remains
+required before accepting customers.
+
 PostgreSQL migration/backup/restore has been rehearsed against a real **local** PostgreSQL 17 instance (2026-07-11, see [MIGRATION_GUIDE.md](docs/migration/MIGRATION_GUIDE.md) Section 7) — not staging/hosted, but a real database engine, not JSON sandbox mode. The rehearsal found and fixed two real bugs that would have broken `npm run migrate` against any genuinely fresh production database (an unguarded legacy-data query, and a wrong file path), plus documented a real limitation of `npm run restore` (it recreates what the backup contains but doesn't remove newer unrelated objects). Monitoring alert delivery has similarly been exercised against a real local HTTP listener, not a real vendor endpoint (see `docs/operations/MONITORING_AND_INCIDENT_RESPONSE.md` Section 7).
 
 Not proven in real staging or production: all of the above against a real hosted database and domain, production-domain OAuth, ECPay initial/recurring callbacks and failures, callback replay, cancellation, container CI outcome, OBS/browser coverage, and monitoring alert delivery against a real vendor endpoint. The service is not production-ready.
