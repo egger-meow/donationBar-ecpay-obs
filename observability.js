@@ -52,7 +52,7 @@ export async function sendAlert(event, fields = {}, env = process.env) {
       signal: controller.signal
     });
   } catch {
-    logWarn('alert_delivery_failed', { event });
+    logWarn('alert_delivery_failed', { alert_event: event });
   } finally {
     clearTimeout(timeoutId);
   }

@@ -83,9 +83,15 @@ test('sendAlert posts a redacted, allowlisted payload for a known event', async 
 
 test('sendAlert never throws when delivery fails', async () => {
   const stub = stubFetch(() => { throw new Error('network unreachable'); });
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = message => warnings.push(JSON.parse(message));
   try {
     await assert.doesNotReject(sendAlert('http_unhandled_error', { requestId: 'req-1', route: '/other', statusCode: 500 }, { ALERT_WEBHOOK_URL: 'https://alerts.example/hook' }));
+    assert.deepEqual(warnings.map(entry => entry.event), ['alert_delivery_failed']);
+    assert.equal(warnings[0].alert_event, 'http_unhandled_error');
   } finally {
+    console.warn = originalWarn;
     stub.restore();
   }
 });
