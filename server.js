@@ -27,6 +27,11 @@ app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false 
 app.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: 'draft-7', legacyHeaders: false }));
 
 // Middleware
+const protectedStaticPages = new Set(['/admin.html', '/overlay.html', '/donate.html']);
+app.use((req, res, next) => {
+  if (protectedStaticPages.has(req.path)) return res.status(404).send('Not found');
+  return next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
@@ -45,6 +50,15 @@ app.use(session({
 // Initialize Passport
 app.use(passport.initialize());
 app.use(passport.session());
+
+app.get('/health/live', (req, res) => res.json({ status: 'ok' }));
+app.get('/health/ready', async (req, res) => {
+  const databaseHealth = await database.healthCheck();
+  return res.status(databaseHealth.ok ? 200 : 503).json({
+    status: databaseHealth.ok ? 'ready' : 'not_ready',
+    database: databaseHealth.storage
+  });
+});
 
 // Passport serialization
 passport.serializeUser((user, done) => {
@@ -413,7 +427,7 @@ function broadcastAdminNotification(workspaceId, type, message, details = null) 
 }
 
 // SSE endpoint - supports slug query parameter for workspace-specific updates
-app.get('/events', async (req, res) => {
+app.get('/events', requireActiveSubscription, async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -748,7 +762,7 @@ const requireAuth = requireAdmin;
 // =============================================
 app.get('/', (req, res) => {
   if (req.session && req.session.userId) {
-    return res.redirect('/admin.html');
+    return res.redirect('/admin');
   }
   return res.redirect('/login.html');
 });
@@ -758,7 +772,7 @@ app.get('/', (req, res) => {
 // =============================================
 
 // Progress endpoint - supports slug query parameter for multi-user
-app.get('/progress', async (req, res) => {
+app.get('/progress', requireActiveSubscription, async (req, res) => {
   try {
     const { slug } = req.query;
     const workspace = await getWorkspaceFromSlug(slug);
@@ -785,7 +799,7 @@ app.get('/progress', async (req, res) => {
 // Middleware: Check if workspace owner has active subscription
 async function requireActiveSubscription(req, res, next) {
   try {
-    const slug = req.params.slug || DEFAULT_WORKSPACE_SLUG;
+    const slug = req.params.slug || req.query.slug || DEFAULT_WORKSPACE_SLUG;
     const workspace = await getWorkspaceFromSlug(slug);
 
     if (!workspace) {
@@ -2370,9 +2384,33 @@ app.get('/api/subscription/status', requireAuth, async (req, res) => {
 
 // Start server
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
+await database.ready;
+const server = app.listen(port, () => {
   console.log(`🚀 DonationBar server running on port ${port}`);
   console.log(`📊 Overlay URL: http://localhost:${port}/overlay`);
   console.log(`💰 Donation page: http://localhost:${port}/donate`);
   console.log(`⚙️  Admin panel: http://localhost:${port}/admin`);
 });
+
+let shuttingDown = false;
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`Received ${signal}; shutting down`);
+  for (const client of sseClients.keys()) client.end();
+  const forceExit = setTimeout(() => process.exit(1), 10_000);
+  forceExit.unref();
+  server.close(async error => {
+    try {
+      await database.close();
+      clearTimeout(forceExit);
+      process.exit(error ? 1 : 0);
+    } catch (closeError) {
+      console.error('Shutdown failed:', closeError.message);
+      process.exit(1);
+    }
+  });
+}
+
+process.once('SIGTERM', () => shutdown('SIGTERM'));
+process.once('SIGINT', () => shutdown('SIGINT'));

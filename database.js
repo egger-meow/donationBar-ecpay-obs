@@ -27,7 +27,9 @@ class Database {
     }
 
     if (this.isProduction) {
-      this.initPostgreSQL();
+      this.ready = this.initPostgreSQL();
+    } else {
+      this.ready = Promise.resolve();
     }
   }
 
@@ -89,14 +91,36 @@ class Database {
 
     } catch (error) {
       if (process.env.NODE_ENV === 'production' || process.env.ENVIRONMENT === 'production') {
-        process.nextTick(() => { throw error; });
-        return;
+        throw error;
       }
       console.error('❌ PostgreSQL connection failed:', error.message);
       console.log('📝 Falling back to JSON file storage');
       this.isProduction = false;
       this.connected = false;
     }
+  }
+
+  async healthCheck() {
+    await this.ready;
+    if (this.isProduction) {
+      if (!this.connected || !pgClient) return { ok: false, storage: 'postgresql' };
+      try {
+        await pgClient.query('SELECT 1');
+        return { ok: true, storage: 'postgresql' };
+      } catch {
+        this.connected = false;
+        return { ok: false, storage: 'postgresql' };
+      }
+    }
+    return { ok: true, storage: 'json' };
+  }
+
+  async close() {
+    if (pgClient) {
+      await pgClient.end();
+      pgClient = null;
+    }
+    this.connected = false;
   }
 
   // =============================================

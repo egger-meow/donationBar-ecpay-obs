@@ -14,6 +14,7 @@ export function validateProductionConfig(env = process.env) {
     if (!env[name] || env[name].startsWith('your-')) errors.push(`${name} is required`);
   }
   if (!platformAdminEmails(env).length) errors.push('PLATFORM_ADMIN_EMAILS must contain at least one administrator email');
+  if (!['stage', 'production'].includes(env.ECPAY_ENVIRONMENT)) errors.push('ECPAY_ENVIRONMENT must be stage or production');
   if (errors.length) throw new Error(`Invalid production configuration:\n- ${errors.join('\n- ')}`);
 }
 
@@ -30,9 +31,9 @@ export function getBillingECPayCredentials(env = process.env) {
 }
 
 export function getECPayCheckoutUrl(env = process.env) {
-  return isProduction(env) ? 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5' : 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5';
+  return env.ECPAY_ENVIRONMENT === 'production' ? 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5' : 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5';
 }
 
 export function getECPayPeriodActionUrl(env = process.env) {
-  return isProduction(env) ? 'https://payment.ecpay.com.tw/Cashier/CreditCardPeriodAction' : 'https://payment-stage.ecpay.com.tw/Cashier/CreditCardPeriodAction';
+  return env.ECPAY_ENVIRONMENT === 'production' ? 'https://payment.ecpay.com.tw/Cashier/CreditCardPeriodAction' : 'https://payment-stage.ecpay.com.tw/Cashier/CreditCardPeriodAction';
 }

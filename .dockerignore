@@ -1,0 +1,15 @@
+.git
+.github
+.claude
+.codex
+.agents
+node_modules
+.env
+.env.*
+!.env.example
+db.json
+db.json.backup
+*-old-backup.js
+*.log
+docs
+test

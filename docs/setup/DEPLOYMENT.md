@@ -1,126 +1,82 @@
-# Production Deployment Guide
+# Production deployment
 
-The issue you experienced where goal settings keep reverting to default values happens because cloud hosting platforms like Render have **ephemeral file systems**. When the server restarts, all changes to local files are lost.
+DonationBar ships as a Node.js service and a production container. PostgreSQL and HTTPS are mandatory in production. The process fails startup when required configuration or PostgreSQL is unavailable; it never falls back to `db.json`.
 
-## Solution: PostgreSQL Database on Render
+## Required infrastructure
 
-This fix implements persistent cloud database storage using PostgreSQL directly on Render (free tier available).
+- A container or Node.js 20 runtime
+- PostgreSQL with automated backups and point-in-time recovery where available
+- An HTTPS reverse proxy that forwards `X-Forwarded-Proto`
+- A public, stable domain for OAuth and ECPay callbacks
+- Centralized application logs and an uptime monitor
 
-## Setup Instructions
+## Required configuration
 
-### 1. Create PostgreSQL Database on Render
+Start from `.env.example`. Production requires at least:
 
-1. Go to your [Render Dashboard](https://dashboard.render.com/)
-2. Click "New +" and select "PostgreSQL" 
-3. Fill in the details:
-   - **Name:** `donationbar-db` (or any name you prefer)
-   - **Database:** `donationbar`
-   - **User:** `donationbar_user` (or any username)
-   - **Region:** Choose closest to your web service
-   - **PostgreSQL Version:** 15 (latest)
-   - **Plan:** Free (perfect for donation tracking)
-4. Click "Create Database"
-5. Wait for database creation (1-2 minutes)
+```dotenv
+NODE_ENV=production
+ENVIRONMENT=production
+ECPAY_ENVIRONMENT=stage
+BASE_URL=https://your-domain.example
+DATABASE_URL=postgresql://...
+SESSION_SECRET=a-random-secret-at-least-32-characters-long
+PLATFORM_ADMIN_EMAILS=owner@example.com
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_CALLBACK_URL=https://your-domain.example/api/auth/google/callback
+BILLING_ECPAY_MERCHANT_ID=...
+BILLING_ECPAY_HASH_KEY=...
+BILLING_ECPAY_HASH_IV=...
+```
 
-### 2. Get Database Connection Details
+Streamer donation merchant credentials are entered per workspace. Never put streamer credentials in the platform billing variables.
 
-1. After creation, go to your PostgreSQL service dashboard
-2. In the "Connections" section, copy the **External Database URL**
-3. It looks like: `postgres://username:password@dpg-xxxxx-a.oregon-postgres.render.com/database`
+## Build and release
 
-### 3. Connect Database to Your Web Service
+```bash
+docker build -t donationbar:release .
+docker run --rm --env-file .env donationbar:release npm run migrate
+docker run --env-file .env -p 3000:3000 donationbar:release
+```
 
-1. Go to your **web service** (not the database) dashboard
-2. Click "Environment" tab
-3. Add new environment variable:
-   - **Key:** `DATABASE_URL`
-   - **Value:** The External Database URL you copied from step 2
-4. Also make sure you have:
-   - `ENVIRONMENT=production`
-   - All other required variables from `.env.example`
+Run `npm run migrate` as a release job before switching traffic to the new application version. Do not run multiple migration jobs concurrently.
 
-### 4. Optional: Connect Database to Same Project
+Configure probes:
 
-1. In your PostgreSQL dashboard, scroll down to "Connect"
-2. Select your web service from the dropdown
-3. This will automatically add `DATABASE_URL` to your web service
+- Liveness: `GET /health/live`
+- Readiness: `GET /health/ready`
 
-### 5. Deploy Updated Code
+Only readiness checks query PostgreSQL. Remove an instance from traffic whenever readiness returns HTTP 503.
 
-1. Install new dependency locally:
-   ```bash
-   npm install pg
-   ```
+## Provider setup
 
-2. Push changes to your repository:
-   ```bash
-   git add .
-   git commit -m "Add PostgreSQL persistence to fix goal reset issue"
-   git push
-   ```
+Register these HTTPS endpoints with the platform billing merchant:
 
-3. Render will automatically redeploy
+- Initial payment notification: `https://your-domain.example/ecpay/return`
+- Recurring payment notification: `https://your-domain.example/ecpay/period/callback`
 
-## How It Works
+Set the Google OAuth callback to the exact `GOOGLE_CALLBACK_URL`. Perform the first release with ECPay stage credentials and `ECPAY_ENVIRONMENT=stage`; switch that variable to `production` only after signed callback, duplicate callback, simulated payment, cancellation, and failed-payment tests succeed.
 
-### Development (Local)
-- Uses `db.json` file for easy development
-- No database setup needed
+## Backup and rollback
 
-### Production (Render)
-- Automatically detects production environment
-- Uses PostgreSQL for persistent storage
-- Creates tables automatically on first run
-- Migrates existing data from `db.json` if present
-- Goal settings persist across server restarts
+Before every database migration:
 
-## Migration
+1. Create and verify a PostgreSQL snapshot.
+2. Record the application image tag and migration commit.
+3. Run the migration release job.
+4. Verify readiness, login, trial access, subscription checkout, donation checkout, and OBS overlay reconnect.
 
-The system automatically migrates your existing data:
-- ✅ Current goal settings
-- ✅ All donations history  
-- ✅ ECPay credentials
-- ✅ Overlay settings
-- ✅ Seen trade numbers (prevents duplicates)
+The current migrations are additive and forward-compatible. Application rollback means redeploying the previous image while leaving the additive schema in place. If a migration causes data corruption, stop writes and restore the pre-migration PostgreSQL snapshot; do not attempt an ad-hoc down migration on live payment data.
 
-## Verification
+## Launch verification
 
-After deployment:
-1. Check logs for "🐘 Connected to PostgreSQL"
-2. Check logs for "📊 PostgreSQL tables initialized"
-3. Test changing goal settings in admin panel
-4. Wait 10-15 minutes or force a restart
-5. Verify settings are still preserved
-
-## Troubleshooting
-
-### Connection Issues
-- Verify DATABASE_URL is correct and matches the External Database URL from Render
-- Check that PostgreSQL service is running on Render
-- Ensure web service and database are in the same region for better performance
-
-### Fallback Behavior
-- If PostgreSQL connection fails, app automatically falls back to JSON file
-- Logs will show "📝 Falling back to JSON file storage"
-
-### Environment Detection
-- Production mode: `ENVIRONMENT=production` OR `DATABASE_URL` present
-- Development mode: Neither condition met
-
-## Cost
-
-- **Render PostgreSQL (Free Tier):**
-  - 1 GB storage
-  - Shared CPU
-  - No credit card required
-  - Perfect for donation tracking
-  - Automatic backups
-  - 90-day data retention
-
-## Support
-
-If you encounter issues:
-1. Check Render logs for database connection status
-2. Verify all environment variables are set correctly
-3. Ensure PostgreSQL service is running in your Render dashboard
-4. Test locally with `DATABASE_URL` set to ensure compatibility
+- `npm test` passes and `npm audit --omit=dev` reports no vulnerabilities.
+- Production startup fails when PostgreSQL or required secrets are missing.
+- Sessions survive application restarts and multiple instances.
+- ECPay stage payment activates exactly once; replaying the callback creates no second payment.
+- Cancellation succeeds at ECPay before local status changes.
+- Trial, paid, cancelled-through-period, and expired access rules are exercised.
+- OBS browser source loads with transparency, reconnects after interruption, and handles long localized text.
+- Desktop and mobile donation/admin pages are manually checked.
+- Alerts exist for readiness failures and recurring callback errors.
