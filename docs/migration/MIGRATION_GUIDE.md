@@ -51,6 +51,13 @@ Net effect: for a staging PostgreSQL database, re-running `npm run migrate` afte
 
 ## 4. Verification
 
+**Activation-tracking update (2026-07-11):** the activation migration now also adds
+`provider_configured_at` to `workspace_settings` and backfills it from an existing
+complete ECPay provider row's `created_at`. New configurations retain their exact first
+complete-configuration timestamp. `GET /admin/activation` exposes workspace-scoped
+milestones, while `GET /admin/platform/activation-funnel` is restricted to platform
+administrators and returns aggregate counts and median durations only.
+
 After migration completes, before declaring the rehearsal a pass:
 
 - [ ] `GET /health/ready` on the staging instance returns HTTP 200 with `"database": "postgresql"` (see `server.js` health routes, backed by `database.js` `healthCheck()`, which runs `SELECT 1`).

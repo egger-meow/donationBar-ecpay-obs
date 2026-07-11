@@ -1,16 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { computeActivationSteps } from '../activation.js';
+import { computeActivationFunnel, computeActivationSteps } from '../activation.js';
 
 const configuredProvider = { merchantId: 'm-1', hashKey: 'k'.repeat(32), hashIV: 'i'.repeat(16) };
 
 test('no provider and no settings yields every step incomplete', () => {
   const steps = computeActivationSteps({ provider: null, settings: null });
   assert.deepEqual(steps, {
-    ecpayConfigured: false,
+    ecpayConfigured: { done: false, at: null },
     obsConnected: { done: false, at: null },
     firstDonation: { done: false, at: null },
-    liveAlertConfirmed: false
+    liveAlertDelivered: { done: false, at: null }
   });
 });
 
@@ -19,12 +19,12 @@ test('a provider row missing hashIV does not count as configured', () => {
     provider: { merchantId: 'm-1', hashKey: 'k'.repeat(32), hashIV: '' },
     settings: null
   });
-  assert.equal(steps.ecpayConfigured, false);
+  assert.equal(steps.ecpayConfigured.done, false);
 });
 
-test('ecpayConfigured is true once merchantId, hashKey, and hashIV are all present', () => {
-  const steps = computeActivationSteps({ provider: configuredProvider, settings: null });
-  assert.equal(steps.ecpayConfigured, true);
+test('ecpayConfigured records its first complete-configuration timestamp', () => {
+  const steps = computeActivationSteps({ provider: configuredProvider, settings: { providerConfiguredAt: '2026-07-11T00:01:00.000Z' } });
+  assert.deepEqual(steps.ecpayConfigured, { done: true, at: '2026-07-11T00:01:00.000Z' });
 });
 
 test('obsConnected and firstDonation report their recorded timestamps independently', () => {
@@ -34,13 +34,39 @@ test('obsConnected and firstDonation report their recorded timestamps independen
   });
   assert.deepEqual(steps.obsConnected, { done: true, at: '2026-07-11T00:00:00.000Z' });
   assert.deepEqual(steps.firstDonation, { done: false, at: null });
-  assert.equal(steps.liveAlertConfirmed, false, 'liveAlertConfirmed requires both obsConnected and firstDonation');
+  assert.equal(steps.liveAlertDelivered.done, false, 'live alert requires an overlay connection before the donation');
 });
 
-test('liveAlertConfirmed is true only once both obsConnected and firstDonation are true', () => {
+test('live alert is counted only when the overlay was connected before the donation', () => {
   const steps = computeActivationSteps({
     provider: configuredProvider,
     settings: { obsConnectedAt: '2026-07-11T00:00:00.000Z', firstDonationAt: '2026-07-11T00:05:00.000Z' }
   });
-  assert.equal(steps.liveAlertConfirmed, true);
+  assert.deepEqual(steps.liveAlertDelivered, { done: true, at: '2026-07-11T00:05:00.000Z' });
+});
+
+test('a later overlay connection cannot retroactively count as a delivered alert', () => {
+  const steps = computeActivationSteps({
+    provider: configuredProvider,
+    settings: { firstDonationAt: '2026-07-11T00:00:00.000Z', obsConnectedAt: '2026-07-11T00:05:00.000Z' }
+  });
+  assert.deepEqual(steps.liveAlertDelivered, { done: false, at: null });
+});
+
+test('activation funnel returns aggregate counts and median elapsed time without tenant records', () => {
+  const funnel = computeActivationFunnel([
+    { oauthCompletedAt: '2026-07-11T00:00:00.000Z', workspaceCreatedAt: '2026-07-11T00:01:00.000Z', providerConfiguredAt: '2026-07-11T00:02:00.000Z', obsConnectedAt: '2026-07-11T00:03:00.000Z', firstDonationAt: '2026-07-11T00:04:00.000Z', liveAlertDeliveredAt: '2026-07-11T00:04:00.000Z' },
+    { oauthCompletedAt: '2026-07-11T00:00:00.000Z', workspaceCreatedAt: '2026-07-11T00:03:00.000Z', providerConfiguredAt: '2026-07-11T00:06:00.000Z', obsConnectedAt: null, firstDonationAt: null, liveAlertDeliveredAt: null }
+  ]);
+
+  assert.deepEqual(funnel, {
+    workspaces: 2,
+    milestones: {
+      workspaceCreatedAt: { completed: 2, medianMillisecondsFromOAuth: 120000 },
+      providerConfiguredAt: { completed: 2, medianMillisecondsFromOAuth: 240000 },
+      obsConnectedAt: { completed: 1, medianMillisecondsFromOAuth: 180000 },
+      firstDonationAt: { completed: 1, medianMillisecondsFromOAuth: 240000 },
+      liveAlertDeliveredAt: { completed: 1, medianMillisecondsFromOAuth: 240000 }
+    }
+  });
 });

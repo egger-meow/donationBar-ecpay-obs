@@ -307,6 +307,7 @@ async function getECPayCredentials(workspaceId = null) {
       hashIV: envCredentials.hashIV,
       isActive: true
     });
+    await database.markWorkspaceProviderConfigured(workspaceId);
     logInfo('ecpay_credentials_migrated_from_env');
     return envCredentials;
   }
@@ -1556,9 +1557,21 @@ app.get('/admin/activation', requireAdmin, async (req, res) => {
       database.getWorkspaceSettings(workspace.id)
     ]);
 
-    res.json({ steps: computeActivationSteps({ provider, settings }) });
+    const steps = computeActivationSteps({ provider, settings });
+    res.json({ steps });
   } catch (error) {
     logError('admin_activation_fetch_failed', { request_id: req.requestId });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// Aggregate activation funnel data is available only to a platform administrator. It
+// deliberately returns counts and median durations, never tenant-level event records.
+app.get('/admin/platform/activation-funnel', requirePlatformAdmin, async (req, res) => {
+  try {
+    res.json({ funnel: await database.getActivationFunnelMetrics() });
+  } catch (error) {
+    logError('platform_activation_funnel_fetch_failed', { request_id: req.requestId });
     res.status(500).json({ error: 'internal_error' });
   }
 });
@@ -1685,7 +1698,10 @@ app.post('/admin/ecpay', requireAdmin, requireSameOrigin, async (req, res) => {
       isActive: true
     };
 
-    await database.upsertPaymentProvider(workspace.id, updateData);
+    const provider = await database.upsertPaymentProvider(workspace.id, updateData);
+    if (provider.merchantId && provider.hashKey && provider.hashIV) {
+      await database.markWorkspaceProviderConfigured(workspace.id);
+    }
 
     res.json({ success: true, message: 'ECPay credentials updated successfully' });
   } catch (error) {

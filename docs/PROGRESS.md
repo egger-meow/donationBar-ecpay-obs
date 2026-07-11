@@ -14,6 +14,17 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-11 — Guided activation funnel timing and ordered live-alert heuristic
+
+Completed the measurement half of ROADMAP.md's P1 Guided Activation slice without introducing third-party analytics or cross-tenant event access:
+
+- `workspace_settings` now records `provider_configured_at` alongside the existing first OBS connection and first donation timestamps. The migration backfills a best-available timestamp from an existing complete ECPay provider row; subsequent credential rotations cannot rewrite the first configuration time.
+- `GET /admin/activation` remains workspace-scoped and now returns timestamped provider, OBS, donation, and live-alert milestones. The admin checklist consumes the expanded shape unchanged visually.
+- `GET /admin/platform/activation-funnel` is restricted by `requirePlatformAdmin` and returns only aggregate workspace counts plus median elapsed milliseconds from OAuth; it never returns workspace IDs, creator details, donor information, payment data, or provider credentials. This measures OAuth → workspace → provider → OBS → first donation → delivered-alert conversion and timing for the beta operations review.
+- Corrected the earlier `liveAlertConfirmed` heuristic: a donation followed by a later overlay connection no longer counts as a delivered alert. The heuristic is now `liveAlertDelivered` only when OBS was connected before (or at) the first donation; it is still not proof that someone visually observed the alert.
+
+Verification: `npm.cmd test` passes **55/55** tests, including new pure tests for aggregate median calculation, no per-tenant output, provider timing, and alert event ordering; the existing browser-page script parsing test also passes. `git diff --check` passes. This is local/sandbox evidence only: the activation UI and live-alert sequence still require real staging and OBS Browser Source verification before P1 or release evidence can be claimed complete.
+
 ## 2026-07-11 — Real local PostgreSQL migration/backup/restore rehearsal, two real bugs found and fixed
 
 With explicit permission, installed PostgreSQL 17 natively via `winget` (no WSL2/Docker

@@ -2304,16 +2304,16 @@
       if (!data.steps) return;
 
       const { steps } = data;
-      const allDone = steps.ecpayConfigured && steps.obsConnected.done && steps.firstDonation.done && steps.liveAlertConfirmed;
+      const allDone = steps.ecpayConfigured.done && steps.obsConnected.done && steps.firstDonation.done && steps.liveAlertDelivered.done;
 
       document.getElementById('activationStepEcpay').textContent =
-        (steps.ecpayConfigured ? '✅' : '⬜') + ' 設定 ECPay 收款方式';
+        (steps.ecpayConfigured.done ? '✅' : '⬜') + ' 設定 ECPay 收款方式';
       document.getElementById('activationStepObs').textContent =
         (steps.obsConnected.done ? '✅' : '⬜') + ' 在 OBS 加入斗內條 Browser Source';
       document.getElementById('activationStepDonation').textContent =
         (steps.firstDonation.done ? '✅' : '⬜') + ' 收到第一筆捐款（可用測試模式）';
       document.getElementById('activationStepAlert').textContent =
-        (steps.liveAlertConfirmed ? '✅' : '⬜') + ' 確認直播畫面有跳出即時提示';
+        (steps.liveAlertDelivered.done ? '✅' : '⬜') + ' 確認直播畫面有跳出即時提示';
 
       // Hide the checklist once every step is complete, so returning users aren't
       // nagged after they're fully activated.

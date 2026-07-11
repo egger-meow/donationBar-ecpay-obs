@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { isPlatformAdminEmail } from './config.js';
 import { decryptCredential, encryptCredential } from './credentials.js';
 import { databaseSsl } from './database-ssl.js';
+import { computeActivationFunnel } from './activation.js';
 
 const { Client } = pg;
 
@@ -359,6 +360,9 @@ class Database {
         goalStartFrom: 0,
         totalAmount: 0,
         totalDonationsCount: 0,
+        providerConfiguredAt: null,
+        obsConnectedAt: null,
+        firstDonationAt: null,
         overlaySettings: {},
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -514,6 +518,26 @@ class Database {
   }
 
   /**
+   * Record the first time a workspace has a complete ECPay configuration.
+   * Idempotent so later credential rotation does not alter funnel timing.
+   */
+  async markWorkspaceProviderConfigured(workspaceId) {
+    if (this.isProduction && this.connected) {
+      await pgClient.query(
+        'UPDATE workspace_settings SET provider_configured_at = NOW() WHERE workspace_id = $1 AND provider_configured_at IS NULL',
+        [workspaceId]
+      );
+    } else {
+      const data = await this.readJSON();
+      const settingsIdx = data.workspaceSettings.findIndex(s => s.workspaceId === workspaceId);
+      if (settingsIdx !== -1 && !data.workspaceSettings[settingsIdx].providerConfiguredAt) {
+        data.workspaceSettings[settingsIdx].providerConfiguredAt = new Date().toISOString();
+        await this.writeJSON(data);
+      }
+    }
+  }
+
+  /**
    * Record the first time a workspace receives a donation, if not already recorded.
    * Idempotent: a second call after the first is a no-op.
    */
@@ -531,6 +555,35 @@ class Database {
         await this.writeJSON(data);
       }
     }
+  }
+
+  // Aggregate activation timing for platform operations. Input records and output are
+  // timestamp/count only; no workspace, creator, donor, credential, or payment fields.
+  async getActivationFunnelMetrics() {
+    if (this.isProduction && this.connected) {
+      const result = await pgClient.query(`
+        SELECT u.created_at AS oauth_completed_at, w.created_at AS workspace_created_at,
+               s.provider_configured_at, s.obs_connected_at, s.first_donation_at
+        FROM user_workspaces w
+        JOIN users u ON u.id = w.user_id
+        JOIN workspace_settings s ON s.workspace_id = w.id
+      `);
+      return computeActivationFunnel(result.rows.map(row => this.camelCaseKeys(row)));
+    }
+
+    const data = await this.readJSON();
+    const users = new Map(data.users.map(user => [user.id, user]));
+    const settings = new Map(data.workspaceSettings.map(setting => [setting.workspaceId, setting]));
+    return computeActivationFunnel(data.workspaces.map(workspace => {
+      const setting = settings.get(workspace.id) || {};
+      return {
+        oauthCompletedAt: users.get(workspace.userId)?.createdAt || null,
+        workspaceCreatedAt: workspace.createdAt || null,
+        providerConfiguredAt: setting.providerConfiguredAt || null,
+        obsConnectedAt: setting.obsConnectedAt || null,
+        firstDonationAt: setting.firstDonationAt || null
+      };
+    }));
   }
 
   // =============================================
