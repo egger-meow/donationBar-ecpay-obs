@@ -17,21 +17,27 @@ Codex and Claude Code are peer engineers sharing the `multiuser` working directo
 - Cycle: `003`
 - Integration branch: `multiuser`
 - Baseline commit: `973fd16`
-- State: `active`
+- State: `complete`
 
 ### Codex lane A
 
 - Outcome: prevent JSON sandbox migrations from silently rewriting already-migrated `db.json` data.
 - Owned files: `migrations/migrate.js`, `test/migration-security.test.js`, and new focused migration tests if needed.
 - Acceptance criteria: detect the current multi-user JSON shape before rewriting; fail closed with a clear recovery message; preserve the explicit legacy one-time migration path; add automated coverage for both shapes; do not edit backup files.
-- Status: active.
+- Status: done — `a0a2b80 fix: guard sandbox migration against data loss`.
 
 ### Claude lane B
 
 - Outcome: turn structured operational events into safe, configurable external alert delivery for staging/production.
 - Owned files: `observability.js`, `server.js`, `config.js`, `.env.example`, `test/observability.test.js`, and `docs/operations/` only.
 - Acceptance criteria: use an optional configured alert webhook with short timeout and non-blocking failure behavior; send only a fixed/redacted event vocabulary plus request ID/route/status (never raw request data, donor data, credentials, tokens, or stack traces); alert on readiness failure, unhandled 5xx, and payment callback errors; keep local/sandbox behavior usable with no alert URL; add automated tests and document configuration/exercise steps.
-- Status: queued.
+- Status: done — `cb62800 feat: deliver redacted operational alerts to an optional webhook`.
+
+### Cycle result
+
+- Review follow-up: `8db8fe2 fix: preserve alert delivery failure event`.
+- Combined verification: `npm.cmd test` — 31 passed, 0 failed; `npm.cmd audit --omit=dev --json` — 0 production vulnerabilities (from cycle 002, no dependency changes since).
+- Remaining external release gates: provision staging infrastructure; run migration/restore rehearsal; exercise OAuth/ECPay callbacks and alert webhook on staging; complete legal/accounting review.
 
 ## General prompt for Claude Code
 
