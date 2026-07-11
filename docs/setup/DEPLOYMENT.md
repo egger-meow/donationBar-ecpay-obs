@@ -33,6 +33,24 @@ BILLING_ECPAY_HASH_IV=...
 
 Streamer donation merchant credentials are entered per workspace. Never put streamer credentials in the platform billing variables. `npm run migrate` encrypts existing PostgreSQL provider credentials with `CREDENTIAL_ENCRYPTION_KEY`; store that key in a managed secret vault and preserve it in backups, because losing it prevents decryption.
 
+## Encrypted backup and restore
+
+Install PostgreSQL client tools (`pg_dump` and `pg_restore`) on the operations runner. Store a random 32-byte `BACKUP_ENCRYPTION_KEY` in the secret vault, separately from the backup files. Create a backup without overwriting an existing file:
+
+```bash
+npm run backup -- backups/donationbar-2026-07-11.dump.enc
+```
+
+Restore only into an explicitly selected database. The restore uses `--clean --if-exists` and is destructive, so it requires a deliberate confirmation variable:
+
+```bash
+ALLOW_DATABASE_RESTORE=yes npm run restore -- backups/donationbar-2026-07-11.dump.enc
+```
+
+The restore authenticates the complete encrypted backup before invoking `pg_restore`, uses a private temporary dump, and removes it afterward. A wrong key or modified backup therefore fails before database changes begin.
+
+Rehearse restoration on an isolated staging database after every schema release. Verify `/health/ready`, workspace/user counts, and one redacted donation and subscription record. Record duration and evidence, then delete the temporary database. A backup is not proven until this restore drill succeeds.
+
 ## Build and release
 
 ```bash
