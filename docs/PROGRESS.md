@@ -14,6 +14,25 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-11 — P0 SSE notification isolation and webhook-reference redaction
+
+Fixed a real tenant/privacy issue in the shared real-time stream:
+
+- The `/events` SSE stream serves both owner-facing admin panels and public OBS/donation
+  clients. `admin-notification` webhook diagnostics were previously broadcast to every
+  connected client for the workspace. Connections now carry workspace and authorization
+  metadata, and diagnostics go only to an authenticated session whose user owns that
+  workspace.
+- Ordinary progress and overlay-settings broadcasts remain workspace-scoped for OBS
+  compatibility; only operational notification delivery changed.
+- Removed `MerchantTradeNo` from the unpaid-webhook notification payload, avoiding a
+  provider payment reference even for an authorized notification recipient.
+- Added regression tests for the required owner-session gate and absence of the trade
+  number in the unpaid branch.
+
+Verification: `npm.cmd test` passes **62/62** tests and `git diff --check` passes. This
+is source/local evidence; real OBS and staged webhook exercises remain required.
+
 ## 2026-07-11 — P0 sensitive logging remediation in database and email paths
 
 Found and removed logging that contradicted the project's payment/privacy rules:

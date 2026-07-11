@@ -327,7 +327,10 @@ async function getECPayCredentials(workspaceId = null) {
 }
 
 // SSE: Server-Sent Events for real-time updates
-// Store clients with their workspace IDs: Map<Response, workspaceId>
+// Store workspace and authorization metadata. The same SSE stream serves public OBS
+// overlays and owner-facing admin UI, so sensitive operational notifications must be
+// delivered only to the latter.
+// Map<Response, { workspaceId: string, canReceiveAdminNotifications: boolean }>
 const sseClients = new Map();
 
 async function broadcastProgress(workspaceId = null) {
@@ -353,8 +356,8 @@ async function broadcastProgress(workspaceId = null) {
     let successCount = 0;
     let errorCount = 0;
 
-    for (const [res, clientWorkspaceId] of sseClients.entries()) {
-      if (clientWorkspaceId === workspaceId) {
+    for (const [res, client] of sseClients.entries()) {
+      if (client.workspaceId === workspaceId) {
         try {
           if (!res.writableEnded && !res.destroyed) {
             res.write(payload);
@@ -392,8 +395,8 @@ async function broadcastOverlaySettings(workspaceId = null) {
     const payload = `event: overlay-settings\ndata: ${JSON.stringify(settings?.overlaySettings || {})}\n\n`;
 
     // Only broadcast to clients watching this specific workspace
-    for (const [res, clientWorkspaceId] of sseClients.entries()) {
-      if (clientWorkspaceId === workspaceId) {
+    for (const [res, client] of sseClients.entries()) {
+      if (client.workspaceId === workspaceId) {
         try {
           if (!res.writableEnded && !res.destroyed) {
             res.write(payload);
@@ -423,9 +426,10 @@ function broadcastAdminNotification(workspaceId, type, message, details = null) 
   };
   const payload = `event: admin-notification\ndata: ${JSON.stringify(notification)}\n\n`;
 
-  // Only broadcast to clients watching this specific workspace
-  for (const [res, clientWorkspaceId] of sseClients.entries()) {
-    if (clientWorkspaceId === workspaceId) {
+  // Never send payment/provider operational detail to public overlays or donation-page
+  // clients. Only an authenticated owner connection for this workspace may receive it.
+  for (const [res, client] of sseClients.entries()) {
+    if (client.workspaceId === workspaceId && client.canReceiveAdminNotifications) {
       try {
         if (!res.writableEnded && !res.destroyed) {
           res.write(payload);
@@ -485,8 +489,12 @@ app.get('/events', requireActiveSubscription, async (req, res) => {
     res.write(`event: ping\ndata: ${Date.now()}\n\n`);
   }, 30000);
 
-  // Store client with its workspace ID
-  sseClients.set(res, workspace.id);
+  // Public overlays use this same endpoint. Only the workspace owner gets admin
+  // notification events; progress and overlay-settings events remain workspace-scoped.
+  sseClients.set(res, {
+    workspaceId: workspace.id,
+    canReceiveAdminNotifications: req.session?.userId === workspace.userId
+  });
 
   req.on('close', () => {
     clearInterval(keepAlive);
@@ -1026,8 +1034,7 @@ app.post('/webhook/:slug', async (req, res) => {
     if (Number(orderInfo.TradeStatus) !== 1) {
       logInfo('payment_webhook_not_paid', { request_id: req.requestId });
       broadcastAdminNotification(workspace.id, 'warning', 'Webhook: 交易尚未付款', {
-        tradeStatus: orderInfo.TradeStatus,
-        tradeNo: orderInfo.MerchantTradeNo
+        tradeStatus: orderInfo.TradeStatus
       });
       return res.send('1|OK');
     }
