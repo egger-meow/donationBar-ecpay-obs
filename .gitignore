@@ -7,3 +7,4 @@ db.json
 .codex/
 DATABASE_CA_VALUE.txt
 *.log
+docs/collaboration/CLAUDE_CODE_COWORK.md
