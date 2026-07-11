@@ -12,7 +12,7 @@ import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import database from './database.js';
 import * as emailService from './email.js';
-import { getBillingECPayCredentials, getECPayCheckoutUrl, getECPayPeriodActionUrl, isProduction, validateProductionConfig } from './config.js';
+import { getBillingECPayCredentials, getECPayCheckoutUrl, getECPayPeriodActionUrl, getSubscriptionPlan, isProduction, validateProductionConfig } from './config.js';
 import { generateCheckMacValueForCredentials, verifyCheckMacValueForCredentials } from './ecpay.js';
 import { requireSameOrigin } from './security.js';
 import { logError, logInfo, logWarn, requestObservability, sendAlert } from './observability.js';
@@ -57,6 +57,16 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 app.get('/health/live', (req, res) => res.json({ status: 'ok' }));
+app.get('/api/pricing', (req, res) => {
+  const plan = getSubscriptionPlan();
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    plan: plan.phase,
+    currency: plan.currency,
+    monthlyPrice: plan.monthlyPrice,
+    trialDays: plan.trialDays
+  });
+});
 app.get('/health/ready', async (req, res) => {
   const databaseHealth = await database.healthCheck();
   if (!databaseHealth.ok) {
@@ -636,7 +646,7 @@ async function processSubscriptionPaymentCallback(payload) {
   return processSubscriptionPaymentCallbackCore(payload, {
     credentials: getBillingECPayCredentials(),
     database,
-    monthlyPrice: process.env.SUBSCRIPTION_MONTHLY_PRICE
+    monthlyPrice: getSubscriptionPlan().monthlyPrice
   });
 }
 
@@ -1871,7 +1881,7 @@ app.post('/subscription/checkout', requireAuth, requireSameOrigin, async (req, r
     const credentials = getBillingECPayCredentials();
 
     // Subscription parameters
-    const monthlyPrice = parseInt(process.env.SUBSCRIPTION_MONTHLY_PRICE) || 70;
+    const monthlyPrice = getSubscriptionPlan().monthlyPrice;
     const tradeNo = 'SUB' + Date.now();
     const tradeDate = formatECPayDate(new Date());
 

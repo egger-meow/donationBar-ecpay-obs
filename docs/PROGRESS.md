@@ -14,6 +14,29 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-11 — Configuration-backed, public closed-beta pricing
+
+Shipped the internally controllable part of ROADMAP.md P1 Paid Conversion: the offer
+is now defined once and exposed truthfully to prospective creators.
+
+- `getSubscriptionPlan()` validates the closed-beta trial and monthly TWD price. Checkout
+  and recurring-callback amount verification now use that same value; malformed or
+  unsafe production configuration fails startup instead of silently charging a fallback
+  amount.
+- Added public `GET /api/pricing` (no-store) and [pricing.html](../public/pricing.html),
+  a Traditional Chinese, responsive offer page that fetches the configured price and
+  trial length. It states clearly that NT$70 is an invitation-only validation price,
+  not a public-launch pricing promise.
+- Login and paywall pages link to the public source of truth rather than presenting a
+  stale fixed amount. `.env.example` now defines the valid settings and their beta
+  meaning.
+
+Verification: `npm.cmd test` passes **57/57** tests, including plan default, custom
+pricing, and invalid-production-settings tests; browser-script parsing includes the
+new page. A sandbox local-server smoke check confirmed `GET /api/pricing` returns the
+expected closed-beta TWD plan and `GET /pricing.html` returns HTTP 200. This does not
+prove live ECPay checkout or real willingness-to-pay; those remain staging/beta gates.
+
 ## 2026-07-11 — Guided activation funnel timing and ordered live-alert heuristic
 
 Completed the measurement half of ROADMAP.md's P1 Guided Activation slice without introducing third-party analytics or cross-tenant event access:

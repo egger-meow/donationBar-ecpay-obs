@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DonationBar 方案與價格</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, -apple-system, "Noto Sans TC", sans-serif; background: #101827; color: #f8fafc; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; box-sizing: border-box; }
+    main { width: min(100%, 680px); }
+    a { color: #a7f3d0; }
+    .back { display: inline-block; margin-bottom: 26px; }
+    .card { background: linear-gradient(145deg, #172554, #0f766e); border: 1px solid #34d399; border-radius: 18px; padding: clamp(24px, 5vw, 42px); box-shadow: 0 20px 50px #0007; }
+    h1 { margin: 0 0 12px; font-size: clamp(28px, 7vw, 44px); }
+    .lede { color: #d1fae5; line-height: 1.7; }
+    .price { font-size: clamp(36px, 10vw, 62px); font-weight: 800; margin: 26px 0 4px; }
+    .unit { font-size: 18px; color: #d1fae5; }
+    ul { padding-left: 22px; line-height: 1.9; }
+    .notice { margin-top: 22px; padding: 14px 16px; background: #0f172acc; border-radius: 10px; color: #cbd5e1; line-height: 1.6; }
+    .action { display: inline-block; margin-top: 26px; background: #f8fafc; color: #064e3b; font-weight: 800; padding: 13px 20px; border-radius: 10px; text-decoration: none; }
+    footer { margin-top: 22px; color: #94a3b8; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="/login">← 回到 DonationBar</a>
+    <section class="card" aria-labelledby="pricing-title">
+      <p>邀請制封閉測試</p>
+      <h1 id="pricing-title">DonationBar Pro</h1>
+      <p class="lede">給台灣實況主的 ECPay 捐款頁與 OBS 瀏覽器來源提示。</p>
+      <div class="price" id="price" aria-live="polite">載入價格中…</div>
+      <div class="unit">每月，自動續訂；可隨時取消後續續扣。</div>
+      <ul>
+        <li id="trial">載入試用資訊中…</li>
+        <li>一個工作區的 ECPay 捐款頁與 OBS Overlay</li>
+        <li>即時捐款進度與提示</li>
+        <li>由 ECPay 處理平台訂閱付款</li>
+      </ul>
+      <div class="notice">目前價格僅用於封閉測試與價值驗證，並非公開上市承諾。正式價格、稅務與電子發票安排會在法律及會計審查完成後確認。</div>
+      <a class="action" href="/api/auth/google">以 Google 登入並加入測試</a>
+    </section>
+    <footer><a href="/terms.html">服務條款</a> · <a href="/privacy.html">隱私權政策</a></footer>
+  </main>
+  <script>
+    async function loadPricing() {
+      const response = await fetch('/api/pricing', { headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error('pricing_unavailable');
+      const pricing = await response.json();
+      if (!Number.isInteger(pricing.monthlyPrice) || pricing.monthlyPrice < 1 || !Number.isInteger(pricing.trialDays) || pricing.trialDays < 1) throw new Error('pricing_invalid');
+      document.getElementById('price').textContent = `NT$ ${pricing.monthlyPrice}`;
+      document.getElementById('trial').textContent = `新用戶享 ${pricing.trialDays} 天免費試用`;
+    }
+    loadPricing().catch(() => {
+      document.getElementById('price').textContent = '價格暫時無法載入';
+      document.getElementById('trial').textContent = '請稍後再試，或聯絡支援團隊';
+    });
+  </script>
+</body>
+</html>
