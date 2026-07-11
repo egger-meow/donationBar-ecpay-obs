@@ -16,4 +16,4 @@ The authoritative execution plan is [ROADMAP.md](../ROADMAP.md). It separates sh
 
 DonationBar is the reliable Taiwan payment-to-OBS layer. Viewer donations settle through the creator's provider account; the platform subscription is separate. ECPay is first. NewebPay, LINE Pay, virtual accounts, convenience-store payments, and reconciliation are validation candidates, not commitments.
 
-Prioritize payment correctness, activation, stream reliability, paid conversion, and retention. See [Claude Code cowork workflow](collaboration/CLAUDE_CODE_COWORK.md) for safe parallel development.
+Prioritize payment correctness, activation, stream reliability, paid conversion, and retention.

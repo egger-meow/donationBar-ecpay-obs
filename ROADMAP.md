@@ -4,9 +4,9 @@ Status: execution baseline, 2026-07-11. This is authoritative for priorities; co
 
 ## 1. Current repository assessment
 
-Shipped in code: Google OAuth state validation, PostgreSQL production sessions, workspace-scoped routes, separate ECPay donation and platform recurring billing, signature verification, idempotency, trial/paywall/cancellation, encrypted provider credentials, same-origin protection, rate limits/security headers, health checks, graceful shutdown, migrations, Docker/CI configuration, and reconnecting SSE overlays. The suite currently contains 19 tests.
+Shipped in code: Google OAuth state validation, PostgreSQL production sessions, workspace-scoped routes, separate ECPay donation and platform recurring billing, signature verification, idempotency, trial/paywall/cancellation, encrypted provider credentials, same-origin protection, rate limits/security headers, health checks, graceful shutdown, migrations, Docker/CI configuration, reconnecting SSE overlays, structured request/error logging with a fixed-vocabulary external alert webhook (never leaking donor PII, credentials, or `error.message` to logs or API responses), a redacted staging-preflight CLI check, and a recurring-subscription callback lifecycle test suite (success/failure/replay/duplicate). The suite currently contains 46 tests.
 
-Not proven in real staging: PostgreSQL migration/restore, production-domain OAuth, ECPay initial/recurring callbacks and failures, callback replay, cancellation, container CI outcome, OBS/browser coverage, monitoring alerts, and backup recovery. The service is not production-ready.
+Not proven in real staging: PostgreSQL migration/restore, production-domain OAuth, ECPay initial/recurring callbacks and failures, callback replay, cancellation, container CI outcome, OBS/browser coverage, an exercised (not just unit-tested) monitoring alert delivery, and backup recovery. The service is not production-ready.
 
 ## 2–5. Market, customer, gap, positioning
 

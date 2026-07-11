@@ -23,7 +23,7 @@ npm start
 npm run migrate
 ```
 
-Node.js 18 or newer is required. There is currently no test, lint, or rollback implementation despite the `migrate:rollback` package script. Do not claim those checks passed or that the app is production-ready until the corresponding tooling exists and succeeds.
+Node.js 18 or newer is required. `npm test` (node --test) runs the suite under `test/`. There is currently no lint script and no `migrate:rollback` implementation — rollback means restoring the pre-migration backup, not a reverse migration (see `docs/migration/MIGRATION_GUIDE.md`). Do not claim a check passed or that the app is production-ready until the corresponding tooling exists and succeeds.
 
 ## Working Rules
 
