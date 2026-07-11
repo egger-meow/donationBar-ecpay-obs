@@ -37,7 +37,7 @@ Run Codex in `C:\IDEA\donationBar-ecpay-obs` and Claude Code in `C:\IDEA\donatio
 - Payment, authentication, tenant isolation, migrations, and destructive operations require narrow ownership and automated tests.
 - If the assignment needs an unowned file or broader authority, stop and record a blocker; do not expand scope silently.
 
-## Active cycle
+## Cycle 001 archive
 
 - Cycle: `001`
 - Integration branch: `multiuser`
@@ -79,6 +79,45 @@ Claude updates only this subsection while lane B is active.
 - Combined verification: `npm.cmd test` — 22 passed, 0 failed on 2026-07-11.
 - Next cycle: select two non-overlapping P0 implementation slices after this integration baseline.
 
+## Active cycle
+
+- Cycle: `002`
+- Integration branch: `multiuser`
+- Baseline commit: `706625c`
+- State: `awaiting Claude start`
+
+### Codex lane A
+
+- Task: add safe request correlation and structured operational error logging, including removal of known payment/donor PII from process logs.
+- Owned files: `server.js`, `security.js`, `test/security.test.js`, and new focused logging module/tests if needed.
+- Status: active.
+- Commit: pending.
+
+### Claude lane B
+
+- Task: replace the stale migration guide with a UTF-8 production staging migration-and-restore rehearsal runbook grounded in the current `npm run migrate`, encrypted backup/restore commands, and actual migration scripts.
+- Owned files: `docs/migration/` only. Do not edit code, package scripts, `.env.example`, or any other documentation.
+- Definition of done: clear preflight, backup, migration, verification, restore/rollback decision path, failure stop conditions, evidence checklist, and explicit limitations. Never print or document example real credentials; call out that current migration output exposes admin credentials as an open code issue for Codex lane A or a later cycle.
+- Status: queued.
+
+### Claude handoff
+
+Claude updates only this subsection while lane B is active.
+
+- Status: queued
+- Summary:
+- Changed files:
+- Verification:
+- Risks or blockers:
+- Commit SHA:
+
+### Integration result
+
+- Claude commit reviewed: pending.
+- Cherry-picked as: pending.
+- Combined verification: pending.
+- Next cycle: pending.
+
 ## Prompt for Claude Code
 
 Paste this prompt into Claude Code running in `C:\IDEA\donationBar-claude`:
@@ -88,7 +127,7 @@ You are lane B in a two-agent DonationBar productization workflow. Codex is the 
 
 First read AGENTS.md, ROADMAP.md, and docs/collaboration/CLAUDE_CODE_COWORK.md completely. The Active cycle in that bridge file is your authoritative assignment and ownership boundary. Code and tests are authoritative for shipped behavior; never describe roadmap work as shipped.
 
-Execute only the current Claude lane B task. In cycle 001 you may create or edit files under docs/operations/ and may update only the “Claude handoff” subsection of docs/collaboration/CLAUDE_CODE_COWORK.md. Do not edit any other file. Inspect application code read-only to verify every route and operational claim.
+Execute only the current Claude lane B task. In cycle 002 you may create or edit files under docs/migration/ and may update only the “Claude handoff” subsection of docs/collaboration/CLAUDE_CODE_COWORK.md. Do not edit any other file. Inspect application code read-only to verify every route and operational claim.
 
 While working, set your handoff status to active. When complete, run the closest relevant checks, inspect your diff, and update the handoff with summary, changed files, exact verification and results, risks/blockers, and the final commit SHA. Create one focused commit whose message starts with docs:. Do not merge, rebase, cherry-pick, reset, push, or modify Codex’s worktree. Preserve unrelated changes and never touch .claude/, db.json.backup, backup files, secrets, or customer data.
 
