@@ -1424,6 +1424,10 @@
       }, 5000);
     }
 
+    if (new URLSearchParams(window.location.search).get('subscription') === 'success') {
+      showAlert('Subscription payment received. Your account will update after ECPay confirms the payment.', 'success');
+    }
+
     function showFormFeedback(elementId, message, type = 'success') {
       const feedback = document.getElementById(elementId);
       if (feedback) {

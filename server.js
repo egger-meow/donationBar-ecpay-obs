@@ -1327,6 +1327,16 @@ app.get('/admin', requireAdmin, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
+// ECPay client-side return for the initial subscription authorization. Payment
+// state is changed only by /ecpay/return; this route is display/navigation only.
+function subscriptionClientReturn(req, res) {
+  const destination = req.session?.userId ? '/admin?subscription=success' : '/login?subscription=success';
+  return res.redirect(303, destination);
+}
+
+app.get('/subscription/success', subscriptionClientReturn);
+app.post('/subscription/success', subscriptionClientReturn);
+
 // ECPay callback endpoint
 app.post('/ecpay/return', async (req, res) => {
   const p = req.body;
