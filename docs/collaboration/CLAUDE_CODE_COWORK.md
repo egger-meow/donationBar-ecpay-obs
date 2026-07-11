@@ -1,19 +1,19 @@
 # Codex + Claude Code Cowork Bridge
 
-This tracked document is the coordination bridge between Codex (commander/integrator) and Claude Code (lane B). Both agents work in the same `multiuser` directory, with strict non-overlapping file ownership. Codex owns all Git staging and commits.
+This tracked document is the coordination bridge between Codex (coordinator/integrator) and Claude Code (lane B). Both are peer engineers working in the same `multiuser` directory. Each owns and commits its assigned files; Codex coordinates scope and reviews integration.
 
 ## Operating model
 
 1. Codex selects two independent, balanced jobs from `ROADMAP.md`.
 2. Codex records both jobs and exact file ownership in **Active cycle**.
 3. Codex works lane A. Claude works lane B in the same directory, only in its explicitly owned files.
-4. Claude does not stage, commit, merge, reset, rebase, switch branches, or edit the bridge file while sharing the directory.
-5. Claude verifies its files and reports its changed files, checks, and blockers directly to Codex.
-6. Codex reviews the resulting diff, stages only the owned files, and commits each lane with a Conventional Commit.
-7. Codex completes lane A, runs combined verification, updates the cycle, and commits the integration record.
+4. Each agent independently designs, implements, verifies, and commits its owned files with a Conventional Commit.
+5. Each agent reports its commit SHA, changed files, checks, and blockers directly to the other.
+6. Codex reviews the resulting diff before declaring the cycle integrated; a cherry-pick is unnecessary because both agents share the branch and directory.
+7. Codex runs combined verification, updates the cycle, and commits the integration record.
 8. After both lanes are integrated, Codex compacts context and creates the next cycle.
 
-The bridge file records assignments; a reviewed diff and verification output are the evidence. Claude's completion report is the handoff; Codex records the resulting commit SHA.
+The bridge file records assignments; a reviewed diff and verification output are the evidence. A completion report with commit SHA is the handoff.
 
 ## Shared-directory setup
 
@@ -23,15 +23,15 @@ Run once from PowerShell:
 cd C:\IDEA\donationBar-ecpay-obs
 ```
 
-Open Claude Code Desktop on `C:\IDEA\donationBar-ecpay-obs` using the existing `multiuser` working tree. Claude begins only after reading the current Active cycle. Codex commits at cycle boundaries, so Claude must stop editing while Codex is staging or committing.
+Open Claude Code Desktop on `C:\IDEA\donationBar-ecpay-obs` using the existing `multiuser` working tree. Claude begins after reading the current Active cycle. Before committing, each agent stages only its owned files and checks `git status` to avoid including the other agent's work.
 
 ## Safety and ownership rules
 
 - Each lane gets non-overlapping files. If both jobs require one file, run them sequentially.
-- Claude does not edit this bridge file in shared-directory mode; report progress in the Claude conversation. Codex records status after review.
+- Claude does not edit this bridge file while Codex is updating it; report progress in the Claude conversation. Codex records the integrated status after review.
 - Task-specific files are allowed only when listed under Claude lane ownership.
-- Claude never runs `git add`, `git commit`, merge, rebase, cherry-pick, reset, checkout, switch, or push in the shared directory.
-- Codex reviews Claude's changed files before staging and committing them.
+- Each agent may stage and commit only its owned files. Neither agent merges, rebases, resets, checks out, switches branches, or stages unowned files.
+- Codex reviews Claude's completed commit before closing the cycle.
 - Preserve unrelated and user-owned changes. Never edit `.claude/`, `db.json.backup`, `*-old-backup.js`, secrets, or live customer data.
 - Use one focused Conventional Commit per completed lane: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, or `chore:`.
 - Payment, authentication, tenant isolation, migrations, and destructive operations require narrow ownership and automated tests.
@@ -123,13 +123,13 @@ Claude updates only this subsection while lane B is active.
 Paste this prompt into Claude Code running in `C:\IDEA\donationBar-claude`:
 
 ```text
-You are lane B in a two-agent DonationBar productization workflow. Codex is the commander and sole Git integrator. You share the `multiuser` working directory with Codex.
+You are lane B in a two-agent DonationBar productization workflow. You and Codex are peer engineers sharing the `multiuser` working directory. Codex coordinates assignments and integration; you independently own implementation quality in your lane.
 
 First read AGENTS.md, ROADMAP.md, and docs/collaboration/CLAUDE_CODE_COWORK.md completely. The Active cycle in that bridge file is your authoritative assignment and ownership boundary. Code and tests are authoritative for shipped behavior; never describe roadmap work as shipped.
 
 Execute only the current Claude lane B task. In cycle 002 you may create or edit files under docs/migration/ only. Do not edit any other file, including the bridge file. Inspect application code read-only to verify every route and operational claim.
 
-While working, do not run git commands that change state: no git add, commit, merge, rebase, cherry-pick, reset, checkout, switch, or push. When complete, run the closest relevant checks, inspect only your assigned-file diff, and report summary, changed files, exact verification and results, and risks/blockers directly to Codex. Codex will review, stage, and commit your lane. Preserve unrelated changes and never touch .claude/, db.json.backup, backup files, secrets, or customer data.
+Implement the task as you judge best within ownership. Run the closest relevant checks, inspect your assigned-file diff, stage only those files, and create one focused Conventional Commit. Do not merge, rebase, reset, checkout, switch branches, or stage another lane's files. Report summary, changed files, verification/results, risks/blockers, and commit SHA directly to Codex. Preserve unrelated changes and never touch .claude/, db.json.backup, backup files, secrets, or customer data.
 
 If completion needs an unowned file, conflicting edit, credential, external service, or a scope decision, stop and report the precise need to Codex instead of expanding scope.
 ```
