@@ -635,8 +635,9 @@ async function processSubscriptionPaymentCallback(payload) {
   const userId = String(payload.CustomField1 || '').trim();
   const tradeNo = String(payload.TradeNo || '').trim();
   const merchantTradeNo = String(payload.MerchantTradeNo || '').trim();
-  const amount = Number.parseInt(payload.PeriodAmount || payload.TradeAmt, 10);
-  if (!userId || !tradeNo || !merchantTradeNo || !Number.isSafeInteger(amount)) {
+  const amountText = String(payload.PeriodAmount || payload.TradeAmt || '').trim();
+  const amount = /^\d{1,9}$/.test(amountText) ? Number(amountText) : NaN;
+  if (!userId || !/^[a-zA-Z0-9_-]{1,50}$/.test(tradeNo) || !/^[a-zA-Z0-9_-]{1,50}$/.test(merchantTradeNo) || !Number.isSafeInteger(amount)) {
     return { ok: false, status: 400, message: '0|Invalid payment data' };
   }
 
