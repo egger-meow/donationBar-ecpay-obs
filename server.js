@@ -533,7 +533,8 @@ async function getProgress(workspaceId = null) {
     startFrom,
     goal,
     percent,
-    donations: displayDonations
+    donations: displayDonations,
+    latestDonation: progress.donations[0] || null
   };
 }
 

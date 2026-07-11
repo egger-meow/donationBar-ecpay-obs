@@ -36,6 +36,9 @@
       text-align: center;
       opacity: 1;
       animation: fadeInUp 1s ease forwards;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .progress-wrapper {
@@ -194,6 +197,8 @@
       max-width: 600px;
       margin-left: auto;
       margin-right: auto;
+      height: 150px;
+      overflow: hidden;
     }
 
     .donation-item {
@@ -212,6 +217,8 @@
       box-sizing: border-box;
       will-change: transform, opacity;
       transform: translateZ(0);
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
 
     .donation-amount {
@@ -407,6 +414,8 @@
       margin-bottom: 5px;
       color: white;
       text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
 
     .alert-amount {
@@ -427,6 +436,8 @@
       line-height: 1.3;
       max-width: 100%;
       word-wrap: break-word;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
 
     .alert-message {
@@ -821,7 +832,13 @@
     }
 
     function formatNumber(num) {
-      return (num || 0).toLocaleString('zh-TW');
+      return new Intl.NumberFormat(navigator.language).format(Number(num) || 0);
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[character]);
     }
 
     // Calculate donation amount color intensity (more money = more red)
@@ -837,7 +854,7 @@
 
 
     function renderProgress(data) {
-      const { title, current, goal, percent, donations, actualDonations, startFrom } = data;
+      const { title, current, goal, percent, donations, latestDonation, actualDonations, startFrom } = data;
       console.log('📊 Rendering progress:', { current, goal, percent, donationCount: donations?.length || 0, lastTotal });
       
       // Update current goal for normalization calculations
@@ -903,23 +920,17 @@
       lastTotal = current;
       
       // Check for new donations and show alerts (fixed detection)
-      if (donations && donations.length) {
-        // newest donation is the last item in the (last 5) list
-        const newest = donations[donations.length - 1];
-
+      if (latestDonation) {
         if (initialized) {
-          if (newest.tradeNo && newest.tradeNo !== lastSeenTradeNo) {
-            // Try to show all unseen donations that are still within the last-5 window
-            const startIdx = donations.findIndex(d => d.tradeNo === lastSeenTradeNo);
-            const newOnes = startIdx === -1 ? [newest] : donations.slice(startIdx + 1);
-            newOnes.forEach(d => showDonationAlert(d.payer, d.amount, d.message));
+          if (latestDonation.tradeNo && latestDonation.tradeNo !== lastSeenTradeNo) {
+            showDonationAlert(latestDonation.payer, latestDonation.amount, latestDonation.message);
           }
         } else {
           // don't alert on initial load
           initialized = true;
         }
 
-        lastSeenTradeNo = newest.tradeNo || lastSeenTradeNo;
+        lastSeenTradeNo = latestDonation.tradeNo || lastSeenTradeNo;
       }
       
       // Render donations (server handles filtering based on donationDisplayMode)
@@ -928,12 +939,12 @@
           .map(donation => {
             const amountColor = getDonationAmountColor(donation.amount);
             const messageHTML = donation.message && donation.message.trim() 
-              ? `<div style="font-size: 13px; margin-top: 4px; opacity: 0.9;">${donation.message}</div>` 
+              ? `<div style="font-size: 13px; margin-top: 4px; opacity: 0.9;">${escapeHtml(donation.message)}</div>`
               : '';
             return `
             <div class="donation-item">
               <div>
-                <strong>${donation.payer}</strong> 斗內了 
+                <strong>${escapeHtml(donation.payer)}</strong> 斗內了
                 <span class="donation-amount" style="color: ${amountColor}; font-weight: bold;">NT$ ${formatNumber(donation.amount)}</span>！！
               </div>
               ${messageHTML}

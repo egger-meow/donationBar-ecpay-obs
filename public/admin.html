@@ -1461,13 +1461,19 @@
     }
 
     function formatNumber(num) {
-      return (num || 0).toLocaleString('zh-TW');
+      return new Intl.NumberFormat(navigator.language).format(Number(num) || 0);
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[character]);
     }
 
     function formatDate(dateStr) {
       if (!dateStr) return '';
       const date = new Date(dateStr);
-      return date.toLocaleDateString('zh-TW');
+      return date.toLocaleDateString(navigator.language);
     }
 
     function renderProgress(data) {
@@ -1496,9 +1502,9 @@
           .map(donation => `
             <div class="donation-item">
               <div class="donation-info">
-                <div class="donation-payer">${donation.payer}</div>
+                <div class="donation-payer">${escapeHtml(donation.payer)}</div>
                 <div class="donation-amount">NT$ ${formatNumber(donation.amount)}</div>
-                <div class="donation-time">${new Date(donation.at).toLocaleString('zh-TW')}</div>
+                <div class="donation-time">${new Date(donation.at).toLocaleString(navigator.language)}</div>
               </div>
             </div>
           `).join('');
@@ -2458,7 +2464,7 @@
       let detailsHtml = '';
       if (details) {
         const detailsText = Object.entries(details)
-          .map(([key, value]) => `${key}: ${value}`)
+          .map(([key, value]) => `${escapeHtml(key)}: ${escapeHtml(value)}`)
           .join('\n');
         detailsHtml = `<div class="details">${detailsText}</div>`;
       }
@@ -2468,7 +2474,7 @@
       notifEl.innerHTML = `
         <span class="icon">${icons[type] || '📡'}</span>
         <div class="content">
-          <div class="message">${message}</div>
+          <div class="message">${escapeHtml(message)}</div>
           ${detailsHtml}
           <div class="time">${time}</div>
         </div>
