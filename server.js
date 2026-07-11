@@ -141,7 +141,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
               pricePerMonth: 0
             });
 
-            console.log(`🚨 User ${user.email} created WITHOUT trial (abuse prevention)`);
+            console.log('Trial was withheld by abuse-prevention policy');
           } else {
             // Normal flow - create user with trial
             user = await database.createUser({
@@ -180,14 +180,14 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             slug: isFirstWorkspace ? 'default' : user.username.toLowerCase().replace(/[^a-z0-9-]/g, '')
           });
 
-          console.log(`✅ New user created via Google OAuth: ${user.email}`);
+          console.log('New user created via Google OAuth');
         } else {
           // Existing user - check if they have a workspace
-          console.log(`ℹ️ Existing user logging in: ${user.email}`);
+          console.log('Existing user login');
 
           const userWorkspaces = await database.getUserWorkspaces(user.id);
           if (!userWorkspaces || userWorkspaces.length === 0) {
-            console.log(`⚠️ User ${user.email} has no workspace, creating one...`);
+            console.log('Authenticated user has no workspace; creating one');
 
             // Check if any workspaces exist in the system
             const allWorkspaces = await database.getAllWorkspaces();
@@ -199,7 +199,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
               slug: isFirstWorkspace ? 'default' : user.username.toLowerCase().replace(/[^a-z0-9-]/g, '')
             });
 
-            console.log(`✅ Workspace created for existing user: ${user.email}`);
+            console.log('Workspace created for existing user');
           }
         }
 
@@ -243,7 +243,7 @@ async function getUserWorkspaceFromSession(req) {
     return null;
   }
 
-  console.log('🔍 Getting workspace for user:', req.session.userId);
+  console.log('Resolving workspace for authenticated user');
 
   const workspaces = await database.getUserWorkspaces(req.session.userId);
 
@@ -1067,10 +1067,10 @@ app.get('/login', (req, res) => {
 
 // Logout
 app.post('/logout', requireSameOrigin, (req, res) => {
-  const userId = req.session?.userId;
-  const userEmail = req.session?.passport?.user?.email;
+  const userId = 'authenticated';
+  const userEmail = null;
 
-  console.log('🚪 User logging out:', userEmail || userId || 'unknown');
+  console.log('User logout requested');
 
   req.session.destroy((err) => {
     if (err) {
@@ -1112,13 +1112,14 @@ app.get('/api/auth/google/callback',
     // Update last login time
     await database.updateUserLastLogin(req.user.id);
 
-    console.log('✅ OAuth login successful:', req.user.email);
-    console.log('🔑 Session created:', {
+    console.log('OAuth login successful');
+    /* Session fields are intentionally not logged. */
+    /*
       userId: req.session.userId,
       email: req.session.email,
       username: req.session.username,
       sessionID: req.sessionID
-    });
+    }); */
 
     res.redirect('/admin');
   }
@@ -1281,7 +1282,7 @@ app.post('/api/feedback', requireAdmin, requireSameOrigin, async (req, res) => {
 
         easterEggActivated = true;
 
-        console.log(`🎉🎁 FREE PASS ACTIVATED for user ${userId}!`);
+        console.log('Free pass activated');
 
         // Add special audit log
         await database.addAuditLog({
@@ -1834,7 +1835,7 @@ app.post('/admin/overlay', requireAdmin, requireSameOrigin, async (req, res) => 
 });
 
 // Overlay settings endpoint for overlay.html - supports slug query parameter
-app.get('/overlay-settings', async (req, res) => {
+app.get('/overlay-settings', requireActiveSubscription, async (req, res) => {
   try {
     const { slug } = req.query;
     const workspace = await getWorkspaceFromSlug(slug);
@@ -1847,7 +1848,7 @@ app.get('/overlay-settings', async (req, res) => {
 });
 
 // Database schema endpoint (for debugging and documentation)
-app.get('/api/schema', async (req, res) => {
+app.get('/api/schema', requirePlatformAdmin, async (req, res) => {
   try {
     const queryActual = req.query.actual === 'true';
     const schema = await database.getDatabaseSchema(queryActual);
@@ -2097,7 +2098,7 @@ async function legacyEncryptedSubscriptionCallback(req, res) {
         ecpayTradeNo: orderInfo.TradeNo
       });
 
-      console.log(`✅ Subscription payment successful for user ${subscription.userId}`);
+      console.log('Subscription payment successful');
       console.log(`   Amount: NT$${orderInfo.TradeAmt}`);
       console.log(`   Next billing: ${nextBillingDate.toISOString()}`);
 
@@ -2116,7 +2117,7 @@ async function legacyEncryptedSubscriptionCallback(req, res) {
         gracePeriodEndAt: gracePeriodEnd.toISOString()
       });
 
-      console.warn(`⚠️ Payment failed for subscription ${subscription.id}`);
+      console.warn('Subscription payment failed');
       console.warn(`   Failed count: ${failedCount}`);
       console.warn(`   Grace period until: ${gracePeriodEnd.toISOString()}`);
 
@@ -2236,7 +2237,7 @@ app.post('/subscription/cancel', requireAuth, requireSameOrigin, async (req, res
       metadata: { gracePeriodEnd }
     });
 
-    console.log(`🚫 Subscription cancelled for user ${user.email}`);
+    console.log('Subscription cancelled');
     console.log(`   Access until: ${gracePeriodEnd}`);
 
     res.json({
@@ -2288,7 +2289,7 @@ app.post('/subscription/pause', requireAuth, requireSameOrigin, async (req, res)
       status: 'success'
     });
 
-    console.log(`⏸️ Subscription paused for user ${user.email}`);
+    console.log('Subscription paused');
 
     res.json({
       success: true,
@@ -2337,7 +2338,7 @@ app.post('/subscription/resume', requireAuth, requireSameOrigin, async (req, res
       status: 'success'
     });
 
-    console.log(`▶️ Subscription resumed for user ${user.email}`);
+    console.log('Subscription resumed');
 
     res.json({
       success: true,

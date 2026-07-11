@@ -192,7 +192,7 @@ class Database {
       ]);
 
       if (isAdmin) {
-        console.log('👑 Auto-promoted user to admin:', userData.email);
+        console.log('Platform administrator access granted');
       }
 
       return this.camelCaseKeys(result.rows[0]);
@@ -220,7 +220,7 @@ class Database {
       };
 
       if (isAdmin) {
-        console.log('👑 Auto-promoted user to admin:', userData.email);
+        console.log('Platform administrator access granted');
       }
 
       data.users.push(newUser);
