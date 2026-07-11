@@ -2106,7 +2106,7 @@
                 <li>優先技術支援</li>
               </ul>
               
-              <!-- Payment History Section (Placeholder) -->
+              <!-- Payment history is available after the first successful charge. -->
               <div style="background: rgba(0, 0, 0, 0.2); padding: 15px; border-radius: 8px; margin-top: 20px; margin-bottom: 20px;">
                 <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
                   <span><strong>📜 付款紀錄</strong></span>
@@ -2118,13 +2118,13 @@
                   <div style="padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
                     <div style="display: flex; justify-content: space-between;">
                       <span>最近一次付款</span>
-                      <span style="color: #46e65a;">待串接</span>
+                      <span style="color: #46e65a;">Available after first payment</span>
                     </div>
                   </div>
                 </div>
               </div>
               
-              <!-- Invoice Section (Placeholder) -->
+              <!-- Invoice integration is not enabled until the provider account is configured. -->
               <div style="background: rgba(0, 0, 0, 0.2); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
                 <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 10px;">
                   <strong>🧾 電子發票</strong>
@@ -2169,18 +2169,10 @@
       document.body.appendChild(form);
       form.submit();
       return;
-      // TODO: Redirect to ECPay subscription payment page
-      showAlert('💎 即將前往 ECPay 付款頁面（待串接）', 'info');
-      // Future: window.location.href = '/subscription/checkout';
     }
 
     function manageBilling() {
-      // TODO: Show payment method management modal
-      // Should allow:
-      // - View current payment method (last 4 digits of card)
-      // - Update payment method
-      // - Change billing address
-      showAlert('💳 付款方式管理功能（待串接 ECPay）', 'info');
+      showAlert('Payment-method changes are managed by ECPay. Cancel and start a new subscription to change cards.', 'info');
     }
 
     async function cancelSubscription() {
@@ -2196,12 +2188,6 @@
       }
       return;
       if (confirm('確定要取消訂閱嗎？\n\n取消後：\n- 本期結束後將無法使用付費功能\n- 斗內條和捐款頁面將被停用\n- 可隨時重新訂閱')) {
-        // TODO: Call API to cancel subscription
-        // POST /api/subscription/cancel
-        // Should update subscription status to 'canceled'
-        // Should set canceledAt timestamp
-        // Should still allow access until nextBillingDate
-        showAlert('⚠️ 取消訂閱功能（待串接）', 'info');
       }
     }
 
@@ -2219,11 +2205,6 @@
       }
       return;
       if (confirm('確定要暫停訂閱嗎？\n\n暫停期間：\n- 不會扣款\n- 無法使用付費功能\n- 可隨時恢復訂閱')) {
-        // TODO: Call API to pause subscription
-        // POST /api/subscription/pause
-        // Should update subscription status to 'paused'
-        // Should set pausedAt timestamp
-        showAlert('⏸️ 暫停訂閱功能（待串接）', 'info');
       }
     }
 
@@ -2240,27 +2221,10 @@
         showAlert(error.message, 'error');
       }
       return;
-      // TODO: Show payment history modal
-      // Should display:
-      // - Date of payment
-      // - Amount paid
-      // - Payment method (last 4 digits)
-      // - Status (success/failed/pending)
-      // - Invoice download link
-      // - Receipt download link
-      showAlert('📜 付款紀錄查看功能（待串接）', 'info');
-      // Future: Display modal with payment history from ECPay query API
     }
 
     function manageInvoice() {
-      // TODO: Show invoice settings modal
-      // Should allow:
-      // - Set buyer tax ID (統編)
-      // - Set invoice type (個人/公司)
-      // - Set company name
-      // - Set invoice email
-      // - Enable/disable automatic invoice
-      showAlert('🧾 電子發票設定功能（待串接 ECPay 發票 API）', 'info');
+      showAlert('Electronic invoicing is not enabled for this account yet.', 'info');
     }
 
     // Feedback Form

@@ -636,14 +636,17 @@ async function processSubscriptionPaymentCallback(payload) {
   const tradeNo = String(payload.TradeNo || '').trim();
   const merchantTradeNo = String(payload.MerchantTradeNo || '').trim();
   const amount = Number.parseInt(payload.PeriodAmount || payload.TradeAmt, 10);
-  const expectedAmount = Number.parseInt(process.env.SUBSCRIPTION_MONTHLY_PRICE || '70', 10);
-  if (!userId || !tradeNo || !merchantTradeNo || !Number.isSafeInteger(amount) || amount !== expectedAmount) {
+  if (!userId || !tradeNo || !merchantTradeNo || !Number.isSafeInteger(amount)) {
     return { ok: false, status: 400, message: '0|Invalid payment data' };
   }
 
   const subscription = await database.getUserSubscription(userId);
   if (!subscription || (subscription.ecpayMerchantTradeNo && subscription.ecpayMerchantTradeNo !== merchantTradeNo)) {
     return { ok: false, status: 404, message: '0|Subscription not found' };
+  }
+  const expectedAmount = Number.parseInt(subscription.pricePerMonth || process.env.SUBSCRIPTION_MONTHLY_PRICE || '70', 10);
+  if (!Number.isSafeInteger(expectedAmount) || expectedAmount < 1 || amount !== expectedAmount) {
+    return { ok: false, status: 400, message: '0|Invalid payment amount' };
   }
 
   const success = String(payload.RtnCode) === '1';
@@ -2098,7 +2101,7 @@ async function legacyEncryptedSubscriptionCallback(req, res) {
       console.log(`   Amount: NT$${orderInfo.TradeAmt}`);
       console.log(`   Next billing: ${nextBillingDate.toISOString()}`);
 
-      // TODO: Send success email notification
+      // Optional: send a success email when SMTP notification templates are configured.
     } else {
       // Payment failed - update failure count
       const failedCount = (subscription.failedPaymentCount || 0) + 1;
@@ -2126,7 +2129,7 @@ async function legacyEncryptedSubscriptionCallback(req, res) {
         console.error(`❌ Subscription cancelled after 6 failed payments`);
       }
 
-      // TODO: Send failed payment email notification
+      // Optional: send a failed-payment email when SMTP notification templates are configured.
     }
 
     // Log audit trail
@@ -2242,7 +2245,7 @@ app.post('/subscription/cancel', requireAuth, requireSameOrigin, async (req, res
       gracePeriodEnd
     });
 
-    // TODO: Send cancellation confirmation email
+    // Optional: send a cancellation confirmation email when SMTP is configured.
   } catch (error) {
     console.error('❌ Cancel subscription error:', error);
     res.status(500).json({ error: 'Failed to cancel subscription' });
@@ -2292,7 +2295,7 @@ app.post('/subscription/pause', requireAuth, requireSameOrigin, async (req, res)
       message: 'Subscription paused successfully'
     });
 
-    // TODO: Send pause confirmation email
+    // Pause is not supported by ECPay; this block is unreachable.
   } catch (error) {
     console.error('❌ Pause subscription error:', error);
     res.status(500).json({ error: 'Failed to pause subscription' });

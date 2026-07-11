@@ -13,7 +13,7 @@ function createTransporter() {
     return null;
   }
 
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT || '587'),
     secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
@@ -30,7 +30,7 @@ function createTransporter() {
 export async function sendWelcomeEmail(email, username) {
   const transporter = createTransporter();
   if (!transporter) {
-    console.log('📧 Welcome email would be sent to:', email, '(SMTP not configured)');
+    console.log('Welcome email skipped because SMTP is not configured');
     return { success: false, error: 'SMTP not configured' };
   }
 
@@ -96,7 +96,7 @@ export async function sendWelcomeEmail(email, username) {
       `
     });
 
-    console.log(`📧 Welcome email sent to: ${email}`);
+    console.log('Welcome email sent');
     return { success: true };
   } catch (error) {
     console.error('❌ Failed to send welcome email:', error);
