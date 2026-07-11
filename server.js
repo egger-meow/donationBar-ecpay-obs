@@ -1636,6 +1636,15 @@ app.post('/admin/goal', requireAdmin, requireSameOrigin, async (req, res) => {
     const { title, amount, startFrom } = req.body;
     const workspace = await getUserWorkspaceFromSession(req);
 
+    const normalizedTitle = String(title || '').trim().slice(0, 200);
+    const amountText = String(amount ?? '').trim();
+    const startText = String(startFrom ?? '0').trim();
+    const normalizedAmount = /^\d{1,10}$/.test(amountText) ? Number(amountText) : NaN;
+    const normalizedStart = /^\d{1,10}$/.test(startText) ? Number(startText) : NaN;
+    if (!normalizedTitle || !Number.isSafeInteger(normalizedAmount) || normalizedAmount < 1 || normalizedAmount > 1_000_000_000 || !Number.isSafeInteger(normalizedStart) || normalizedStart < 0 || normalizedStart > 1_000_000_000) {
+      return res.status(400).json({ success: false, error: 'Invalid goal values' });
+    }
+
     if (!workspace) {
       console.error('❌ No workspace found for goal update');
       return res.status(404).json({ success: false, error: 'Workspace not found' });
@@ -1644,9 +1653,9 @@ app.post('/admin/goal', requireAdmin, requireSameOrigin, async (req, res) => {
     console.log(`🎯 Updating goal for workspace ${workspace.slug}:`, { title, amount, startFrom });
 
     await database.updateWorkspaceSettings(workspace.id, {
-      goalTitle: title,
-      goalAmount: Number(amount),
-      goalStartFrom: Number(startFrom) || 0
+      goalTitle: normalizedTitle,
+      goalAmount: normalizedAmount,
+      goalStartFrom: normalizedStart
     });
 
     console.log('✅ Goal settings updated in database');
@@ -1716,6 +1725,14 @@ app.post('/admin/ecpay', requireAdmin, requireSameOrigin, async (req, res) => {
     if (!merchantId && !hashKey && !hashIV) {
       return res.status(400).json({ error: 'At least one ECPay credential is required' });
     }
+    const normalizedMerchantId = merchantId ? String(merchantId).trim() : '';
+    const normalizedHashKey = hashKey ? String(hashKey).trim() : '';
+    const normalizedHashIV = hashIV ? String(hashIV).trim() : '';
+    if ((normalizedMerchantId && !/^[A-Za-z0-9]{1,20}$/.test(normalizedMerchantId)) ||
+      (normalizedHashKey && !/^[A-Za-z0-9]{8,128}$/.test(normalizedHashKey)) ||
+      (normalizedHashIV && !/^[A-Za-z0-9]{8,128}$/.test(normalizedHashIV))) {
+      return res.status(400).json({ error: 'Invalid ECPay credential format' });
+    }
 
     const workspace = await getUserWorkspaceFromSession(req);
 
@@ -1728,9 +1745,9 @@ app.post('/admin/ecpay', requireAdmin, requireSameOrigin, async (req, res) => {
     // Prepare update data
     const updateData = {
       providerName: 'ecpay',
-      merchantId: merchantId ? merchantId.trim() : existing?.merchantId,
-      hashKey: hashKey ? hashKey.trim() : existing?.hashKey,
-      hashIV: hashIV ? hashIV.trim() : existing?.hashIV,
+      merchantId: normalizedMerchantId || existing?.merchantId,
+      hashKey: normalizedHashKey || existing?.hashKey,
+      hashIV: normalizedHashIV || existing?.hashIV,
       isActive: true
     };
 
