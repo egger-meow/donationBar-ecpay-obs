@@ -5,6 +5,7 @@ import path from 'path';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { databaseSsl } from '../database-ssl.js';
+import { assertLegacySingleUserSandboxData } from './sandbox-shape.js';
 
 const { Client } = pg;
 const __dirname = path.resolve();
@@ -575,10 +576,11 @@ async function migrateSandbox() {
   try {
     // Backup existing db.json
     if (fs.existsSync(DB_PATH)) {
+      const oldData = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
+      assertLegacySingleUserSandboxData(oldData);
+
       fs.copyFileSync(DB_PATH, DB_BACKUP_PATH);
       console.log('✅ Backed up existing db.json to db.json.backup\n');
-
-      const oldData = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
 
       // Get admin credentials
       const adminEmail = process.env.ADMIN_EMAIL || 'admin@localhost';
