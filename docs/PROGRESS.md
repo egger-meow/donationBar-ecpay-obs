@@ -14,6 +14,20 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-11 — Production dependency audit clean (P0 evidence)
+
+Ran the roadmap-required production dependency scan against the current npm lockfile:
+
+- `npm.cmd audit --omit=dev --json` completed successfully against npm's advisory
+  service with **0 vulnerabilities** (0 info, low, moderate, high, and critical).
+- The audited dependency graph contains 127 production dependencies (156 total including
+  development/optional dependencies). No dependency change was needed.
+
+This is point-in-time dependency evidence for the committed lockfile, not a permanent
+security claim. Re-run the same audit after dependency changes and immediately before a
+staging/production release; it does not prove container-image, hosting, configuration,
+or provider security.
+
 ## 2026-07-11 — P0 callback rate-limit isolation
 
 Fixed a payment-correctness risk in the request middleware order:
