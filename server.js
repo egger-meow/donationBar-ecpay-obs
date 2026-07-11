@@ -15,7 +15,7 @@ import * as emailService from './email.js';
 import { getBillingECPayCredentials, getECPayCheckoutUrl, getECPayPeriodActionUrl, isProduction, validateProductionConfig } from './config.js';
 import { generateCheckMacValueForCredentials, verifyCheckMacValueForCredentials } from './ecpay.js';
 import { requireSameOrigin } from './security.js';
-import { logError, logInfo, logWarn, requestObservability } from './observability.js';
+import { logError, logInfo, logWarn, requestObservability, sendAlert } from './observability.js';
 
 const app = express();
 const __dirname = path.resolve();
@@ -57,6 +57,9 @@ app.use(passport.session());
 app.get('/health/live', (req, res) => res.json({ status: 'ok' }));
 app.get('/health/ready', async (req, res) => {
   const databaseHealth = await database.healthCheck();
+  if (!databaseHealth.ok) {
+    sendAlert('readiness_check_failed', { requestId: req.requestId, route: '/health/ready', statusCode: 503 });
+  }
   return res.status(databaseHealth.ok ? 200 : 503).json({
     status: databaseHealth.ok ? 'ready' : 'not_ready',
     database: databaseHealth.storage
@@ -973,6 +976,7 @@ app.post('/webhook/:slug', async (req, res) => {
 
     if (!merchantIdOk) {
       logWarn('payment_webhook_invalid_merchant', { request_id: req.requestId });
+      sendAlert('payment_webhook_invalid_merchant', { requestId: req.requestId, route: '/webhook/:slug', statusCode: 400 });
       broadcastAdminNotification(workspace.id, 'error', 'Webhook: Merchant ID 不符', {
         reason: 'invalid_merchant'
       });
@@ -991,6 +995,7 @@ app.post('/webhook/:slug', async (req, res) => {
     const decryptedData = await decryptECPayData(payload.Data, workspace.id);
     if (!decryptedData) {
       logWarn('payment_webhook_decryption_failed', { request_id: req.requestId });
+      sendAlert('payment_webhook_decryption_failed', { requestId: req.requestId, route: '/webhook/:slug', statusCode: 400 });
       broadcastAdminNotification(workspace.id, 'error', 'Webhook: 無法解密 Data 欄位', {
         hint: '請確認 HashKey 和 HashIV 設定是否正確'
       });
@@ -1048,6 +1053,7 @@ app.post('/webhook/:slug', async (req, res) => {
 
   } catch (error) {
     logError('payment_webhook_unexpected_error', { request_id: req.requestId });
+    sendAlert('payment_webhook_unexpected_error', { requestId: req.requestId, route: '/webhook/:slug', statusCode: 500 });
     return res.status(500).send('0|Server error');
   }
 });
@@ -1315,6 +1321,7 @@ app.post('/ecpay/return', async (req, res) => {
       return res.status(result.status || 200).send(result.ok ? '1|OK' : result.message);
     } catch (error) {
       logError('subscription_initial_callback_failed', { request_id: req.requestId });
+      sendAlert('subscription_initial_callback_failed', { requestId: req.requestId, route: '/ecpay/return', statusCode: 500 });
       return res.status(500).send('0|Server error');
     }
   }
@@ -1990,6 +1997,7 @@ app.post('/ecpay/period/callback', async (req, res) => {
     return res.status(result.status || 200).send(result.ok ? '1|OK' : result.message);
   } catch (error) {
     logError('subscription_callback_unexpected_error', { request_id: req.requestId });
+    sendAlert('subscription_callback_unexpected_error', { requestId: req.requestId, route: '/ecpay/period/callback', statusCode: 500 });
     return res.status(500).send('0|Server error');
   }
 });
@@ -2379,7 +2387,9 @@ app.get('/api/subscription/status', requireAuth, async (req, res) => {
 
 app.use((error, req, res, next) => {
   if (res.headersSent) return next(error);
-  logError('http_unhandled_error', { request_id: req.requestId, route: req.path?.startsWith('/webhook/') ? '/webhook/:slug' : req.path?.startsWith('/api/') ? '/api/*' : '/other' });
+  const route = req.path?.startsWith('/webhook/') ? '/webhook/:slug' : req.path?.startsWith('/api/') ? '/api/*' : '/other';
+  logError('http_unhandled_error', { request_id: req.requestId, route });
+  sendAlert('http_unhandled_error', { requestId: req.requestId, route, statusCode: 500 });
   return res.status(500).json({ error: 'Internal server error', requestId: req.requestId });
 });
 

@@ -22,6 +22,7 @@ export function validateProductionConfig(env = process.env) {
   }
   if (!platformAdminEmails(env).length) errors.push('PLATFORM_ADMIN_EMAILS must contain at least one administrator email');
   if (!['stage', 'production'].includes(env.ECPAY_ENVIRONMENT)) errors.push('ECPAY_ENVIRONMENT must be stage or production');
+  if (env.ALERT_WEBHOOK_URL && !env.ALERT_WEBHOOK_URL.startsWith('https://')) errors.push('ALERT_WEBHOOK_URL must use HTTPS when set');
   if (errors.length) throw new Error(`Invalid production configuration:\n- ${errors.join('\n- ')}`);
 }
 

@@ -2,7 +2,7 @@
 
 Use one copy of this template per exercise. Store filled-in copies wherever the team keeps operational evidence (do not commit real credentials, donor names, or payment payloads into this repository — redact before saving). Definitions of the signals below come from [MONITORING_AND_INCIDENT_RESPONSE.md](MONITORING_AND_INCIDENT_RESPONSE.md).
 
-No exercise has been run yet as of 2026-07-11; this template is unused until one is.
+No exercise has been run yet as of 2026-07-11; this template is unused until one is. An external delivery path now exists (`ALERT_WEBHOOK_URL`, see [MONITORING_AND_INCIDENT_RESPONSE.md Section 4d](MONITORING_AND_INCIDENT_RESPONSE.md#4d-external-alert-delivery-configuration)) but has not yet been exercised against a real staging endpoint.
 
 ## Exercise record
 
@@ -29,7 +29,7 @@ Describe exactly how the failure was induced, e.g.:
 - Observed HTTP status:
 - Observed log line / reason string:
 - Time signal first appeared in logs (UTC):
-- Time alert fired (UTC) — leave blank and note "no delivery path" if this exercise is only testing the in-app log, per current Gaps in MONITORING_AND_INCIDENT_RESPONSE.md Section 7:
+- Time alert fired (UTC) — leave blank and note "ALERT_WEBHOOK_URL not configured for this environment" if this exercise is only testing the in-app log:
 - Time acknowledged (UTC):
 
 ## Timing
