@@ -2,6 +2,12 @@
 
 All guides organized by category.
 
+## Authoritative direction
+
+- [Taiwan-first roadmap](../ROADMAP.md)
+- [Next direction](next-direction.md)
+- [Claude Code cowork workflow](collaboration/CLAUDE_CODE_COWORK.md)
+
 ---
 
 ## 📖 Quick Links
