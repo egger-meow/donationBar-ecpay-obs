@@ -62,12 +62,15 @@ Run Codex in `C:\IDEA\donationBar-ecpay-obs` and Claude Code in `C:\IDEA\donatio
 
 Claude updates only this subsection while lane B is active.
 
-- Status: queued
-- Summary:
+- Status: done
+- Summary: Added a monitoring and incident-response baseline under `docs/operations/`, grounded in read-only verification of `server.js`, `database.js`, `config.js`, `.env.example`, `package.json`, and `test/`. Documents `/health/live` and `/health/ready` behavior, current (unstructured, no redaction layer) console logging, why `broadcastAdminNotification`/SSE is an in-session signal and not an alert channel, redacted alert-signal definitions for readiness failures, `/webhook/:slug` and `/ecpay/period/callback` callback failures, and general 5xx spikes, a severity/ownership table (owners left as explicit placeholders — no rotation exists in the repo), first-response steps, and a reusable alert-exercise evidence template. An explicit "Gaps (not yet built)" section states plainly that no external alert delivery, monitoring vendor, request-ID middleware, on-call rotation, or prior alert exercise exists yet, so the baseline cannot be mistaken for shipped observability.
 - Changed files:
-- Verification:
-- Risks or blockers:
-- Commit SHA:
+  - `docs/operations/MONITORING_AND_INCIDENT_RESPONSE.md` (new)
+  - `docs/operations/ALERT_EXERCISE_TEMPLATE.md` (new)
+  - `docs/collaboration/CLAUDE_CODE_COWORK.md` (Claude handoff subsection only)
+- Verification: Read `server.js` end-to-end for route definitions, health checks (lines 55-62), the donation webhook (957-1059) and subscription callback (2026-2034), `broadcastAdminNotification`/SSE (402-436), and confirmed no global Express error handler or `process.on('uncaughtException'|'unhandledRejection')` exists (grep, no matches). Read `database.js:105-118` for `healthCheck()` semantics (Postgres `SELECT 1` vs. always-ok JSON mode). Read `config.js:9-26` for `validateProductionConfig()`. Grepped `package.json` for monitoring/logging vendors (none) and read `.env.example` (no monitoring env vars). Confirmed `legacyEncryptedSubscriptionCallback` (server.js:2038) is defined but never mounted as a route — dead code, not a live duplicate webhook, so it is described that way rather than as an active alert source. Ran `npm test`: 19/19 pass (baseline unaffected, docs-only change). No lint script exists in this repo (per AGENTS.md/CLAUDE.md), so none was run.
+- Risks or blockers: None blocking. Two follow-ups intentionally left as open gaps rather than resolved unilaterally (both require decisions/infrastructure outside `docs/operations/` scope): (1) no on-call rotation/owner names exist in the repo — the severity table uses explicit placeholders; (2) no alert-delivery channel (email/Slack/PagerDuty/etc.) or monitoring vendor is wired up, so today these signals are only visible by watching logs/polling the health endpoints directly, which the doc states rather than assumes away.
+- Commit SHA: pending (recorded after commit below)
 
 ### Integration result
 
