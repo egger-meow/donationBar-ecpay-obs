@@ -4,6 +4,7 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { isPlatformAdminEmail } from './config.js';
 import { decryptCredential, encryptCredential } from './credentials.js';
+import { databaseSsl } from './database-ssl.js';
 
 const { Client } = pg;
 
@@ -49,8 +50,8 @@ class Database {
       // Parse DATABASE_URL to extract connection details
       const dbUrl = new URL(databaseUrl);
 
-      let sslConfig = false;
-      if (databaseUrl.includes('sslmode=require')) {
+      let sslConfig = databaseSsl();
+      if (databaseUrl.includes('sslmode=require') || process.env.NODE_ENV === 'production' || process.env.ENVIRONMENT === 'production') {
         let caCert = process.env.DATABASE_CA;
 
         // Decode Base64 if the cert doesn't start with -----BEGIN

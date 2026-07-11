@@ -1,12 +1,16 @@
 import 'dotenv/config';
 import pg from 'pg';
 import { encryptCredential, isEncryptedCredential } from '../credentials.js';
+import { databaseSsl } from '../database-ssl.js';
 
 const { Client } = pg;
 if (process.env.ENVIRONMENT === 'sandbox') process.exit(0);
 if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required to encrypt provider credentials');
 
-const client = new Client({ connectionString: process.env.DATABASE_URL });
+const client = new Client({
+  connectionString: process.env.DATABASE_URL,
+  ssl: databaseSsl()
+});
 try {
   await client.connect();
   await client.query('BEGIN');

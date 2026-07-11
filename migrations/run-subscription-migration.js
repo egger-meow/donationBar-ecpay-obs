@@ -8,6 +8,7 @@ import 'dotenv/config';
 import pg from 'pg';
 import fs from 'fs';
 import path from 'path';
+import { databaseSsl } from '../database-ssl.js';
 
 const { Client } = pg;
 const __dirname = path.resolve();
@@ -36,7 +37,7 @@ if (!databaseUrl) {
 async function runMigration() {
   const client = new Client({
     connectionString: databaseUrl,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    ssl: databaseSsl()
   });
 
   try {

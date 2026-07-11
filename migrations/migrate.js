@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
+import { databaseSsl } from '../database-ssl.js';
 
 const { Client } = pg;
 const __dirname = path.resolve();
@@ -24,7 +25,7 @@ if (!isSandbox && !databaseUrl) {
 async function migratePostgreSQL() {
   const client = new Client({
     connectionString: databaseUrl,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    ssl: databaseSsl()
   });
 
   try {
