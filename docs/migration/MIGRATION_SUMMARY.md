@@ -1,5 +1,7 @@
 # Multi-User Migration Summary
 
+> **Historical record.** This describes the original 2024 single-user → multi-user schema conversion, which has already shipped. It is not a runbook for staging rehearsals or future migrations — see [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) for that. Some statements below (e.g. "server.js needs to be updated") are no longer true of the current codebase; verify any operational claim against current code before acting on it.
+
 ## ✅ Completed Tasks
 
 ### 1. **Package Dependencies Updated** (`package.json`)

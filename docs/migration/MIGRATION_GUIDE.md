@@ -1,462 +1,122 @@
-# Multi-User Migration Guide
+# Production Staging Migration and Restore Rehearsal Runbook
 
-This guide explains how to migrate your existing single-user donation bar application to the new multi-user schema.
+This replaces the previous single-user-to-multi-user `MIGRATION_GUIDE.md`. That guide described a one-time 2024 schema conversion that has already shipped; its command examples (dropping `app_data`/`donations_old`, "next steps: update server.js") no longer match the current codebase and are removed rather than repeated here. `docs/migration/MIGRATION_SUMMARY.md` is that same historical record and is now out of date for the same reason — treat it as archive only, not as instructions.
 
-## 📋 Overview
+This document is the runbook for rehearsing `npm run migrate` and the encrypted backup/restore cycle against an **isolated staging PostgreSQL database** before every schema-changing release, per [ROADMAP.md](../../ROADMAP.md) section 17 action 2 ("Run migrations; rehearse documented rollback and full restore") and the [Deployment Guide](../setup/DEPLOYMENT.md) backup/rollback sections. It does not cover the JSON sandbox path in depth — see the sandbox warning in Limitations below before ever running `npm run migrate` with `ENVIRONMENT=sandbox` more than once against real data.
 
-The migration process will:
-- ✅ Create new multi-user database tables (users, workspaces, subscriptions, etc.)
-- ✅ Migrate your existing donations and settings to a default workspace
-- ✅ Create an admin user account
-- ✅ Preserve all your existing data
-- ✅ Support both PostgreSQL and JSON file modes
+All commands below assume PowerShell in the project root on a machine with `pg_dump`/`pg_restore` installed (same major version family as the target PostgreSQL server) and Node.js 18+.
 
----
+## 1. Preflight checklist
 
-## 🚀 Quick Start (Sandbox Mode)
+Confirm every item before touching the staging database:
 
-For testing locally with JSON file (recommended first step):
+- [ ] Target is an **isolated staging PostgreSQL instance**, never the production database and never a database you cannot safely drop afterward.
+- [ ] `DATABASE_URL` in the operator's shell/`.env` points at that staging instance only — read it back and confirm the host/database name before running anything.
+- [ ] `ENVIRONMENT` is **not** set to `sandbox` (that switches `npm run migrate` to the JSON-file code path instead of PostgreSQL — see [database.js](../../database.js)).
+- [ ] If the staging provider requires TLS, `DATABASE_URL` includes `sslmode=require` (or the provider's equivalent). `operations/postgres-backup.js` and `operations/postgres-restore.js` invoke the `pg_dump`/`pg_restore` binaries directly with `--dbname <DATABASE_URL>`, so they rely on libpq parsing SSL parameters out of the URL itself — they do not go through [database-ssl.js](../../database-ssl.js), which only covers the Node `pg` client used by the migration scripts.
+- [ ] `BACKUP_ENCRYPTION_KEY` is a base64-encoded 32-byte key present in the operator's environment and recorded in the secret vault, per `.env.example`. `operations/postgres-backup.js` throws immediately if it is missing or the wrong length.
+- [ ] `CREDENTIAL_ENCRYPTION_KEY` is set and matches the key already used to encrypt any existing `payment_providers` rows in that staging database — a mismatched key makes `decryptCredential()` (see [credentials.js](../../credentials.js)) throw at runtime, not at migration time.
+- [ ] `ADMIN_EMAIL`, `ADMIN_USERNAME`, `ADMIN_PASSWORD` are set to disposable staging-only values and recorded in the operator's secret manager before running the migration — `migrate.js` bcrypt-hashes the password into the database and no longer echoes it to the console (see Limitations, "Resolved" note).
+- [ ] `pg_dump --version` and `pg_restore --version` succeed and are compatible with the staging server version.
+- [ ] The output path for the backup file is on a volume the operator controls, and the exact filename does not already exist (`postgres-backup.js` opens the file with the `wx` flag and refuses to overwrite).
+- [ ] `npm test` passes on the commit being rehearsed (baseline confidence before altering staging state).
 
-### Step 1: Install Dependencies
+## 2. Backup (before every migration attempt)
 
-```bash
-npm install
+```powershell
+node operations/postgres-backup.js "backups/donationbar-staging-$(Get-Date -Format yyyyMMdd-HHmmss).dump.enc"
 ```
 
-This will install all new packages including:
-- `bcrypt` - Password hashing
-- `passport` - Authentication
-- `passport-google-oauth20` - Google OAuth
-- `uuid` - UUID generation
-- `helmet`, `cors`, `express-rate-limit` - Security
+(or `npm run backup -- <path>`, which passes the path through identically). This streams `pg_dump --format=custom --no-owner --no-acl` through AES-256-GCM encryption keyed by `BACKUP_ENCRYPTION_KEY`, prefixed with a version header and IV, suffixed with the auth tag ([operations/postgres-backup.js](../../operations/postgres-backup.js)). Confirm the command printed `Encrypted PostgreSQL backup created: <path>` and that the file exists and is non-empty before proceeding. If it fails partway, the script removes the partial output file itself — do not proceed on a partial file if it somehow remains.
 
-### Step 2: Set Environment Variables
+Record the backup file path and its size in the evidence checklist (Section 7) before continuing.
 
-Create or update your `.env` file:
+## 3. Run the migration
 
-```bash
-# For sandbox mode
-ENVIRONMENT=sandbox
-
-# Admin credentials (will be created during migration)
-ADMIN_EMAIL=admin@localhost
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=admin123  # CHANGE THIS!
-
-# Security keys (generate random strings)
-SESSION_SECRET=your-session-secret-key
-ENCRYPTION_KEY=your-32-character-encryption-key!!
-JWT_SECRET=your-jwt-secret-key
-```
-
-See `ENV_VARIABLES.md` for complete environment variable documentation.
-
-### Step 3: Backup Your Data
-
-```bash
-# Backup your current db.json (if it exists)
-copy db.json db.json.backup
-```
-
-### Step 4: Run Migration
-
-```bash
+```powershell
 npm run migrate
 ```
 
-You should see output like:
-```
-🔄 Starting migration to multi-user schema...
-🧪 Running migration in SANDBOX mode (JSON file)
-✅ Backed up existing db.json to db.json.backup
-✅ Migrated db.json to multi-user format
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📝 Admin credentials:
-   Email: admin@localhost
-   Username: admin
-   Password: admin123
-   ⚠️  CHANGE THE PASSWORD AFTER FIRST LOGIN!
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-✨ Migration completed successfully!
-```
-
-### Step 5: Verify Migration
-
-Start the server:
-```bash
-npm start
-```
-
-Your data should be accessible at:
-- Admin panel: `http://localhost:3000/admin.html`
-- Overlay: `http://localhost:3000/overlay/default`
-- Donations: `http://localhost:3000/donate/default`
-
----
-
-## 🐘 Production Mode (PostgreSQL)
-
-For production with PostgreSQL database:
-
-### Step 1: Set Environment Variables
-
-Update your `.env` file:
-
-```bash
-# Database
-DATABASE_URL=postgresql://user:password@host:5432/database
-ENVIRONMENT=production
-
-# Admin credentials
-ADMIN_EMAIL=admin@yourdomain.com
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=strong-password-here
-
-# Security (use random strings!)
-SESSION_SECRET=generate-random-secret-64-chars
-ENCRYPTION_KEY=generate-random-secret-32-chars!!
-JWT_SECRET=generate-random-secret-64-chars
-
-# OAuth (optional)
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-GOOGLE_CALLBACK_URL=https://yourdomain.com/api/auth/google/callback
-```
-
-**Generate secure random keys:**
-```bash
-# Using Node.js
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-
-# Or OpenSSL
-openssl rand -hex 32
-```
-
-### Step 2: Backup Your Database
-
-```bash
-# PostgreSQL backup
-pg_dump your_database > backup_before_migration.sql
-```
-
-### Step 3: Run Migration
-
-```bash
-npm run migrate
-```
-
-The migration will:
-1. Create all new tables (users, workspaces, subscriptions, etc.)
-2. Migrate data from old tables (`app_data`, `donations`)
-3. Create default admin user and workspace
-4. Drop old tables after successful migration
-
-### Step 4: Verify Migration
-
-```bash
-# Check if new tables exist
-psql your_database -c "\dt"
-
-# Should show:
-# - users
-# - subscriptions  
-# - user_workspaces
-# - workspace_settings
-# - payment_providers
-# - donations
-# - api_keys
-# - audit_logs
-```
-
----
-
-## 📊 What Gets Migrated
-
-### Old Schema → New Schema
-
-| Old | New |
-|-----|-----|
-| `app_data.goal_title` | `workspace_settings.goal_title` |
-| `app_data.goal_amount` | `workspace_settings.goal_amount` |
-| `app_data.goal_start_from` | `workspace_settings.goal_start_from` |
-| `app_data.total` | `workspace_settings.total_amount` |
-| `app_data.overlay_settings` | `workspace_settings.overlay_settings` |
-| `app_data.ecpay_*` | `payment_providers.*` (ECPay entry) |
-| `donations.trade_no` | `donations.trade_no` |
-| `donations.amount` | `donations.amount` |
-| `donations.payer` | `donations.payer_name` |
-| `donations.message` | `donations.message` |
-| `donations.created_at` | `donations.created_at` |
-
-### New Entities Created
-
-1. **Admin User**
-   - Email from `ADMIN_EMAIL` env var
-   - Username from `ADMIN_USERNAME` env var
-   - Password from `ADMIN_PASSWORD` env var (hashed with bcrypt)
-
-2. **Default Workspace**
-   - Name: "Default Workspace"
-   - Slug: "default"
-   - URLs:
-     - Donation: `/donate/default`
-     - Overlay: `/overlay/default`
-     - Webhook: `/webhook/default`
-
-3. **Free Subscription**
-   - Plan: "free"
-   - Status: "active"
-   - Linked to admin user
-
----
-
-## 🔄 Rollback (If Needed)
-
-### Sandbox Mode (JSON)
-
-```bash
-# Restore from backup
-copy db.json.backup db.json
-```
-
-### PostgreSQL Mode
-
-```bash
-# Restore from SQL dump
-psql your_database < backup_before_migration.sql
-```
-
----
-
-## 🧪 Testing the Migration
-
-### 1. Check Database Structure
-
-**Sandbox (JSON):**
-```bash
-# View the structure
-cat db.json | jq .
-```
-
-**PostgreSQL:**
-```bash
-# Connect to database
-psql your_database
-
-# List tables
-\dt
-
-# Check user
-SELECT * FROM users;
-
-# Check workspaces
-SELECT * FROM user_workspaces;
-
-# Check donations
-SELECT * FROM donations LIMIT 5;
-```
-
-### 2. Test Authentication
-
-The new schema supports user authentication. While the full auth endpoints aren't implemented yet, you can verify the user exists:
-
-**Using Node.js REPL:**
-```javascript
-node
-
-> import('./database.js').then(async (db) => {
-    const database = db.default;
-    const user = await database.findUserByEmail('admin@localhost');
-    console.log('User:', user);
-    process.exit();
-  });
-```
-
-### 3. Test Workspace Access
-
-```javascript
-node
-
-> import('./database.js').then(async (db) => {
-    const database = db.default;
-    const workspace = await database.getWorkspaceBySlug('default');
-    console.log('Workspace:', workspace);
-    
-    const settings = await database.getWorkspaceSettings(workspace.id);
-    console.log('Settings:', settings);
-    
-    const donations = await database.getWorkspaceDonations(workspace.id, 5);
-    console.log('Recent donations:', donations);
-    
-    process.exit();
-  });
-```
-
----
-
-## 📝 New Database Methods
-
-The updated `database.js` includes new methods:
-
-### User Methods
-```javascript
-await database.createUser(userData)
-await database.findUserByEmail(email)
-await database.findUserByUsername(username)
-await database.findUserById(userId)
-await database.updateUserLastLogin(userId)
-```
-
-### Workspace Methods
-```javascript
-await database.createWorkspace(userId, workspaceData)
-await database.getUserWorkspaces(userId)
-await database.getWorkspaceBySlug(slug)
-await database.getWorkspaceById(workspaceId)
-```
-
-### Workspace Settings Methods
-```javascript
-await database.getWorkspaceSettings(workspaceId)
-await database.updateWorkspaceSettings(workspaceId, settings)
-```
-
-### Donation Methods (Workspace-Scoped)
-```javascript
-await database.addDonation(workspaceId, donationData)
-await database.getWorkspaceDonations(workspaceId, limit)
-await database.getWorkspaceProgress(workspaceId)
-await database.clearWorkspaceDonations(workspaceId)
-```
-
-### Payment Provider Methods
-```javascript
-await database.getPaymentProvider(workspaceId, providerName)
-await database.upsertPaymentProvider(workspaceId, providerData)
-```
-
-### Subscription Methods
-```javascript
-await database.getUserSubscription(userId)
-await database.createSubscription(userId, subscriptionData)
-```
-
----
-
-## 🔐 Security Considerations
-
-### Password Hashing
-All passwords are hashed using **bcrypt** with 10 salt rounds. Never store plain passwords.
-
-### Sensitive Data Encryption
-ECPay credentials (merchant_id, hash_key, hash_iv) should be encrypted at rest in production. The schema supports this via the `credentials` JSONB field.
-
-### Environment Variables
-- Never commit `.env` to version control
-- Use strong random values for secrets
-- Rotate keys periodically
-
-### API Keys
-- Generated API keys are hashed using SHA-256
-- Only the prefix is stored for identification
-- Keys are shown once to the user, then stored as hashes
-
----
-
-## ⚠️ Known Limitations
-
-1. **Old `server.js` compatibility**: The existing `server.js` needs to be updated to use the new database methods. This migration only handles the database layer.
-
-2. **Authentication endpoints**: You'll need to implement actual login/register endpoints (not included in this migration).
-
-3. **Workspace routing**: URLs like `/overlay/:slug` need to be added to `server.js`.
-
-4. **Backward compatibility**: Some old endpoints might break until `server.js` is updated to support workspace-scoped operations.
-
----
-
-## 📚 Next Steps
-
-After successful migration:
-
-1. **Update `server.js`**
-   - Add authentication routes (`/api/auth/login`, `/api/auth/register`)
-   - Update existing routes to be workspace-scoped
-   - Add workspace management endpoints
-
-2. **Update Frontend**
-   - Add login page
-   - Add workspace selector
-   - Update admin panel for multi-workspace support
-
-3. **Implement OAuth**
-   - Set up Google OAuth (if desired)
-   - Configure OAuth callback routes
-
-4. **Add Subscription Logic**
-   - Implement plan limits checking
-   - Add billing/payment integration
-
-5. **Security Hardening**
-   - Add rate limiting
-   - Implement CORS properly
-   - Add helmet for security headers
-   - Enable CSRF protection
-
----
-
-## 🆘 Troubleshooting
-
-### Migration fails with "table already exists"
-- Tables from new schema already exist
-- Either drop them manually or the migration has already run
-- Check: `SELECT * FROM users LIMIT 1;`
-
-### "No DATABASE_URL found" in production
-- Set `DATABASE_URL` environment variable
-- Or set `ENVIRONMENT=sandbox` to use JSON file
-
-### bcrypt installation fails
-- May need build tools on Windows: `npm install --global windows-build-tools`
-- Or use pre-built binaries: `npm rebuild bcrypt --build-from-source`
-
-### UUID generation errors
-- Make sure PostgreSQL has `pgcrypto` extension enabled
-- Run: `CREATE EXTENSION IF NOT EXISTS pgcrypto;`
-
-### Donations not appearing
-- Check workspace ID in donations table matches workspace_settings
-- Verify `workspaceId` is correctly passed to `addDonation()`
-
----
-
-## 📞 Support
-
-For issues:
-1. Check logs: `npm start` output
-2. Check database: Query tables directly
-3. Review `MIGRATION_GUIDE.md` (this file)
-4. Check `ENV_VARIABLES.md` for configuration
-
----
-
-## ✅ Migration Checklist
-
-- [ ] Backed up existing data (`db.json` or PostgreSQL dump)
-- [ ] Installed new dependencies (`npm install`)
-- [ ] Set environment variables (`.env` file)
-- [ ] Ran migration script (`npm run migrate`)
-- [ ] Verified admin user created
-- [ ] Verified workspace created
-- [ ] Verified donations migrated
-- [ ] Tested database access (Node.js REPL)
-- [ ] Changed default admin password
-- [ ] Updated `server.js` (next step)
-
----
-
-**Migration Version:** 1.0.0  
-**Date:** 2024  
-**Schema Version:** Multi-User v1
+This runs four scripts in sequence (`package.json`), and the whole chain stops at the first failure (`&&`):
+
+1. **`migrations/migrate.js`** — the original base-schema migration. Against PostgreSQL it checks whether the `users` table already exists; if so it rolls back and exits without making changes (already-migrated staging databases are safe to re-run against). If `users` does not exist, it creates all core tables (`users`, `subscriptions`, `user_workspaces`, `workspace_settings`, `payment_providers`, `donations`, `api_keys`, `audit_logs`, `fraud_prevention`, `feedback`) inside one transaction, migrates any legacy `app_data`/`donations` rows into the new schema, creates one admin user from `ADMIN_EMAIL`/`ADMIN_USERNAME`/`ADMIN_PASSWORD`, and drops the old `app_data`/`donations_old` tables. **This script only ever runs its migration once per database** — it is not designed to be re-applied after schema drift; do not treat a clean second run as proof the migration is idempotent for content changes, only that it will not error.
+2. **`migrations/run-subscription-migration.js`** — applies `migrations/add-subscription-payment-system.sql` (adds ECPay tracking columns to `subscriptions`, creates `payment_history`, creates the `subscription_overview` view). It checks for the `ecpay_merchant_trade_no` column first and skips with a message if already applied. The SQL itself uses `ADD COLUMN IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS`, so it is safe to re-run.
+3. **`migrations/run-payment-idempotency-migration.js`** — applies `migrations/20260711-fix-payment-idempotency.sql` (drops the old unique constraint on `payment_history.ecpay_trade_no` and replaces it with a partial unique index that ignores `NULL`). The index is created with `IF NOT EXISTS`, so re-running is safe.
+4. **`migrations/encrypt-provider-credentials.js`** — locks and scans every `payment_providers` row; any `merchant_id`/`hash_key`/`hash_iv` value not already in the `enc:v1:` envelope format is encrypted with `CREDENTIAL_ENCRYPTION_KEY`. Rows already encrypted are left untouched, so re-running is safe **as long as `CREDENTIAL_ENCRYPTION_KEY` has not changed** since the previous run — see [credentials.js](../../credentials.js) `isEncryptedCredential`/`encryptCredential`.
+
+Net effect: for a staging PostgreSQL database, re-running `npm run migrate` after a successful run is safe (steps 1 skips entirely, steps 2–4 are idempotent). Capture the full console output for the evidence checklist; it no longer contains the admin password (see Limitations, "Resolved" note), but still redact `DATABASE_URL`/hostnames if the connection string was echoed by any wrapper script before storing output anywhere outside a local secret vault.
+
+`migrations/add-feedback-table.sql` exists in the `migrations/` directory but is **not** referenced by `npm run migrate` or by any script in `package.json` — step 1 already creates `feedback` inline. Do not run it manually; it is dead/duplicate SQL, not an undocumented required step. Flag its removal to Codex/a later cycle rather than deleting it in this doc-only lane.
+
+## 4. Verification
+
+After migration completes, before declaring the rehearsal a pass:
+
+- [ ] `GET /health/ready` on the staging instance returns HTTP 200 with `"database": "postgresql"` (see `server.js` health routes, backed by `database.js` `healthCheck()`, which runs `SELECT 1`).
+- [ ] `psql "$DATABASE_URL" -c "\dt"` shows `users`, `subscriptions`, `user_workspaces`, `workspace_settings`, `payment_providers`, `donations`, `api_keys`, `audit_logs`, `fraud_prevention`, `feedback`, `payment_history`, and no leftover `app_data`/`donations_old`.
+- [ ] `SELECT ecpay_merchant_trade_no, last_payment_status, grace_period_end_at FROM subscriptions LIMIT 1;` succeeds (confirms step 2 columns exist).
+- [ ] `SELECT indexname FROM pg_indexes WHERE tablename = 'payment_history' AND indexname = 'uq_payment_history_ecpay_trade_no';` returns one row (confirms step 3).
+- [ ] `SELECT merchant_id FROM payment_providers LIMIT 5;` — every non-empty value starts with `enc:v1:` (confirms step 4; do not print decrypted values).
+- [ ] One redacted `SELECT` against `user_workspaces` and `donations` shows expected row counts relative to the pre-migration backup (spot-check, not a full diff).
+- [ ] Log in through Google OAuth against the staging domain and confirm the created admin account is reachable via `requirePlatformAdmin` if `ADMIN_EMAIL` was added to staging `PLATFORM_ADMIN_EMAILS`; otherwise confirm the row exists in `users` without attempting a login that isn't wired up.
+- [ ] `npm test` still passes (it does not touch the staging database, but confirms the code under rehearsal is the code that produced these results).
+
+## 5. Restore / rollback decision path
+
+There is no automated rollback script — `AGENTS.md`/`CLAUDE.md` state this explicitly, and no `migrate:rollback` entry exists in `package.json`. All four migration scripts above are additive (new tables/columns/indexes); none drop or narrow existing columns except step 1's one-time drop of the legacy `app_data`/`donations_old` tables during the original bootstrap.
+
+Decision path if verification (Section 4) fails or migration errors mid-run:
+
+1. **If `npm run migrate` fails before COMMIT** (step 1's `migratePostgreSQL` wraps its work in one transaction and rolls back on error; steps 2–4 are single-statement/idempotent so a failure there generally leaves prior state intact) — read the printed error, fix the root cause (missing extension, permissions, connectivity), and re-run `npm run migrate` from Section 3. Re-running is safe per the idempotency notes above.
+2. **If verification fails after a reported success** (data looks wrong, counts don't match, encrypted values are missing) — stop making further writes to the staging database immediately. Do not attempt an ad-hoc manual `ALTER`/`UPDATE` to patch it live.
+3. **Restore from the Section 2 backup:**
+   ```powershell
+   $env:ALLOW_DATABASE_RESTORE = "yes"
+   node operations/postgres-restore.js "backups/donationbar-staging-<timestamp>.dump.enc"
+   ```
+   (or `npm run restore -- <path>`). This is deliberately gated behind `ALLOW_DATABASE_RESTORE=yes` because it runs `pg_restore --clean --if-exists --no-owner --no-acl --exit-on-error`, which drops and recreates objects in the target database ([operations/postgres-restore.js](../../operations/postgres-restore.js)). It authenticates the full encrypted backup (AES-256-GCM auth tag) before invoking `pg_restore`, so a wrong `BACKUP_ENCRYPTION_KEY` or a corrupted/tampered file fails closed before any destructive command runs.
+4. **Re-verify** with the Section 4 checklist against the restored database before re-attempting the migration.
+5. **If restore itself fails or the backup cannot be authenticated** — this is the hard stop condition. Do not attempt to reconstruct data by hand from application logs. Escalate: the rehearsal has failed, the release does not proceed, and the backup/restore path itself needs investigation (wrong key, corrupted file, `pg_restore` version mismatch) before it can be trusted for a real incident.
+
+Production rollback (per [Deployment Guide](../setup/DEPLOYMENT.md)) means redeploying the previous application image while leaving the additive schema in place — never a live down-migration against real payment data. This staging rehearsal exists specifically to prove the migration/backup/restore sequence works *before* it is ever needed against production.
+
+## 6. Failure stop conditions
+
+Stop and do not proceed past the listed step if any of the following occur:
+
+| Condition | Stop at | Required action |
+|---|---|---|
+| `DATABASE_URL` cannot be confirmed as the staging instance | Preflight | Do not run any command. Resolve the correct connection string first. |
+| `operations/postgres-backup.js` exits non-zero or the output file is missing/empty | Section 2 | Do not run `npm run migrate`. Fix the backup path/key/connectivity and retry the backup. |
+| `npm run migrate` exits non-zero | Section 3 | Do not run verification as if it succeeded. Follow Section 5, item 1. |
+| Any Section 4 verification check fails | Section 4 | Stop writes. Follow Section 5, items 2–4. |
+| `operations/postgres-restore.js` exits non-zero, including auth-tag/format failures | Section 5 | Hard stop per Section 5, item 5. Escalate — do not attempt manual recovery. |
+| `CREDENTIAL_ENCRYPTION_KEY` differs from the key used on a previous run against the same staging data | Preflight/Section 3 | Do not run step 4 of the migration; decrypting existing rows will fail later with a mismatched key. Confirm the correct key from the secret vault first. |
+
+## 7. Evidence checklist
+
+Fill in one copy per rehearsal. Store filled-in copies outside this repository if they contain real hostnames or connection strings — redact those before saving anywhere shared, matching the redaction discipline in [docs/operations/ALERT_EXERCISE_TEMPLATE.md](../operations/ALERT_EXERCISE_TEMPLATE.md).
+
+- **Date/time (UTC):**
+- **Operator:**
+- **Staging database identity (host/database name, not full credentials):**
+- **Commit/branch under rehearsal:**
+- **Backup file path and size (Section 2):**
+- **`npm run migrate` exit code and redacted console output (Section 3):**
+- **Verification checklist results (Section 4), pass/fail per item:**
+- **Restore rehearsed this cycle? (yes/no) — if yes, restore file, exit code, re-verification result (Section 5):**
+- **Total duration (backup → migrate → verify, and separately restore → re-verify if performed):**
+- **Result:** pass / fail / partial (explain)
+- **Follow-up actions filed (link):**
+
+No rehearsal evidence exists in this repository as of 2026-07-11; this runbook is unexercised until the first filled-in copy is produced and reviewed.
+
+## 8. Explicit limitations and known open issues
+
+- **No automated rollback tooling exists.** `package.json` has no `migrate:rollback` script despite the name appearing in some historical docs/comments elsewhere in the repo. Rollback is "restore the pre-migration backup" (Section 5), not a reverse migration.
+- **Resolved during this cycle, verify it stays fixed:** `migrations/migrate.js` previously printed the admin email/username/password to stdout in both the PostgreSQL and JSON-sandbox code paths. That was fixed in commit `5e6dadf` ("fix: prevent migration credential logging"), landed concurrently with this documentation lane: both `console.log` calls now print `Admin user created. Sign in with the credentials stored in your secret manager.` instead of the credential values, and `test/migration-security.test.js` asserts the source never logs `adminEmail`/`adminUsername`/`adminPassword` directly. Re-confirm this test still passes (`npm test`) before trusting console output from a migration run as safe to store; if the assertion or the log lines regress, treat it as a failure stop condition and do not paste migration console output into shared evidence.
+- **Legal/data baseline is in progress, not complete.** `public/privacy.html` and `public/terms.html` now exist (added alongside the migration hardening in commit `653425c`), but that is a published-pages checkpoint, not confirmation that the full Taiwan legal/accounting review (retention, tax/e-invoice, merchant eligibility — [ROADMAP.md](../../ROADMAP.md) action 7) is complete. Do not treat the existence of these pages as clearance to rehearse against real customer data.
+- **The JSON-sandbox path of `migrations/migrate.js` (`ENVIRONMENT=sandbox`) is not idempotent and is not covered by this runbook's rehearsal procedure.** `migrateSandbox()` unconditionally rewrites `db.json` from the *old* single-user field names (`oldData.goal`, `oldData.total`, `oldData.donations[].payer`) every time it runs and `db.json` exists — it does not detect that `db.json` is already in the new multi-user shape. Running `npm run migrate` a second time with `ENVIRONMENT=sandbox` against an already-migrated `db.json` will silently reset goal settings to defaults and drop donor names (the new shape's `payerName` field is not read by the old-shape mapping, which looks for `.payer`). This is a real data-loss footgun in local/dev use, separate from the production staging rehearsal this document targets; it is verified by reading `migrations/migrate.js` lines under `migrateSandbox()`, not run against real data as part of this cycle.
+- **`migrations/add-feedback-table.sql` is dead code relative to `npm run migrate`** — it duplicates the inline `CREATE TABLE feedback` in `migrate.js` step 1 and is not invoked by any script in `package.json`. Noted here so it is not mistaken for a required manual step; not removed in this cycle (out of `docs/migration/` scope).
+- **This runbook has not yet been exercised against a real staging PostgreSQL instance** as part of this cycle — no hosted staging Postgres, domain, or provider sandbox was available to this lane (`docs/migration/` is a documentation-only ownership boundary; no infrastructure access was in scope). Every command and script behavior above was verified by reading `migrations/*.js`, `operations/postgres-*.js`, `database.js`, `credentials.js`, `database-ssl.js`, `server.js` health routes, `config.js`, `package.json`, and `test/postgres-operations.test.js`, not by running them against a live database. The Section 7 evidence checklist is unfilled until an operator with staging access runs the actual rehearsal.
+- **Retention/export scope:** this document does not cover data retention, export, or deletion obligations for donor/user data touched during a rehearsal. It assumes staging data is synthetic or already-authorized test data, not a live copy of real customer data.
