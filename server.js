@@ -124,7 +124,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           const hasUsedTrial = await database.hasUsedTrial(fingerprint);
 
           if (hasUsedTrial) {
-            console.warn(`⚠️ Trial abuse detected: fingerprint ${fingerprint} already used`);
+            logWarn('trial_abuse_detected');
             // Create user without trial (direct to free plan or require payment)
             user = await database.createUser({
               email: profile.emails[0].value,
@@ -208,7 +208,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 
         return done(null, user);
       } catch (error) {
-        console.error('Google OAuth error:', error);
+        logError('google_oauth_failed');
         return done(error, null);
       }
     }
@@ -1263,40 +1263,7 @@ app.post('/api/feedback', requireAdmin, requireSameOrigin, async (req, res) => {
     });
 
     // Easter egg: Secret free pass activation 🎁
-    const secretCode = "jjmow is my daddy fuck fuck fuck";
-    let easterEggActivated = false;
-
-    if (message.trim() === secretCode) {
-      try {
-        // Upgrade user to free_pass - use session userId (logged-in user)
-        await database.updateSubscription(userId, {
-          planType: 'free_pass',
-          status: 'active',
-          isTrial: false,
-          trialEndDate: null,
-          pricePerMonth: 0
-        });
-
-        easterEggActivated = true;
-
-        console.log('Free pass activated');
-
-        // Add special audit log
-        await database.addAuditLog({
-          userId: userId,
-          action: 'subscription.free_pass_granted',
-          resourceType: 'subscription',
-          resourceId: feedback.id,
-          status: 'success',
-          metadata: {
-            source: 'easter_egg',
-            grantedAt: new Date().toISOString()
-          }
-        });
-      } catch (easterEggError) {
-        console.error('Easter egg activation failed:', easterEggError);
-      }
-    }
+    const easterEggActivated = false;
 
     // Add regular audit log
     await database.addAuditLog({
@@ -1318,7 +1285,7 @@ app.post('/api/feedback', requireAdmin, requireSameOrigin, async (req, res) => {
       specialReward: easterEggActivated
     });
   } catch (error) {
-    console.error('Submit feedback error:', error);
+    logError('feedback_submission_failed', { request_id: req.requestId });
     res.status(500).json({ error: 'Failed to submit feedback' });
   }
 });
@@ -1347,7 +1314,7 @@ app.post('/ecpay/return', async (req, res) => {
       const result = await processSubscriptionPaymentCallback(p);
       return res.status(result.status || 200).send(result.ok ? '1|OK' : result.message);
     } catch (error) {
-      console.error('Subscription initial payment callback failed:', error.message);
+      logError('subscription_initial_callback_failed', { request_id: req.requestId });
       return res.status(500).send('0|Server error');
     }
   }
@@ -2165,8 +2132,7 @@ async function legacyEncryptedSubscriptionCallback(req, res) {
     return res.send('1|OK');
 
   } catch (error) {
-    console.error('❌ Period callback error:', error);
-    console.error('Stack:', error.stack);
+    logError('subscription_period_callback_failed');
     // Still return 1|OK to avoid ECPay retrying indefinitely
     return res.send('1|OK');
   }
