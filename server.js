@@ -15,6 +15,7 @@ import * as emailService from './email.js';
 import { getBillingECPayCredentials, getECPayCheckoutUrl, getECPayPeriodActionUrl, isProduction, validateProductionConfig } from './config.js';
 import { generateCheckMacValueForCredentials, verifyCheckMacValueForCredentials } from './ecpay.js';
 import { requireSameOrigin } from './security.js';
+import { logError, logInfo, logWarn, requestObservability } from './observability.js';
 
 const app = express();
 const __dirname = path.resolve();
@@ -25,6 +26,7 @@ if (production) app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
 app.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: 'draft-7', legacyHeaders: false }));
+app.use(requestObservability);
 
 // Middleware
 const protectedStaticPages = new Set(['/admin.html', '/overlay.html', '/donate.html']);
@@ -735,12 +737,7 @@ async function decryptECPayData(encryptedData, workspaceId = null, credentialOve
     console.log('✅ Decryption + decode + parse OK');
     return obj;
   } catch (error) {
-    console.error('Failed to decrypt ECPay data:', error);
-    console.error('Error details:', {
-      name: error.name,
-      message: error.message,
-      code: error.code
-    });
+    logWarn('ecpay_decryption_failed');
     return null;
   }
 }
@@ -955,14 +952,14 @@ app.post('/success', async (req, res) => {
 // Merchants can set this URL in ECPay's "付款完成通知回傳網址" (ReturnURL)
 
 app.post('/webhook/:slug', async (req, res) => {
-  console.log('📨 ECPay webhook received');
+  logInfo('payment_webhook_received', { request_id: req.requestId, provider: 'ecpay' });
 
   try {
     const { slug } = req.params;
     const workspace = await database.getWorkspaceBySlug(slug);
 
     if (!workspace) {
-      console.error(`❌ Webhook: Workspace not found for slug: ${slug}`);
+      logWarn('payment_webhook_workspace_not_found', { request_id: req.requestId });
       return res.status(404).send('0|Workspace not found');
     }
 
@@ -975,16 +972,15 @@ app.post('/webhook/:slug', async (req, res) => {
     const merchantIdOk = String(payload.MerchantID) === String(credentials.merchantId);
 
     if (!merchantIdOk) {
-      console.warn('❌ Webhook: Merchant ID mismatch');
+      logWarn('payment_webhook_invalid_merchant', { request_id: req.requestId });
       broadcastAdminNotification(workspace.id, 'error', 'Webhook: Merchant ID 不符', {
-        received: payload.MerchantID,
-        expected: credentials.merchantId
+        reason: 'invalid_merchant'
       });
       return res.status(400).send('0|Invalid merchant');
     }
 
     if (transCode !== 1) {
-      console.warn('⚠️ Webhook: TransCode is not 1:', payload.TransCode);
+      logWarn('payment_webhook_transcode_rejected', { request_id: req.requestId });
       broadcastAdminNotification(workspace.id, 'warning', 'Webhook: TransCode 非 1', {
         transCode: payload.TransCode
       });
@@ -994,7 +990,7 @@ app.post('/webhook/:slug', async (req, res) => {
     // Decrypt the Data field
     const decryptedData = await decryptECPayData(payload.Data, workspace.id);
     if (!decryptedData) {
-      console.error('❌ Webhook: Failed to decrypt Data field');
+      logWarn('payment_webhook_decryption_failed', { request_id: req.requestId });
       broadcastAdminNotification(workspace.id, 'error', 'Webhook: 無法解密 Data 欄位', {
         hint: '請確認 HashKey 和 HashIV 設定是否正確'
       });
@@ -1004,7 +1000,7 @@ app.post('/webhook/:slug', async (req, res) => {
 
     // Check RtnCode (1 = API execution successful) - normalize to number
     if (Number(decryptedData.RtnCode) !== 1) {
-      console.warn('⚠️ Webhook: RtnCode is not 1:', decryptedData.RtnCode, decryptedData.RtnMsg);
+      logWarn('payment_webhook_rtncode_not_success', { request_id: req.requestId });
       broadcastAdminNotification(workspace.id, 'warning', 'Webhook: RtnCode 非 1', {
         rtnCode: decryptedData.RtnCode,
         rtnMsg: decryptedData.RtnMsg
@@ -1014,7 +1010,7 @@ app.post('/webhook/:slug', async (req, res) => {
 
     // Check if this is a simulated payment - normalize to number
     if (Number(decryptedData.SimulatePaid) === 1) {
-      console.warn('⚠️ Webhook: This is a SIMULATED payment, not real. Will not add to database.');
+      logInfo('payment_webhook_simulated', { request_id: req.requestId });
       broadcastAdminNotification(workspace.id, 'warning', 'Webhook: 這是模擬付款', {
         message: '此為測試交易，不會新增到資料庫'
       });
@@ -1024,7 +1020,7 @@ app.post('/webhook/:slug', async (req, res) => {
     // Check trade status (1 = paid) - normalize to number
     const orderInfo = decryptedData.OrderInfo;
     if (Number(orderInfo.TradeStatus) !== 1) {
-      console.warn('⚠️ Webhook: Trade not paid yet, status:', orderInfo.TradeStatus);
+      logInfo('payment_webhook_not_paid', { request_id: req.requestId });
       broadcastAdminNotification(workspace.id, 'warning', 'Webhook: 交易尚未付款', {
         tradeStatus: orderInfo.TradeStatus,
         tradeNo: orderInfo.MerchantTradeNo
@@ -1042,18 +1038,16 @@ app.post('/webhook/:slug', async (req, res) => {
     });
 
     if (donationAdded) {
-      console.log(`✅ Webhook: Donation processed - ${decryptedData.PatronName || 'Anonymous'} donated NT$${orderInfo.TradeAmt}`);
-      console.log(`   Trade No: ${orderInfo.MerchantTradeNo}, ECPay No: ${orderInfo.TradeNo}`);
-      console.log(`   Payment: ${orderInfo.PaymentType} at ${orderInfo.PaymentDate}`);
+      logInfo('payment_webhook_donation_processed', { request_id: req.requestId });
     } else {
-      console.log(`ℹ️ Webhook: Duplicate donation - ${orderInfo.MerchantTradeNo}`);
+      logInfo('payment_webhook_duplicate', { request_id: req.requestId });
     }
 
     // Always return 1|OK to ECPay
     return res.send('1|OK');
 
   } catch (error) {
-    console.error('❌ Webhook error:', error);
+    logError('payment_webhook_unexpected_error', { request_id: req.requestId });
     return res.status(500).send('0|Server error');
   }
 });
@@ -2028,7 +2022,7 @@ app.post('/ecpay/period/callback', async (req, res) => {
     const result = await processSubscriptionPaymentCallback(req.body || {});
     return res.status(result.status || 200).send(result.ok ? '1|OK' : result.message);
   } catch (error) {
-    console.error('Subscription recurring payment callback failed:', error.message);
+    logError('subscription_callback_unexpected_error', { request_id: req.requestId });
     return res.status(500).send('0|Server error');
   }
 });
@@ -2415,6 +2409,12 @@ app.get('/api/subscription/status', requireAuth, async (req, res) => {
     console.error('❌ Get subscription status error:', error);
     res.status(500).json({ error: 'Failed to retrieve subscription status' });
   }
+});
+
+app.use((error, req, res, next) => {
+  if (res.headersSent) return next(error);
+  logError('http_unhandled_error', { request_id: req.requestId, route: req.path?.startsWith('/webhook/') ? '/webhook/:slug' : req.path?.startsWith('/api/') ? '/api/*' : '/other' });
+  return res.status(500).json({ error: 'Internal server error', requestId: req.requestId });
 });
 
 // Start server
