@@ -8,7 +8,9 @@ Shipped in code: Google OAuth state validation, PostgreSQL production sessions, 
 
 The P1 "Guided activation" row below is **not** fully done: the checklist UI exists, but funnel/activation-time measurement (the second half of that row's definition of done) is not built, and the checklist itself is unverified against real staging or a real OBS Browser Source — only sandbox/local testing.
 
-Not proven in real staging: PostgreSQL migration/restore, production-domain OAuth, ECPay initial/recurring callbacks and failures, callback replay, cancellation, container CI outcome, OBS/browser coverage, an exercised (not just unit-tested) monitoring alert delivery, and backup recovery. The service is not production-ready.
+PostgreSQL migration/backup/restore has been rehearsed against a real **local** PostgreSQL 17 instance (2026-07-11, see [MIGRATION_GUIDE.md](docs/migration/MIGRATION_GUIDE.md) Section 7) — not staging/hosted, but a real database engine, not JSON sandbox mode. The rehearsal found and fixed two real bugs that would have broken `npm run migrate` against any genuinely fresh production database (an unguarded legacy-data query, and a wrong file path), plus documented a real limitation of `npm run restore` (it recreates what the backup contains but doesn't remove newer unrelated objects). Monitoring alert delivery has similarly been exercised against a real local HTTP listener, not a real vendor endpoint (see `docs/operations/MONITORING_AND_INCIDENT_RESPONSE.md` Section 7).
+
+Not proven in real staging or production: all of the above against a real hosted database and domain, production-domain OAuth, ECPay initial/recurring callbacks and failures, callback replay, cancellation, container CI outcome, OBS/browser coverage, and monitoring alert delivery against a real vendor endpoint. The service is not production-ready.
 
 ## 2–5. Market, customer, gap, positioning
 

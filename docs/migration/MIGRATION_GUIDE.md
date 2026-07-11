@@ -111,7 +111,57 @@ Fill in one copy per rehearsal. Store filled-in copies outside this repository i
 - **Result:** pass / fail / partial (explain)
 - **Follow-up actions filed (link):**
 
-No rehearsal evidence exists in this repository as of 2026-07-11; this runbook is unexercised until the first filled-in copy is produced and reviewed.
+One rehearsal has been run, against a **local** PostgreSQL 17 instance, not a hosted
+staging environment — this is a lesser but real substitute; it exercises the actual
+`pg_dump`/`pg_restore`/Postgres-mode code paths, but not network/TLS/hosting-provider
+conditions. Filled-in copy:
+
+- **Date/time (UTC):** 2026-07-11
+- **Operator:** automated coding session, local rehearsal
+- **Staging database identity:** `127.0.0.1:5432/donationbar_staging_rehearsal` (local PostgreSQL 17, not staging/hosted)
+- **Commit/branch under rehearsal:** `multiuser` branch, immediately before this rehearsal's fix commit
+- **Backup file path and size (Section 2):** pre-migration backup, 997 bytes (empty schema)
+- **`npm run migrate` exit code and redacted console output (Section 3):** first attempt exit 1, two real bugs found and fixed (see below); second attempt exit 0, full success
+- **Verification checklist results (Section 4):** all items pass — 11 expected tables present, no `app_data`/`donations_old` leftover, `subscriptions` new columns present, `payment_history` unique index present, new `obs_connected_at`/`first_donation_at` columns present, `payment_providers` encryption check vacuously passes (0 rows)
+- **Restore rehearsed this cycle? yes, twice.** (1) Restored the pre-migration (empty) backup over the migrated database — see the new Section 8 limitation below, this did **not** remove the migrated tables. (2) Took a post-migration backup, then simulated corruption (dropped `subscriptions.grace_period_end_at` with `CASCADE`, which also dropped the `subscription_overview` view; created an unrelated stray table), then restored the post-migration backup: the dropped column and view were correctly recreated; the stray table — never captured by that backup — correctly remained, demonstrating the Section 8 limitation directly rather than just documenting it
+- **Total duration:** approximately 15 minutes end-to-end, including diagnosing and fixing the two bugs below
+- **Result:** pass, after two real fixes
+- **Follow-up actions filed:** the two bugs below are fixed in this same cycle, not just filed
+
+**Two real bugs were found and fixed by this rehearsal** (i.e., `npm run migrate` would
+have failed against any genuinely fresh production/staging PostgreSQL database before
+this cycle — it had apparently never been run against one):
+
+1. `migrations/migrate.js` unconditionally ran `SELECT * FROM app_data WHERE id = 'main'`
+   to migrate legacy single-user data. A brand-new database — one that never had the old
+   single-user schema — has no `app_data` table at all, so this threw
+   `relation "app_data" does not exist" and aborted the entire migration transaction,
+   rolling back every table just created. Fixed by guarding the query behind an
+   `information_schema.tables` existence check, the same pattern already used for the
+   `users` table at the top of the same function. Regression-tested in
+   `test/migration-security.test.js` via source inspection (the script talks to a real
+   database, so it isn't unit-testable directly — see the same tradeoff noted in
+   `docs/PROGRESS.md` for `activation.js`).
+2. `migrations/run-subscription-migration.js` resolved its SQL file as
+   `path.join(__dirname, 'add-subscription-payment-system.sql')` where `__dirname` is
+   `path.resolve()` — the process's current working directory (the project root when run
+   via `npm run migrate`), not the `migrations/` directory. It looked for the file next
+   to `package.json` and always threw `Migration file not found`. Fixed by adding the
+   missing `'migrations'` path segment, matching the sibling scripts
+   (`run-payment-idempotency-migration.js`, `run-activation-tracking-migration.js`), which
+   already did this correctly. Regression-tested the same way.
+
+Also fixed in passing: `migrations/migrate.js`'s legacy-donation-migration fallback used
+the English string `'Anonymous'` instead of `'匿名'` for a missing payer name (only
+reachable when migrating real historical data from the old single-user schema, so it
+never showed up in this rehearsal's fresh-database run, but it's the same class of bug
+already fixed in `server.js`'s live donation paths — see `docs/PROGRESS.md`).
+
+Still not exercised: a real hosted/staging environment (network conditions, the
+provider's actual TLS/SSL requirements, connection pooling limits, and whatever the
+hosting provider's own failure modes look like). The `DATABASE_URL` already present in
+this project's local `.env` (an Aiven-hosted Postgres instance) is the natural next
+target once its placeholder password is replaced with a real one.
 
 ## 8. Explicit limitations and known open issues
 
@@ -120,5 +170,6 @@ No rehearsal evidence exists in this repository as of 2026-07-11; this runbook i
 - **Legal/data baseline is in progress, not complete.** `public/privacy.html` and `public/terms.html` now exist (added alongside the migration hardening in commit `653425c`), but that is a published-pages checkpoint, not confirmation that the full Taiwan legal/accounting review (retention, tax/e-invoice, merchant eligibility — [ROADMAP.md](../../ROADMAP.md) action 7) is complete. Do not treat the existence of these pages as clearance to rehearse against real customer data.
 - **The JSON-sandbox path of `migrations/migrate.js` (`ENVIRONMENT=sandbox`) is not idempotent and is not covered by this runbook's rehearsal procedure.** `migrateSandbox()` unconditionally rewrites `db.json` from the *old* single-user field names (`oldData.goal`, `oldData.total`, `oldData.donations[].payer`) every time it runs and `db.json` exists — it does not detect that `db.json` is already in the new multi-user shape. Running `npm run migrate` a second time with `ENVIRONMENT=sandbox` against an already-migrated `db.json` will silently reset goal settings to defaults and drop donor names (the new shape's `payerName` field is not read by the old-shape mapping, which looks for `.payer`). This is a real data-loss footgun in local/dev use, separate from the production staging rehearsal this document targets; it is verified by reading `migrations/migrate.js` lines under `migrateSandbox()`, not run against real data as part of this cycle.
 - **`migrations/add-feedback-table.sql` is dead code relative to `npm run migrate`** — it duplicates the inline `CREATE TABLE feedback` in `migrate.js` step 1 and is not invoked by any script in `package.json`. Noted here so it is not mistaken for a required manual step; not removed in this cycle (out of `docs/migration/` scope).
+- **`npm run restore` recreates what the backup contains; it does not remove objects that exist in the target but aren't in the backup.** `operations/postgres-restore.js` runs `pg_restore --clean --if-exists ...`, and `--clean` only emits `DROP` statements for objects present in the archive being restored — it is not a "wipe the target database first" operation. Verified directly in the 2026-07-11 rehearsal above (Section 7): restoring a *pre-migration* (empty) backup over an already-migrated database left every migrated table in place, because the empty backup had nothing to drop them with. A second test — corrupt a real column/view, then restore a *post-migration* backup that had captured them — correctly recreated both, while an unrelated stray table created after that backup (never captured by it) correctly survived the restore untouched. **Operational consequence:** after a real restore, do not assume the database now matches the backup's state. If a bad deploy added new tables/columns since the backup was taken, a restore alone will not remove them — verify explicitly (e.g., diff `\dt`/`\d` output against what the backup's era of the schema should look like) rather than trusting `pg_restore`'s exit code alone.
 - **This runbook has not yet been exercised against a real staging PostgreSQL instance** as part of this cycle — no hosted staging Postgres, domain, or provider sandbox was available to this lane (`docs/migration/` is a documentation-only ownership boundary; no infrastructure access was in scope). Every command and script behavior above was verified by reading `migrations/*.js`, `operations/postgres-*.js`, `database.js`, `credentials.js`, `database-ssl.js`, `server.js` health routes, `config.js`, `package.json`, and `test/postgres-operations.test.js`, not by running them against a live database. The Section 7 evidence checklist is unfilled until an operator with staging access runs the actual rehearsal.
 - **Retention/export scope:** this document does not cover data retention, export, or deletion obligations for donor/user data touched during a rehearsal. It assumes staging data is synthetic or already-authorized test data, not a live copy of real customer data.

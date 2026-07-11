@@ -457,10 +457,19 @@ async function migratePostgreSQL() {
     const workspaceId = workspaceResult.rows[0].id;
     console.log('✅ Created default workspace');
 
-    // Migrate app_data to workspace_settings
-    const appDataResult = await client.query(`
-      SELECT * FROM app_data WHERE id = 'main'
+    // Migrate app_data to workspace_settings, if this database ever had the legacy
+    // single-user schema. A brand-new database (no prior app_data table at all) skips
+    // straight to the "Created default workspace_settings" branch further below.
+    const checkAppData = await client.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_name = 'app_data'
+      )
     `);
+
+    const appDataResult = checkAppData.rows[0].exists
+      ? await client.query(`SELECT * FROM app_data WHERE id = 'main'`)
+      : { rows: [] };
 
     if (appDataResult.rows.length > 0) {
       const appData = appDataResult.rows[0];
@@ -519,7 +528,7 @@ async function migratePostgreSQL() {
               paymentProviderId,
               donation.trade_no,
               donation.amount,
-              donation.payer || 'Anonymous',
+              donation.payer || '匿名',
               donation.message || '',
               donation.created_at
             ]);

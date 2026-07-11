@@ -14,6 +14,54 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-11 — Real local PostgreSQL migration/backup/restore rehearsal, two real bugs found and fixed
+
+With explicit permission, installed PostgreSQL 17 natively via `winget` (no WSL2/Docker
+needed — the earlier Docker Desktop attempt hit a wall requiring WSL2, unavailable on
+this Windows 11 Home machine without an admin-elevated restart; PostgreSQL's own native
+Windows installer needs neither). Created an isolated local database and ran the full
+[docs/migration/MIGRATION_GUIDE.md](migration/MIGRATION_GUIDE.md) runbook against it —
+Section 7 there has the filled-in evidence record. Summary:
+
+- **Two real bugs found and fixed**, both of which would have broken `npm run migrate`
+  against any genuinely fresh production/staging PostgreSQL database (i.e., it seems to
+  have never actually been run against one before this):
+  1. `migrations/migrate.js` unconditionally queried `app_data` to migrate legacy
+     single-user data; a brand-new database has no such table, so this threw and rolled
+     back the entire migration transaction, including the tables just created. Fixed
+     with an existence check.
+  2. `migrations/run-subscription-migration.js` resolved its SQL file path without the
+     `migrations/` segment, so it always looked in the project root and always threw
+     `Migration file not found`. Fixed to match its sibling scripts.
+  Both are regression-tested via source inspection in `test/migration-security.test.js`
+  (53 tests total now), since these scripts talk to a real database and aren't otherwise
+  unit-testable — same tradeoff as `activation.js` below.
+- Also fixed in passing: the same `'Anonymous'` (should be `'匿名'`) donor-fallback bug
+  from the earlier TC-activation-path fix existed in `migrate.js`'s legacy-donation
+  migration path too (only reachable when migrating real old single-user data, so it
+  didn't surface in this fresh-database rehearsal).
+- **A real, previously-undocumented limitation found and documented**: `npm run restore`
+  (`pg_restore --clean --if-exists`) only recreates objects present in the backup being
+  restored — it does not remove objects that exist in the target but weren't captured by
+  that backup. Verified two ways: restoring an empty pre-migration backup over an
+  already-migrated database left every migrated table in place; restoring a real
+  post-migration backup after deliberately corrupting a column/view and adding an
+  unrelated stray table correctly recreated the corrupted objects but correctly left the
+  (never-captured) stray table untouched. Documented in MIGRATION_GUIDE.md Section 8 with
+  the operational consequence spelled out: don't assume a restore fully reverts a bad
+  deploy without independently checking for newer orphaned objects.
+- Cleaned up afterward: dropped the local rehearsal database, deleted the local encrypted
+  backup files, added `backups/` to `.gitignore` (was previously untracked-but-not-
+  ignored — a real gap, since real backup rehearsals would otherwise risk being
+  `git add -A`ed by accident).
+
+**Not done, and explicitly out of scope for what a local rehearsal can prove**: this was
+a real PostgreSQL engine, but not a hosted/staging one — no real network conditions, no
+provider-specific TLS requirements, no provider connection limits or failure modes. This
+project's own `.env` already has a `DATABASE_URL` for a real Aiven-hosted Postgres
+instance with a placeholder password; the user has said they'll retrieve the real
+password to enable the next, more representative rehearsal against that real host.
+
 ## 2026-07-11 — Mobile/desktop verification of this session's UI changes, beta recruitment draft
 
 Belatedly ran the mobile/desktop verification CLAUDE.md requires for UI work, which had

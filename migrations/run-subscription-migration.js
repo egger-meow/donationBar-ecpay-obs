@@ -45,7 +45,7 @@ async function runMigration() {
     console.log('✅ Connected to PostgreSQL\n');
 
     // Read migration SQL
-    const sqlPath = path.join(__dirname, 'add-subscription-payment-system.sql');
+    const sqlPath = path.join(__dirname, 'migrations', 'add-subscription-payment-system.sql');
     if (!fs.existsSync(sqlPath)) {
       throw new Error('Migration file not found: ' + sqlPath);
     }
