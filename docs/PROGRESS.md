@@ -14,6 +14,24 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-11 — P0 callback rate-limit isolation
+
+Fixed a payment-correctness risk in the request middleware order:
+
+- The general 300-IP/minute limiter previously ran before every ECPay webhook and
+  recurring callback. Public traffic from the same source could therefore exhaust the
+  callback's shared quota and yield a 429 before signature/idempotency processing.
+- Added an explicit rate-limit policy: general traffic skips `/webhook` (including
+  workspace-scoped webhook paths) and `/ecpay/period/callback`; those routes receive a
+  separate, bounded 600-IP/minute callback limiter instead.
+- Added pure policy tests covering legacy/workspace/recurring callback paths and the
+  deliberately higher-but-finite provider budget. Current express-rate-limit guidance
+  was consulted for the request-specific `skip` configuration and route middleware.
+
+Verification: `npm.cmd test` passes **64/64** tests and `git diff --check` passes. The
+limits are in-process defaults; multi-instance production deployment still needs a
+shared limiter store and real provider/staging callback exercise.
+
 ## 2026-07-11 — P0 SSE notification isolation and webhook-reference redaction
 
 Fixed a real tenant/privacy issue in the shared real-time stream:

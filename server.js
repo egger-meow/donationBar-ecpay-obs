@@ -19,6 +19,7 @@ import { logError, logInfo, logWarn, requestObservability, sendAlert } from './o
 import { processSubscriptionPaymentCallback as processSubscriptionPaymentCallbackCore } from './subscription-callback.js';
 import { computeActivationSteps } from './activation.js';
 import { buildAccountExport } from './privacy-export.js';
+import { GENERAL_RATE_LIMIT, PROVIDER_CALLBACK_RATE_LIMIT, isProviderCallbackPath } from './rate-limit-policy.js';
 
 const app = express();
 const __dirname = path.resolve();
@@ -28,7 +29,23 @@ validateProductionConfig();
 if (production) app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
-app.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: 'draft-7', legacyHeaders: false }));
+// Public traffic must not consume a payment-provider callback's rate-limit budget.
+// Callback routes receive their own deliberately higher, narrowly scoped guard below.
+app.use(rateLimit({
+  windowMs: 60_000,
+  limit: GENERAL_RATE_LIMIT,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  skip: req => isProviderCallbackPath(req.path)
+}));
+const providerCallbackRateLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: PROVIDER_CALLBACK_RATE_LIMIT,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false
+});
+app.use('/webhook', providerCallbackRateLimiter);
+app.use('/ecpay/period/callback', providerCallbackRateLimiter);
 app.use(requestObservability);
 
 // Middleware
