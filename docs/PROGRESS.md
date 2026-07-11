@@ -14,6 +14,33 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-11 — Real (unmocked) local alert-delivery exercise
+
+Ran `sendAlert('readiness_check_failed', ...)` from `observability.js` for real, twice,
+outside the test suite: once against a throwaway local Node HTTP listener on loopback,
+once against a refused local port. This is the first time this code path has opened a
+real socket — every existing test (`test/observability.test.js`) stubs `global.fetch`.
+Confirmed: the delivered POST body was exactly `{event, timestamp, request_id, route,
+status_code}` (no PII, no credentials) with `Content-Type: application/json`, delivery
+completed in ~30ms; the refused-connection case was caught, logged as
+`alert_delivery_failed`, and did not throw or hang (~20ms). Documented in
+[docs/operations/MONITORING_AND_INCIDENT_RESPONSE.md](operations/MONITORING_AND_INCIDENT_RESPONSE.md)
+Section 7 with an explicit caveat: this is **not** a staging/production exercise — no
+real vendor endpoint, TLS, DNS, or egress path was involved — so
+`ALERT_EXERCISE_TEMPLATE.md` is still unfilled and that gate is still open. It only rules
+out a class of bugs a mocked-fetch test can't catch (URL/method/header/body construction,
+unhandled rejection on connection refusal).
+
+Also attempted a local rehearsal of `npm run migrate` / backup / restore against a real
+PostgreSQL instance per `docs/migration/MIGRATION_GUIDE.md` (the P0 "Staging release
+proof" gap). Blocked: this machine has neither Docker nor a local PostgreSQL install, and
+installing either modifies the system, so it needs the user's explicit go-ahead first —
+not attempted without asking. Real staging Postgres, a domain, Google OAuth production
+credentials, an approved ECPay merchant account, and Taiwan legal/accounting review
+remain blocked on the user's own action (see the current-status report delivered this
+session) — none of those can be provisioned, paid for, or professionally reviewed by an
+autonomous coding agent.
+
 ## 2026-07-11 — Observability cleanup, doc corrections, repo tidy-up
 
 - Finished migrating `server.js`'s remaining `console.log`/`warn`/`error` calls to
