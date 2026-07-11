@@ -11,6 +11,7 @@
     "test:ui": "node --test test/ui-scripts.test.js",
     "backup": "node operations/postgres-backup.js",
     "restore": "node operations/postgres-restore.js",
+    "preflight:staging": "node operations/staging-preflight.js",
     "migrate": "node migrations/migrate.js && node migrations/run-subscription-migration.js && node migrations/run-payment-idempotency-migration.js && node migrations/encrypt-provider-credentials.js"
   },
   "keywords": [
