@@ -14,30 +14,24 @@ Codex and Claude Code are peer engineers sharing the `multiuser` working directo
 
 ## Current cycle
 
-- Cycle: `003`
+- Cycle: `004`
 - Integration branch: `multiuser`
-- Baseline commit: `973fd16`
-- State: `complete`
+- Baseline commit: `91df012`
+- State: `active`
 
 ### Codex lane A
 
-- Outcome: prevent JSON sandbox migrations from silently rewriting already-migrated `db.json` data.
-- Owned files: `migrations/migrate.js`, `test/migration-security.test.js`, and new focused migration tests if needed.
-- Acceptance criteria: detect the current multi-user JSON shape before rewriting; fail closed with a clear recovery message; preserve the explicit legacy one-time migration path; add automated coverage for both shapes; do not edit backup files.
-- Status: done — `a0a2b80 fix: guard sandbox migration against data loss`.
+- Outcome: make recurring subscription callback processing independently testable and prove success, failure, invalid amount, invalid signature, and duplicate callback behavior.
+- Owned files: `server.js`, `database.js`, `test/subscription-callback.test.js`, and new focused subscription modules/tests if needed.
+- Acceptance criteria: preserve callback signature verification and money validation; make payment persistence and subscription state changes demonstrably idempotent; add sandbox-only automated fixtures with no live credentials; do not weaken workspace or user ownership checks.
+- Status: active.
 
 ### Claude lane B
 
-- Outcome: turn structured operational events into safe, configurable external alert delivery for staging/production.
-- Owned files: `observability.js`, `server.js`, `config.js`, `.env.example`, `test/observability.test.js`, and `docs/operations/` only.
-- Acceptance criteria: use an optional configured alert webhook with short timeout and non-blocking failure behavior; send only a fixed/redacted event vocabulary plus request ID/route/status (never raw request data, donor data, credentials, tokens, or stack traces); alert on readiness failure, unhandled 5xx, and payment callback errors; keep local/sandbox behavior usable with no alert URL; add automated tests and document configuration/exercise steps.
-- Status: done — `cb62800 feat: deliver redacted operational alerts to an optional webhook`.
-
-### Cycle result
-
-- Review follow-up: `8db8fe2 fix: preserve alert delivery failure event`.
-- Combined verification: `npm.cmd test` — 31 passed, 0 failed; `npm.cmd audit --omit=dev --json` — 0 production vulnerabilities (from cycle 002, no dependency changes since).
-- Remaining external release gates: provision staging infrastructure; run migration/restore rehearsal; exercise OAuth/ECPay callbacks and alert webhook on staging; complete legal/accounting review.
+- Outcome: add a safe, executable staging preflight command that checks configuration, deployed health endpoints, and optional alert-webhook reachability without sending secrets or changing remote state.
+- Owned files: `operations/staging-preflight.js`, `test/staging-preflight.test.js`, `package.json`, `.env.example`, and `docs/operations/` only.
+- Acceptance criteria: require an explicit staging base URL; reject non-HTTPS outside sandbox; query only `/health/live` and `/health/ready`; report redacted pass/fail diagnostics; optionally test alert-webhook reachability with a fixed synthetic event only when explicitly enabled; no database writes, payment calls, OAuth calls, or raw secret output; add automated tests and a Conventional Commit.
+- Status: queued.
 
 ## General prompt for Claude Code
 
