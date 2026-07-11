@@ -14,6 +14,27 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-11 — Mobile/desktop verification of this session's UI changes, beta recruitment draft
+
+Belatedly ran the mobile/desktop verification CLAUDE.md requires for UI work, which had
+been skipped for this session's earlier `admin.html`/`donate.html` edits. Started the
+sandbox server, temporarily patched the local (gitignored, non-production) sandbox
+`db.json` subscription to `trial` status to get past `requireActiveSubscription` and
+actually view `/donate`, checked both a 375×812 mobile viewport and a desktop viewport:
+no horizontal overflow at either size, the corrected `<h1>支持這個直播</h1>` renders
+correctly, all form fields present and reachable. `admin.html` requires a real
+authenticated session (`requireAdmin`), which sandbox mode has no way to establish
+without Google OAuth configured; verified its responsive behavior by reading its
+`@media (max-width: 768px)` rules instead of bypassing auth to force a render — the new
+activation-checklist card reuses the existing `.card` class and plain block-level `<li>`
+elements, nothing that needs its own media query. Reverted the `db.json` patch
+afterward.
+
+Also drafted (not sent) [docs/operations/BETA_RECRUITMENT_DRAFT.md](operations/BETA_RECRUITMENT_DRAFT.md)
+per ROADMAP.md section 13/17: a screening checklist, a Traditional Chinese outreach
+message, and week-1 check-in questions. Explicitly marked draft/unsent — actually
+contacting anyone is the user's action, not something this session did or could do.
+
 ## 2026-07-11 — Guided activation checklist (P1, first slice)
 
 Attempted a Docker-based local PostgreSQL rehearsal (the previous entry's blocker) with

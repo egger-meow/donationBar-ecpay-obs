@@ -69,6 +69,7 @@ Location: `docs/operations/`
 - **[Monitoring and Incident Response](operations/MONITORING_AND_INCIDENT_RESPONSE.md)** - Health checks, structured logging, alert signals, severity/ownership
 - **[Staging Preflight](operations/STAGING_PREFLIGHT.md)** - `npm run preflight:staging` reachability check
 - **[Alert Exercise Template](operations/ALERT_EXERCISE_TEMPLATE.md)** - Template for recording an alert drill
+- **[Beta Recruitment Draft](operations/BETA_RECRUITMENT_DRAFT.md)** - Unsent draft outreach message, screening checklist, week-1 questions
 
 ### 👨‍💻 Development
 Location: `docs/development/`
