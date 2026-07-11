@@ -6,6 +6,7 @@ import { getSubscriptionPlan, isPlatformAdminEmail } from './config.js';
 import { decryptCredential, encryptCredential } from './credentials.js';
 import { databaseSsl } from './database-ssl.js';
 import { computeActivationFunnel } from './activation.js';
+import { logError, logInfo, logWarn } from './observability.js';
 
 const { Client } = pg;
 
@@ -59,10 +60,8 @@ class Database {
         if (caCert && !caCert.startsWith('-----BEGIN')) {
           try {
             caCert = Buffer.from(caCert, 'base64').toString('utf-8');
-            console.log('CA length:', caCert.length);
-            console.log(caCert.slice(0, 30));
-          } catch (e) {
-            console.error('Failed to decode DATABASE_CA from Base64:', e.message);
+          } catch {
+            logWarn('database_ca_decode_failed');
           }
         }
 
@@ -83,8 +82,8 @@ class Database {
         connectionTimeoutMillis: 5000,
       });
 
-      pgClient.on('error', (error) => {
-        console.error('PostgreSQL client error:', error.message);
+      pgClient.on('error', () => {
+        logError('database_postgres_client_error');
         this.connected = false;
       });
 
@@ -96,8 +95,7 @@ class Database {
       if (process.env.NODE_ENV === 'production' || process.env.ENVIRONMENT === 'production') {
         throw error;
       }
-      console.error('❌ PostgreSQL connection failed:', error.message);
-      console.log('📝 Falling back to JSON file storage');
+      logWarn('database_postgres_connection_failed_using_json');
       this.isProduction = false;
       this.connected = false;
     }
@@ -138,8 +136,8 @@ class Database {
         return defaultData;
       }
       return JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
-    } catch (error) {
-      console.error('Error reading JSON database:', error);
+    } catch {
+      logError('database_json_read_failed');
       return this.getDefaultMultiUserData();
     }
   }
@@ -193,7 +191,7 @@ class Database {
       ]);
 
       if (isAdmin) {
-        console.log('Platform administrator access granted');
+        logInfo('platform_administrator_access_granted');
       }
 
       return this.camelCaseKeys(result.rows[0]);
@@ -221,7 +219,7 @@ class Database {
       };
 
       if (isAdmin) {
-        console.log('Platform administrator access granted');
+        logInfo('platform_administrator_access_granted');
       }
 
       data.users.push(newUser);
@@ -685,7 +683,7 @@ class Database {
 
         if (existing.rows.length > 0) {
           await pgClient.query('ROLLBACK');
-          console.log(`Duplicate trade number: ${donationData.tradeNo}`);
+          logInfo('donation_duplicate_ignored');
           return false;
         }
 
@@ -716,13 +714,13 @@ class Database {
         `, [Number(donationData.amount), workspaceId]);
 
         await pgClient.query('COMMIT');
-        console.log(`New donation: ${donationData.payerName} donated $${donationData.amount}`);
+        logInfo('donation_persisted');
         return true;
 
       } catch (error) {
         await pgClient.query('ROLLBACK');
         if (error.code === '23505') { // Unique violation
-          console.log(`Duplicate trade number: ${donationData.tradeNo}`);
+          logInfo('donation_duplicate_ignored');
           return false;
         }
         throw error;
@@ -735,7 +733,7 @@ class Database {
         d => d.workspaceId === workspaceId && d.tradeNo === donationData.tradeNo
       );
       if (existing) {
-        console.log(`Duplicate trade number: ${donationData.tradeNo}`);
+        logInfo('donation_duplicate_ignored');
         return false;
       }
 
@@ -766,7 +764,7 @@ class Database {
       }
 
       await this.writeJSON(data);
-      console.log(`New donation: ${donationData.payerName} donated $${donationData.amount}`);
+      logInfo('donation_persisted');
       return true;
     }
   }
@@ -851,7 +849,7 @@ class Database {
           WHERE workspace_id = $1
         `, [workspaceId]);
         await pgClient.query('COMMIT');
-        console.log('✨ All donations cleared');
+        logInfo('workspace_donations_cleared');
         return true;
       } catch (error) {
         await pgClient.query('ROLLBACK');
@@ -868,7 +866,7 @@ class Database {
         data.workspaceSettings[settingsIdx].updatedAt = new Date().toISOString();
       }
       await this.writeJSON(data);
-      console.log('✨ All donations cleared');
+      logInfo('workspace_donations_cleared');
       return true;
     }
   }
@@ -943,7 +941,7 @@ class Database {
 
       await this.writeJSON(data);
     }
-    console.log(`🛡️ Trial usage recorded for fingerprint: ${fingerprint}`);
+    logInfo('trial_usage_recorded');
   }
 
   /**

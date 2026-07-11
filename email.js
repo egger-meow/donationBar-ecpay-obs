@@ -98,9 +98,9 @@ export async function sendWelcomeEmail(email, username) {
 
     console.log('Welcome email sent');
     return { success: true };
-  } catch (error) {
-    console.error('❌ Failed to send welcome email:', error);
-    return { success: false, error: error.message };
+  } catch {
+    console.error('welcome_email_delivery_failed');
+    return { success: false, error: 'Email delivery failed' };
   }
 }
 

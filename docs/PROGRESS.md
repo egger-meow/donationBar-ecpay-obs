@@ -14,6 +14,24 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-11 — P0 sensitive logging remediation in database and email paths
+
+Found and removed logging that contradicted the project's payment/privacy rules:
+
+- `database.js` previously wrote donor names and amounts, ECPay trade numbers, and trial
+  device fingerprints to stdout in both PostgreSQL and JSON paths. It now emits
+  fixed-vocabulary structured events without those values.
+- Removed logging of decoded `DATABASE_CA` content and raw PostgreSQL/JSON error values;
+  failure events remain observable without exposing configuration or provider details.
+- Email delivery failures no longer serialize the provider exception or return it to the
+  caller. Generic non-sensitive status remains available for operations.
+- Added source-level regression tests that reject donation/fingerprint/certificate/raw
+  error interpolation in database logging and provider-error serialization in email logs.
+
+Verification: `npm.cmd test` passes **60/60** tests and `git diff --check` passes. This
+remediation covers the discovered database/email paths; it is not a substitute for the
+still-required hosted monitoring and staging evidence.
+
 ## 2026-07-11 — Authenticated creator data export, privacy-operation boundaries (P0 support)
 
 Shipped a tenant-safe self-service data-export capability that supports, but does not
