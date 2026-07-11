@@ -14,6 +14,24 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-11 — Beta operations runbook prepared (P1)
+
+Prepared the operating process required by ROADMAP.md P1 Beta Operations:
+
+- Added [BETA_OPERATIONS_RUNBOOK.md](operations/BETA_OPERATIONS_RUNBOOK.md): pre-invite
+  checks; non-contractual P0–P3 support response targets; observed onboarding, week-one,
+  biweekly, and exit touchpoints; a privacy-safe interview script; a weekly metric review;
+  and the explicit four-week gate for declaring the roadmap row complete.
+- Connected [BETA_RECRUITMENT_DRAFT.md](operations/BETA_RECRUITMENT_DRAFT.md) to the
+  runbook, replacing its previous missing biweekly/exit process.
+- The process directs participant/contact/payment records to an access-controlled private
+  tracker, requires aggregate-only reporting, and aligns payment/availability events with
+  the existing incident response runbook.
+
+Verification: reviewed the new internal links and `git diff --check` passes. This is
+**prepared, not operated**: no participant was contacted, no support SLA was promised,
+and no four-week beta evidence exists yet.
+
 ## 2026-07-11 — Configuration-backed, public closed-beta pricing
 
 Shipped the internally controllable part of ROADMAP.md P1 Paid Conversion: the offer

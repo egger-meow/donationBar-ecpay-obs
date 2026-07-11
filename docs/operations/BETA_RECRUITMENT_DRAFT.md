@@ -56,11 +56,10 @@ Per ROADMAP.md section 13 ("Observe onboarding; check in week one"):
 
 ## Biweekly interview / exit process
 
-Not yet drafted — ROADMAP.md section 13 calls for "interview biweekly and at exit" but
-doesn't specify a question set beyond week one, and section 15–16 flags "low willingness
-to pay" as a risk to watch for specifically. Draft this once the first 5 design partners
-are recruited and the week-1 questions have been asked at least once, so the biweekly
-questions can build on real answers instead of guessing what will matter.
+Use the prepared [Closed-Beta Operations Runbook](BETA_OPERATIONS_RUNBOOK.md) for the
+biweekly questions, exit handling, support targets, and weekly review. It is still a
+prepared process: tailor the interview follow-ups to actual week-one findings, and do
+not claim the four-week Beta Operations gate has been met until a real cohort operates it.
 
 ## What this does not cover
 
