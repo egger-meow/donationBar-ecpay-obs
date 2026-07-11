@@ -14,6 +14,28 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-11 — Content Security Policy enabled with ECPay compatibility (P0)
+
+Replaced the previous disabled Helmet CSP with an enforced policy tailored to the current
+application:
+
+- Defaults browser resources to same-origin; disallows plugins/objects; locks the base
+  URL; limits frames to same-origin; and permits only same-origin connections and
+  frames, plus `data:` image/media/font assets needed by current pages.
+- Limits form submissions to same-origin and the exact ECPay stage/production checkout
+  domains. This preserves generated ECPay auto-post forms without allowing arbitrary
+  form destinations.
+- Keeps `'unsafe-inline'` only for the repository's existing static inline scripts and
+  styles. A nonce-based CSP is the future hardening path once pages are modularized;
+  this change does not overstate that limitation.
+- Enables `upgrade-insecure-requests` only in production so sandbox/localhost HTTP
+  workflows remain usable. `crossOriginEmbedderPolicy` remains disabled for OBS
+  compatibility.
+
+Verification: `npm.cmd test` passes **69/69** tests, including CSP policy assertions;
+a sandbox server returned the expected `Content-Security-Policy` header on
+`/pricing.html`. Current Helmet CSP configuration guidance was consulted.
+
 ## 2026-07-11 — Public progress payload minimization and overlay console redaction (P0)
 
 Removed provider transaction references from browser-visible donation progress:

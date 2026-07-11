@@ -20,6 +20,7 @@ import { processSubscriptionPaymentCallback as processSubscriptionPaymentCallbac
 import { computeActivationSteps } from './activation.js';
 import { buildAccountExport } from './privacy-export.js';
 import { GENERAL_RATE_LIMIT, PROVIDER_CALLBACK_RATE_LIMIT, isProviderCallbackPath } from './rate-limit-policy.js';
+import { getHelmetOptions } from './security-headers.js';
 
 const app = express();
 const __dirname = path.resolve();
@@ -28,7 +29,7 @@ const production = isProduction();
 validateProductionConfig();
 if (production) app.set('trust proxy', 1);
 app.disable('x-powered-by');
-app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+app.use(helmet(getHelmetOptions({ production })));
 // Public traffic must not consume a payment-provider callback's rate-limit budget.
 // Callback routes receive their own deliberately higher, narrowly scoped guard below.
 app.use(rateLimit({
