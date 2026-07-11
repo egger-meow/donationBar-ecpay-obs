@@ -21,6 +21,7 @@ ECPAY_ENVIRONMENT=stage
 BASE_URL=https://your-domain.example
 DATABASE_URL=postgresql://...
 SESSION_SECRET=a-random-secret-at-least-32-characters-long
+CREDENTIAL_ENCRYPTION_KEY=a-base64-encoded-random-32-byte-key
 PLATFORM_ADMIN_EMAILS=owner@example.com
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
@@ -30,7 +31,7 @@ BILLING_ECPAY_HASH_KEY=...
 BILLING_ECPAY_HASH_IV=...
 ```
 
-Streamer donation merchant credentials are entered per workspace. Never put streamer credentials in the platform billing variables.
+Streamer donation merchant credentials are entered per workspace. Never put streamer credentials in the platform billing variables. `npm run migrate` encrypts existing PostgreSQL provider credentials with `CREDENTIAL_ENCRYPTION_KEY`; store that key in a managed secret vault and preserve it in backups, because losing it prevents decryption.
 
 ## Build and release
 

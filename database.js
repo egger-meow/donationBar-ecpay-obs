@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { isPlatformAdminEmail } from './config.js';
+import { decryptCredential, encryptCredential } from './credentials.js';
 
 const { Client } = pg;
 
@@ -233,7 +234,14 @@ class Database {
   async findUserByEmail(email) {
     if (this.isProduction && this.connected) {
       const result = await pgClient.query('SELECT * FROM users WHERE email = $1', [email]);
-      return result.rows.length > 0 ? this.camelCaseKeys(result.rows[0]) : null;
+      if (!result.rows.length) return null;
+      const provider = this.camelCaseKeys(result.rows[0]);
+      return {
+        ...provider,
+        merchantId: decryptCredential(provider.merchantId),
+        hashKey: decryptCredential(provider.hashKey),
+        hashIV: decryptCredential(provider.hashIV)
+      };
     } else {
       const data = await this.readJSON();
       return data.users.find(u => u.email === email) || null;
@@ -520,9 +528,9 @@ class Database {
       `, [
         workspaceId,
         providerData.providerName || 'ecpay',
-        providerData.merchantId,
-        providerData.hashKey,
-        providerData.hashIV,
+        encryptCredential(providerData.merchantId),
+        encryptCredential(providerData.hashKey),
+        encryptCredential(providerData.hashIV),
         providerData.isActive !== false
       ]);
       return this.camelCaseKeys(result.rows[0]);

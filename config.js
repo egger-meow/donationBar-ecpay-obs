@@ -1,3 +1,5 @@
+import { getCredentialEncryptionKey } from './credentials.js';
+
 const PLACEHOLDER_SECRETS = new Set(['super-secret', 'your-super-secret-session-key-change-me']);
 
 export function isProduction(env = process.env) {
@@ -10,6 +12,11 @@ export function validateProductionConfig(env = process.env) {
   if (!env.DATABASE_URL) errors.push('DATABASE_URL is required');
   if (!env.SESSION_SECRET || env.SESSION_SECRET.length < 32 || PLACEHOLDER_SECRETS.has(env.SESSION_SECRET)) errors.push('SESSION_SECRET must be a non-placeholder value of at least 32 characters');
   if (!env.BASE_URL || !env.BASE_URL.startsWith('https://')) errors.push('BASE_URL must use HTTPS');
+  try {
+    getCredentialEncryptionKey(env);
+  } catch (error) {
+    errors.push(error.message);
+  }
   for (const name of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'BILLING_ECPAY_MERCHANT_ID', 'BILLING_ECPAY_HASH_KEY', 'BILLING_ECPAY_HASH_IV']) {
     if (!env[name] || env[name].startsWith('your-')) errors.push(`${name} is required`);
   }

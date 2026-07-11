@@ -8,7 +8,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test",
-    "migrate": "node migrations/migrate.js && node migrations/run-subscription-migration.js && node migrations/run-payment-idempotency-migration.js"
+    "migrate": "node migrations/migrate.js && node migrations/run-subscription-migration.js && node migrations/run-payment-idempotency-migration.js && node migrations/encrypt-provider-credentials.js"
   },
   "keywords": [
     "ecpay",
