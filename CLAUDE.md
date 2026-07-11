@@ -14,7 +14,7 @@ npm run dev      # node --watch server.js (auto-restart)
 npm start        # node server.js
 npm test         # node --test (runs everything under test/)
 npm run test:ui  # node --test test/ui-scripts.test.js
-npm run migrate  # runs migrations/migrate.js, run-subscription-migration.js, run-payment-idempotency-migration.js, encrypt-provider-credentials.js in sequence
+npm run migrate  # runs migrations/migrate.js, run-subscription-migration.js, run-payment-idempotency-migration.js, run-activation-tracking-migration.js, encrypt-provider-credentials.js in sequence
 ```
 
 - Run a single test file directly: `node --test test/ecpay.test.js`

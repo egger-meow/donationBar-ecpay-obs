@@ -493,6 +493,46 @@ class Database {
     }
   }
 
+  /**
+   * Record the first time a workspace's OBS overlay connects (SSE), if not already recorded.
+   * Idempotent: a second call after the first is a no-op.
+   */
+  async markWorkspaceObsConnected(workspaceId) {
+    if (this.isProduction && this.connected) {
+      await pgClient.query(
+        'UPDATE workspace_settings SET obs_connected_at = NOW() WHERE workspace_id = $1 AND obs_connected_at IS NULL',
+        [workspaceId]
+      );
+    } else {
+      const data = await this.readJSON();
+      const settingsIdx = data.workspaceSettings.findIndex(s => s.workspaceId === workspaceId);
+      if (settingsIdx !== -1 && !data.workspaceSettings[settingsIdx].obsConnectedAt) {
+        data.workspaceSettings[settingsIdx].obsConnectedAt = new Date().toISOString();
+        await this.writeJSON(data);
+      }
+    }
+  }
+
+  /**
+   * Record the first time a workspace receives a donation, if not already recorded.
+   * Idempotent: a second call after the first is a no-op.
+   */
+  async markWorkspaceFirstDonation(workspaceId) {
+    if (this.isProduction && this.connected) {
+      await pgClient.query(
+        'UPDATE workspace_settings SET first_donation_at = NOW() WHERE workspace_id = $1 AND first_donation_at IS NULL',
+        [workspaceId]
+      );
+    } else {
+      const data = await this.readJSON();
+      const settingsIdx = data.workspaceSettings.findIndex(s => s.workspaceId === workspaceId);
+      if (settingsIdx !== -1 && !data.workspaceSettings[settingsIdx].firstDonationAt) {
+        data.workspaceSettings[settingsIdx].firstDonationAt = new Date().toISOString();
+        await this.writeJSON(data);
+      }
+    }
+  }
+
   // =============================================
   // PAYMENT PROVIDER METHODS
   // =============================================

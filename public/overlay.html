@@ -982,7 +982,7 @@
     
     // Server-Sent Events for real-time updates
     function setupSSE() {
-      const eventsUrl = workspaceSlug ? `/events?slug=${workspaceSlug}` : '/events';
+      const eventsUrl = workspaceSlug ? `/events?slug=${workspaceSlug}&source=overlay` : '/events?source=overlay';
       console.log('🔌 Connecting to SSE:', eventsUrl);
       const eventSource = new EventSource(eventsUrl);
       

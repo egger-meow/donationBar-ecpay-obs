@@ -795,6 +795,17 @@
 
     <div id="alertContainer"></div>
 
+    <!-- Guided Activation Checklist -->
+    <div class="card" id="activationCard" style="margin-bottom: 30px; display: none;">
+      <h2>開始使用檢查清單</h2>
+      <ul id="activationChecklist" style="list-style: none; padding: 0; margin: 15px 0 0;">
+        <li id="activationStepEcpay" style="padding: 8px 0;">⬜ 設定 ECPay 收款方式</li>
+        <li id="activationStepObs" style="padding: 8px 0;">⬜ 在 OBS 加入斗內條 Browser Source</li>
+        <li id="activationStepDonation" style="padding: 8px 0;">⬜ 收到第一筆捐款（可用測試模式）</li>
+        <li id="activationStepAlert" style="padding: 8px 0;">⬜ 確認直播畫面有跳出即時提示</li>
+      </ul>
+    </div>
+
     <!-- User Info & Subscription Status -->
     <div class="card" style="margin-bottom: 30px;">
       <div class="user-info" id="userInfo">
@@ -2287,6 +2298,28 @@
     });
 
     // Helper: Add timeout to promises
+    async function loadActivationChecklist() {
+      const response = await fetch('/admin/activation');
+      const data = await response.json();
+      if (!data.steps) return;
+
+      const { steps } = data;
+      const allDone = steps.ecpayConfigured && steps.obsConnected.done && steps.firstDonation.done && steps.liveAlertConfirmed;
+
+      document.getElementById('activationStepEcpay').textContent =
+        (steps.ecpayConfigured ? '✅' : '⬜') + ' 設定 ECPay 收款方式';
+      document.getElementById('activationStepObs').textContent =
+        (steps.obsConnected.done ? '✅' : '⬜') + ' 在 OBS 加入斗內條 Browser Source';
+      document.getElementById('activationStepDonation').textContent =
+        (steps.firstDonation.done ? '✅' : '⬜') + ' 收到第一筆捐款（可用測試模式）';
+      document.getElementById('activationStepAlert').textContent =
+        (steps.liveAlertConfirmed ? '✅' : '⬜') + ' 確認直播畫面有跳出即時提示';
+
+      // Hide the checklist once every step is complete, so returning users aren't
+      // nagged after they're fully activated.
+      document.getElementById('activationCard').style.display = allDone ? 'none' : '';
+    }
+
     function withTimeout(promise, ms, name) {
       return Promise.race([
         promise,
@@ -2343,6 +2376,15 @@
       } catch (error) {
         console.error('❌ Failed to load overlay settings:', error);
         console.warn('⚠️ This is not critical - you can still configure overlay later');
+      }
+
+      try {
+        console.log('6️⃣ Loading activation checklist...');
+        await withTimeout(loadActivationChecklist(), 10000, 'loadActivationChecklist');
+        console.log('✅ Activation checklist loaded');
+      } catch (error) {
+        console.error('❌ Failed to load activation checklist:', error);
+        console.warn('⚠️ This is not critical');
       }
 
       console.log('🎉 Admin panel initialized!');

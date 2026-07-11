@@ -37,14 +37,15 @@ Record the backup file path and its size in the evidence checklist (Section 7) b
 npm run migrate
 ```
 
-This runs four scripts in sequence (`package.json`), and the whole chain stops at the first failure (`&&`):
+This runs five scripts in sequence (`package.json`), and the whole chain stops at the first failure (`&&`):
 
 1. **`migrations/migrate.js`** — the original base-schema migration. Against PostgreSQL it checks whether the `users` table already exists; if so it rolls back and exits without making changes (already-migrated staging databases are safe to re-run against). If `users` does not exist, it creates all core tables (`users`, `subscriptions`, `user_workspaces`, `workspace_settings`, `payment_providers`, `donations`, `api_keys`, `audit_logs`, `fraud_prevention`, `feedback`) inside one transaction, migrates any legacy `app_data`/`donations` rows into the new schema, creates one admin user from `ADMIN_EMAIL`/`ADMIN_USERNAME`/`ADMIN_PASSWORD`, and drops the old `app_data`/`donations_old` tables. **This script only ever runs its migration once per database** — it is not designed to be re-applied after schema drift; do not treat a clean second run as proof the migration is idempotent for content changes, only that it will not error.
 2. **`migrations/run-subscription-migration.js`** — applies `migrations/add-subscription-payment-system.sql` (adds ECPay tracking columns to `subscriptions`, creates `payment_history`, creates the `subscription_overview` view). It checks for the `ecpay_merchant_trade_no` column first and skips with a message if already applied. The SQL itself uses `ADD COLUMN IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS`, so it is safe to re-run.
 3. **`migrations/run-payment-idempotency-migration.js`** — applies `migrations/20260711-fix-payment-idempotency.sql` (drops the old unique constraint on `payment_history.ecpay_trade_no` and replaces it with a partial unique index that ignores `NULL`). The index is created with `IF NOT EXISTS`, so re-running is safe.
-4. **`migrations/encrypt-provider-credentials.js`** — locks and scans every `payment_providers` row; any `merchant_id`/`hash_key`/`hash_iv` value not already in the `enc:v1:` envelope format is encrypted with `CREDENTIAL_ENCRYPTION_KEY`. Rows already encrypted are left untouched, so re-running is safe **as long as `CREDENTIAL_ENCRYPTION_KEY` has not changed** since the previous run — see [credentials.js](../../credentials.js) `isEncryptedCredential`/`encryptCredential`.
+4. **`migrations/run-activation-tracking-migration.js`** — applies `migrations/20260711-add-activation-tracking.sql` (adds nullable `obs_connected_at`/`first_donation_at` timestamp columns to `workspace_settings`, used by the guided-activation checklist — see [activation.js](../../activation.js) and `GET /admin/activation`). Both columns are added with `ADD COLUMN IF NOT EXISTS`, so re-running is safe.
+5. **`migrations/encrypt-provider-credentials.js`** — locks and scans every `payment_providers` row; any `merchant_id`/`hash_key`/`hash_iv` value not already in the `enc:v1:` envelope format is encrypted with `CREDENTIAL_ENCRYPTION_KEY`. Rows already encrypted are left untouched, so re-running is safe **as long as `CREDENTIAL_ENCRYPTION_KEY` has not changed** since the previous run — see [credentials.js](../../credentials.js) `isEncryptedCredential`/`encryptCredential`.
 
-Net effect: for a staging PostgreSQL database, re-running `npm run migrate` after a successful run is safe (steps 1 skips entirely, steps 2–4 are idempotent). Capture the full console output for the evidence checklist; it no longer contains the admin password (see Limitations, "Resolved" note), but still redact `DATABASE_URL`/hostnames if the connection string was echoed by any wrapper script before storing output anywhere outside a local secret vault.
+Net effect: for a staging PostgreSQL database, re-running `npm run migrate` after a successful run is safe (step 1 skips entirely, steps 2–5 are idempotent). Capture the full console output for the evidence checklist; it no longer contains the admin password (see Limitations, "Resolved" note), but still redact `DATABASE_URL`/hostnames if the connection string was echoed by any wrapper script before storing output anywhere outside a local secret vault.
 
 `migrations/add-feedback-table.sql` exists in the `migrations/` directory but is **not** referenced by `npm run migrate` or by any script in `package.json` — step 1 already creates `feedback` inline. Do not run it manually; it is dead/duplicate SQL, not an undocumented required step. Flag its removal to Codex/a later cycle rather than deleting it in this doc-only lane.
 
@@ -56,7 +57,8 @@ After migration completes, before declaring the rehearsal a pass:
 - [ ] `psql "$DATABASE_URL" -c "\dt"` shows `users`, `subscriptions`, `user_workspaces`, `workspace_settings`, `payment_providers`, `donations`, `api_keys`, `audit_logs`, `fraud_prevention`, `feedback`, `payment_history`, and no leftover `app_data`/`donations_old`.
 - [ ] `SELECT ecpay_merchant_trade_no, last_payment_status, grace_period_end_at FROM subscriptions LIMIT 1;` succeeds (confirms step 2 columns exist).
 - [ ] `SELECT indexname FROM pg_indexes WHERE tablename = 'payment_history' AND indexname = 'uq_payment_history_ecpay_trade_no';` returns one row (confirms step 3).
-- [ ] `SELECT merchant_id FROM payment_providers LIMIT 5;` — every non-empty value starts with `enc:v1:` (confirms step 4; do not print decrypted values).
+- [ ] `SELECT column_name FROM information_schema.columns WHERE table_name = 'workspace_settings' AND column_name IN ('obs_connected_at', 'first_donation_at');` returns both rows (confirms step 4).
+- [ ] `SELECT merchant_id FROM payment_providers LIMIT 5;` — every non-empty value starts with `enc:v1:` (confirms step 5; do not print decrypted values).
 - [ ] One redacted `SELECT` against `user_workspaces` and `donations` shows expected row counts relative to the pre-migration backup (spot-check, not a full diff).
 - [ ] Log in through Google OAuth against the staging domain and confirm the created admin account is reachable via `requirePlatformAdmin` if `ADMIN_EMAIL` was added to staging `PLATFORM_ADMIN_EMAILS`; otherwise confirm the row exists in `users` without attempting a login that isn't wired up.
 - [ ] `npm test` still passes (it does not touch the staging database, but confirms the code under rehearsal is the code that produced these results).
@@ -67,7 +69,7 @@ There is no automated rollback script — `AGENTS.md`/`CLAUDE.md` state this exp
 
 Decision path if verification (Section 4) fails or migration errors mid-run:
 
-1. **If `npm run migrate` fails before COMMIT** (step 1's `migratePostgreSQL` wraps its work in one transaction and rolls back on error; steps 2–4 are single-statement/idempotent so a failure there generally leaves prior state intact) — read the printed error, fix the root cause (missing extension, permissions, connectivity), and re-run `npm run migrate` from Section 3. Re-running is safe per the idempotency notes above.
+1. **If `npm run migrate` fails before COMMIT** (step 1's `migratePostgreSQL` wraps its work in one transaction and rolls back on error; steps 2–5 are single-statement/idempotent so a failure there generally leaves prior state intact) — read the printed error, fix the root cause (missing extension, permissions, connectivity), and re-run `npm run migrate` from Section 3. Re-running is safe per the idempotency notes above.
 2. **If verification fails after a reported success** (data looks wrong, counts don't match, encrypted values are missing) — stop making further writes to the staging database immediately. Do not attempt an ad-hoc manual `ALTER`/`UPDATE` to patch it live.
 3. **Restore from the Section 2 backup:**
    ```powershell
@@ -91,7 +93,7 @@ Stop and do not proceed past the listed step if any of the following occur:
 | `npm run migrate` exits non-zero | Section 3 | Do not run verification as if it succeeded. Follow Section 5, item 1. |
 | Any Section 4 verification check fails | Section 4 | Stop writes. Follow Section 5, items 2–4. |
 | `operations/postgres-restore.js` exits non-zero, including auth-tag/format failures | Section 5 | Hard stop per Section 5, item 5. Escalate — do not attempt manual recovery. |
-| `CREDENTIAL_ENCRYPTION_KEY` differs from the key used on a previous run against the same staging data | Preflight/Section 3 | Do not run step 4 of the migration; decrypting existing rows will fail later with a mismatched key. Confirm the correct key from the secret vault first. |
+| `CREDENTIAL_ENCRYPTION_KEY` differs from the key used on a previous run against the same staging data | Preflight/Section 3 | Do not run step 5 of the migration; decrypting existing rows will fail later with a mismatched key. Confirm the correct key from the secret vault first. |
 
 ## 7. Evidence checklist
 

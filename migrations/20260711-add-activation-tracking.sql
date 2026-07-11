@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS obs_connected_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS first_donation_at TIMESTAMP WITH TIME ZONE;
+
+COMMIT;

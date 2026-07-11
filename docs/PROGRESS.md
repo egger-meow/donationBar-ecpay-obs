@@ -14,6 +14,55 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-11 — Guided activation checklist (P1, first slice)
+
+Attempted a Docker-based local PostgreSQL rehearsal (the previous entry's blocker) with
+the user's explicit permission to install Docker Desktop. Docker Desktop installed
+cleanly via `winget`, but its engine requires WSL2, which is not installed on this
+Windows 11 **Home** machine (Hyper-V isn't available on Home editions, so WSL2 is the
+only backend option) — enabling it needs admin-elevated `wsl --install` and a system
+restart. Stopped there: enabling an OS virtualization feature and restarting the machine
+is "modifying system settings," which stays off-limits regardless of the earlier Docker
+install consent, and a restart would interrupt whatever else is running on the machine.
+The Postgres rehearsal remains blocked pending either the user running `wsl --install`
+themselves, or a hosted staging `DATABASE_URL`.
+
+Pivoted to P1 "Guided activation" (ROADMAP.md — flagged 100% unbuilt by the earlier TC
+survey), since it needs no external access. Shipped the first slice:
+- `activation.js` — new pure module, `computeActivationSteps({ provider, settings })`,
+  covered by `test/activation.test.js` (5 cases). Follows the same
+  extract-pure-logic-for-testability pattern as `subscription-callback.js`, since
+  `database.js` itself has no test seam (`DB_PATH` is a hardcoded module constant, not
+  injectable — a pre-existing gap, not something this change tries to fix).
+- `migrations/20260711-add-activation-tracking.sql` +
+  `migrations/run-activation-tracking-migration.js` — adds nullable
+  `obs_connected_at`/`first_donation_at` columns to `workspace_settings`. Wired into the
+  `npm run migrate` chain (now 5 scripts, was 4) in `package.json`; `CLAUDE.md` and
+  `docs/migration/MIGRATION_GUIDE.md` updated to match.
+- `database.js` — `markWorkspaceObsConnected`/`markWorkspaceFirstDonation`, each
+  idempotent (first-write-wins) in both the Postgres and JSON/sandbox code paths.
+  Idempotency verified directly against the JSON backend (not just read from the code).
+- `server.js` — `GET /admin/activation` (new); the `/events` SSE handler now marks OBS
+  connected only when the query carries `source=overlay` (added to `overlay.html`'s
+  `EventSource` URL) so that `admin.html`/`donate.html` polling the same SSE stream for
+  live UI updates don't produce a false "OBS connected" positive; the shared
+  `addDonation()` helper marks first-donation on every successful donation-adding call
+  site (webhook, `/ecpay/return`, `/success` POST, sandbox `/create-order`) since they
+  all funnel through it already.
+- `admin.html` — a checklist card, hidden once all four steps are complete so returning
+  activated users aren't nagged.
+
+Known limitation, stated plainly rather than glossed over: "live alert confirmed" is a
+heuristic (`obsConnected && firstDonation`), not a confirmed visual observation — see the
+doc comment in `activation.js`. Not yet built, and explicitly out of scope for this
+slice: funnel timing (median time from OAuth → workspace → provider → test donation →
+OBS → live alert, per ROADMAP.md section 14) and any analytics/event-tracking
+infrastructure — there is none in this codebase. Verified only via `npm test` (51/51)
+and manual sandbox smoke tests (server boot, auth-gating on `/admin/activation`, a real
+sandbox donation setting `first_donation_at`, direct idempotency check on
+`markWorkspaceObsConnected`); **not** verified against a real OBS Browser Source or real
+staging.
+
 ## 2026-07-11 — Real (unmocked) local alert-delivery exercise
 
 Ran `sendAlert('readiness_check_failed', ...)` from `observability.js` for real, twice,

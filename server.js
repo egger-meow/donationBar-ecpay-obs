@@ -17,6 +17,7 @@ import { generateCheckMacValueForCredentials, verifyCheckMacValueForCredentials 
 import { requireSameOrigin } from './security.js';
 import { logError, logInfo, logWarn, requestObservability, sendAlert } from './observability.js';
 import { processSubscriptionPaymentCallback as processSubscriptionPaymentCallbackCore } from './subscription-callback.js';
+import { computeActivationSteps } from './activation.js';
 
 const app = express();
 const __dirname = path.resolve();
@@ -458,6 +459,12 @@ app.get('/events', requireActiveSubscription, async (req, res) => {
 
   logInfo('sse_client_connected');
 
+  // Only the overlay page identifies itself with source=overlay; admin/donate pages
+  // also use this stream for live UI updates and must not count as OBS activation.
+  if (req.query.source === 'overlay') {
+    database.markWorkspaceObsConnected(workspace.id).catch(() => {});
+  }
+
   // Send initial data for the specified workspace
   res.write(`data: ${JSON.stringify(await getProgress(workspace.id))}\n\n`);
 
@@ -551,6 +558,7 @@ async function addDonation(workspaceId, { tradeNo, amount, payer, message, payme
   });
   if (success) {
     await broadcastProgress(workspaceId);
+    database.markWorkspaceFirstDonation(workspaceId).catch(() => {});
   }
   return success;
 }
@@ -1530,6 +1538,28 @@ app.get('/admin/progress', requireAdmin, async (req, res) => {
       percent: 0,
       donations: []
     });
+  }
+});
+
+// Guided activation checklist: provider configured, OBS connected, first donation,
+// live alert. See ROADMAP.md P1 "Guided activation" and activation.js for the
+// (heuristic, documented) definition of each step.
+app.get('/admin/activation', requireAdmin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
+
+    const [provider, settings] = await Promise.all([
+      database.getPaymentProvider(workspace.id, 'ecpay'),
+      database.getWorkspaceSettings(workspace.id)
+    ]);
+
+    res.json({ steps: computeActivationSteps({ provider, settings }) });
+  } catch (error) {
+    logError('admin_activation_fetch_failed', { request_id: req.requestId });
+    res.status(500).json({ error: 'internal_error' });
   }
 });
 
