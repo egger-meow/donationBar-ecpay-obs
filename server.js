@@ -875,7 +875,7 @@ app.post('/success', async (req, res) => {
     await addDonation(workspace.id, {
       tradeNo: p.MerchantTradeNo,
       amount: p.TradeAmt,
-      payer: p.CustomField1 || 'Anonymous',
+      payer: p.CustomField1 || '匿名',
       message: p.CustomField2 || '',
       paymentProviderId: provider?.id
     });
@@ -980,7 +980,7 @@ app.post('/webhook/:slug', async (req, res) => {
     const donationAdded = await addDonation(workspace.id, {
       tradeNo: orderInfo.MerchantTradeNo,
       amount: orderInfo.TradeAmt,
-      payer: decryptedData.PatronName || 'Anonymous',
+      payer: decryptedData.PatronName || '匿名',
       message: decryptedData.PatronNote || '',
       paymentProviderId: provider?.id
     });
@@ -1293,7 +1293,7 @@ app.post('/ecpay/return', async (req, res) => {
     await addDonation(workspace.id, {
       tradeNo: p.MerchantTradeNo,
       amount: p.TradeAmt,
-      payer: p.CustomField1 || 'Anonymous',
+      payer: p.CustomField1 || '匿名',
       message: p.CustomField2 || '',
       paymentProviderId: provider?.id
     });
@@ -1372,7 +1372,7 @@ async function legacyDuplicateWebhookHandler(req, res) {
     const donationAdded = await addDonation(workspace.id, {
       tradeNo: orderInfo.MerchantTradeNo,
       amount: orderInfo.TradeAmt,
-      payer: decryptedData.PatronName || 'Anonymous',
+      payer: decryptedData.PatronName || '匿名',
       message: decryptedData.PatronNote || '',
       paymentProviderId: provider?.id
     });
@@ -1414,7 +1414,7 @@ app.post('/create-order', async (req, res) => {
 
   const amountText = String(amount ?? '').trim();
   const amt = /^\d{1,7}$/.test(amountText) ? Number(amountText) : NaN;
-  const normalizedNickname = String(nickname || 'Anonymous').trim().slice(0, 80) || 'Anonymous';
+  const normalizedNickname = String(nickname || '匿名').trim().slice(0, 80) || '匿名';
   const normalizedMessage = String(message || '').trim().slice(0, 300);
   const normalizedSlug = String(slug || '').trim();
   if (!Number.isSafeInteger(amt) || amt < 1 || amt > 1_000_000) {

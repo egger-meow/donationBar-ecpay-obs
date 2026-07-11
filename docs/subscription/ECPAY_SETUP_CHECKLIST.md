@@ -1,14 +1,18 @@
 # ✅ ECPay Setup Checklist
 
-> 審核通過後的設定步驟清單
+> 審核通過後的設定步驟清單。這份文件描述**平台自身**用於收取 DonationBar 訂閱費的
+> ECPay 特約商店設定（對應 `.env` 中的 `BILLING_ECPAY_MERCHANT_ID` /
+> `BILLING_ECPAY_HASH_KEY` / `BILLING_ECPAY_HASH_IV`），不是個別實況主用來收捐款的
+> workspace ECPay 憑證（那組憑證存在資料庫的 `payment_providers` 表，由各實況主在
+> Admin 後台自行輸入，詳見 [Complete Setup Guide](../setup/COMPLETE_SETUP_GUIDE.md)）。
+
+*最後校對: 2026-07-11。以下審核狀態欄位建立於 2026-01-03，本檔案無法驗證目前真實審核進度 — 執行前請直接登入 ECPay 商家後台確認現況，不要假設本檔案的勾選狀態仍然正確。*
 
 ---
 
-## 🟡 等待中 - ECPay 帳號審核
+## 🟡 帳號審核狀態（建立時記錄，需自行重新確認）
 
-**預計時間：** 3-5 工作日
-
-**審核項目：**
+**審核項目（2026-01-03 時的記錄）：**
 - [x] 身分驗證
 - [x] 銀行驗證
 - [ ] 金流-非信用卡收款 (審核中)
@@ -24,19 +28,22 @@
 
 取得以下資訊：
 ```
-MERCHANT_ID = ________________
-HASH_KEY    = ________________
-HASH_IV     = ________________
+BILLING_ECPAY_MERCHANT_ID = ________________
+BILLING_ECPAY_HASH_KEY    = ________________
+BILLING_ECPAY_HASH_IV     = ________________
 ```
 
 ### Step 2: 更新環境變數
 
 編輯 `.env` 檔案：
 ```env
-# ECPay 正式環境
-MERCHANT_ID=你的特店編號
-HASH_KEY=你的HashKey
-HASH_IV=你的HashIV
+# ECPay 正式環境 — 平台自身用於收訂閱費的商店（不是實況主的收款憑證）
+BILLING_ECPAY_MERCHANT_ID=你的特店編號
+BILLING_ECPAY_HASH_KEY=你的HashKey
+BILLING_ECPAY_HASH_IV=你的HashIV
+
+# 切換 ECPay 端點為正式環境（見 config.js）
+ECPAY_ENVIRONMENT=production
 
 # 確保 BASE_URL 是 HTTPS
 BASE_URL=https://your-production-domain.com
@@ -54,14 +61,10 @@ BASE_URL=https://your-production-domain.com
 
 ### Step 4: 切換到正式環境
 
-修改 `server.js` (約 line 1656):
-```javascript
-// 從測試環境
-const action = 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5';
-
-// 改為正式環境
-const action = 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5';
-```
+不需要修改 `server.js`。stage/production 端點的切換完全由 `.env` 的
+`ECPAY_ENVIRONMENT` 決定（`stage` 或 `production`，見 `config.js`），Step 2 已經設定。
+`validateProductionConfig()`（`config.js`）會在啟動時檢查這個值是合法選項，值錯誤時會
+直接拒絕啟動。
 
 ### Step 5: 執行資料庫遷移
 
@@ -78,10 +81,11 @@ npm run migrate
    - 確認回調正常
 
 2. **檢查 Log**
+
+   Log 現在是結構化 JSON（見 [Monitoring and Incident Response](../operations/MONITORING_AND_INCIDENT_RESPONSE.md)），確認有看到含以下 `event` 欄位的行：
    ```bash
-   # 確認有看到
-   ✅ Subscription payment successful
-   💰 ECPay Period Callback received
+   "event":"legacy_period_callback_received"
+   "event":"legacy_subscription_payment_succeeded"
    ```
 
 3. **資料庫驗證**

@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Admin Panel - Donation Goal Management</title>
+  <title>管理後台 - 捐款目標管理</title>
   <style>
     * {
       margin: 0;
@@ -780,7 +780,7 @@
 <body>
   <div class="container">
     <div class="header">
-      <h1>Admin Panel</h1>
+      <h1>管理後台</h1>
       <p>管理捐款目標和監控直播進度</p>
     </div>
 
@@ -1425,7 +1425,7 @@
     }
 
     if (new URLSearchParams(window.location.search).get('subscription') === 'success') {
-      showAlert('Subscription payment received. Your account will update after ECPay confirms the payment.', 'success');
+      showAlert('已收到訂閱付款，帳號將於 ECPay 確認付款後更新。', 'success');
     }
 
     function showFormFeedback(elementId, message, type = 'success') {
@@ -2172,59 +2172,42 @@
     }
 
     function manageBilling() {
-      showAlert('Payment-method changes are managed by ECPay. Cancel and start a new subscription to change cards.', 'info');
+      showAlert('付款方式變更由 ECPay 管理，如需更換卡片請取消訂閱後重新訂閱。', 'info');
     }
 
     async function cancelSubscription() {
-      if (!confirm('Cancel your subscription? Access continues until the end of the paid period.')) return;
+      if (!confirm('確定要取消訂閱嗎？\n\n取消後：\n- 本期結束後將無法使用付費功能\n- 斗內條和捐款頁面將被停用\n- 可隨時重新訂閱')) return;
       try {
         const response = await fetch('/subscription/cancel', { method: 'POST', headers: { Accept: 'application/json' } });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Cancellation failed');
-        showAlert('Subscription cancelled. Your paid access remains available until the displayed end date.', 'success');
+        if (!response.ok) throw new Error(result.error || '取消失敗');
+        showAlert('訂閱已取消。付費功能可使用至顯示的到期日為止。', 'success');
         await loadUserInfo();
       } catch (error) {
         showAlert(error.message, 'error');
-      }
-      return;
-      if (confirm('確定要取消訂閱嗎？\n\n取消後：\n- 本期結束後將無法使用付費功能\n- 斗內條和捐款頁面將被停用\n- 可隨時重新訂閱')) {
       }
     }
 
     async function pauseSubscription() {
-      showAlert('ECPay cannot safely pause recurring billing. Cancel the subscription to stop future charges.', 'info');
-      return;
-      try {
-        const response = await fetch('/subscription/pause', { method: 'POST', headers: { Accept: 'application/json' } });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Pause failed');
-        showAlert('Subscription paused.', 'success');
-        await loadUserInfo();
-      } catch (error) {
-        showAlert(error.message, 'error');
-      }
-      return;
-      if (confirm('確定要暫停訂閱嗎？\n\n暫停期間：\n- 不會扣款\n- 無法使用付費功能\n- 可隨時恢復訂閱')) {
-      }
+      showAlert('ECPay 無法安全地暫停週期性扣款，請改用取消訂閱以停止未來扣款。', 'info');
     }
 
     async function viewPaymentHistory() {
       try {
         const response = await fetch('/api/subscription/payment-history', { headers: { Accept: 'application/json' } });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Could not load payment history');
+        if (!response.ok) throw new Error(result.error || '無法載入付款紀錄');
         const rows = result.payments.length
           ? result.payments.map(payment => `${new Date(payment.date).toLocaleDateString()} · ${payment.currency} ${payment.amount} · ${payment.status}`).join('\n')
-          : 'No payments yet.';
+          : '尚無付款紀錄。';
         alert(rows);
       } catch (error) {
         showAlert(error.message, 'error');
       }
-      return;
     }
 
     function manageInvoice() {
-      showAlert('Electronic invoicing is not enabled for this account yet.', 'info');
+      showAlert('此帳號尚未啟用電子發票功能。', 'info');
     }
 
     // Feedback Form
