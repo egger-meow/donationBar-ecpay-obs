@@ -1,4 +1,5 @@
 import { verifyCheckMacValueForCredentials } from './ecpay.js';
+import { parseMinorUnitAmount } from './money.js';
 
 function nextMonthlyBillingDate(from = new Date()) {
   const next = new Date(from);
@@ -15,14 +16,14 @@ export async function processSubscriptionPaymentCallback(payload, { credentials,
   const tradeNo = String(payload.TradeNo || '').trim();
   const merchantTradeNo = String(payload.MerchantTradeNo || '').trim();
   const amountText = String(payload.PeriodAmount || payload.TradeAmt || '').trim();
-  const amount = /^\d{1,9}$/.test(amountText) ? Number(amountText) : NaN;
+  const amount = parseMinorUnitAmount(amountText);
   if (!userId || !/^[a-zA-Z0-9_-]{1,50}$/.test(tradeNo) || !/^[a-zA-Z0-9_-]{1,50}$/.test(merchantTradeNo) || !Number.isSafeInteger(amount)) {
     return { ok: false, status: 400, message: '0|Invalid payment data' };
   }
 
   const subscription = await database.getUserSubscription(userId);
   if (!subscription || (subscription.ecpayMerchantTradeNo && subscription.ecpayMerchantTradeNo !== merchantTradeNo)) return { ok: false, status: 404, message: '0|Subscription not found' };
-  const expectedAmount = Number.parseInt(subscription.pricePerMonth || monthlyPrice || '70', 10);
+  const expectedAmount = parseMinorUnitAmount(subscription.pricePerMonth ?? monthlyPrice ?? '70');
   if (!Number.isSafeInteger(expectedAmount) || expectedAmount < 1 || amount !== expectedAmount) return { ok: false, status: 400, message: '0|Invalid payment amount' };
 
   const success = String(payload.RtnCode) === '1';

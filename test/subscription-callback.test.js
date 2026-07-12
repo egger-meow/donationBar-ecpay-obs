@@ -52,6 +52,10 @@ test('invalid signature and wrong amount never persist or mutate subscription', 
   const wrongAmountStore = database();
   assert.deepEqual(await processSubscriptionPaymentCallback(payload({ PeriodAmount: '1' }), { credentials, database: wrongAmountStore, monthlyPrice: '299' }), { ok: false, status: 400, message: '0|Invalid payment amount' });
   assert.equal(wrongAmountStore.calls.payments.length, 0);
+
+  const decimalAmountStore = database();
+  assert.deepEqual(await processSubscriptionPaymentCallback(payload({ PeriodAmount: '299.5' }), { credentials, database: decimalAmountStore, monthlyPrice: '299' }), { ok: false, status: 400, message: '0|Invalid payment data' });
+  assert.equal(decimalAmountStore.calls.payments.length, 0);
 });
 
 test('duplicate callbacks never mutate subscription a second time', async () => {

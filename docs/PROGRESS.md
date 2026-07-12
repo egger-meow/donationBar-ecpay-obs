@@ -14,6 +14,22 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-12 — Strict platform subscription money normalization (P0)
+
+Extended the money invariant to recurring platform billing:
+
+- `subscription-callback.js` now uses the shared minor-unit parser for provider
+  `PeriodAmount`/`TradeAmt` and the stored expected plan price. Decimal, malformed,
+  zero, negative, and out-of-range values cannot create payment history.
+- `database.createPaymentRecord()` validates amount and supported currency before either
+  PostgreSQL or sandbox persistence, and validates optional cumulative-success totals
+  (including legitimate zero for a failed callback).
+- Added a decimal recurring-callback regression fixture; all existing success/failure,
+  signature, wrong-amount, and duplicate/idempotency tests remain green.
+
+Verification: `npm.cmd test` passes **74/74** tests and `git diff --check` passes. Real
+ECPay recurring callbacks and reconciliation remain staging evidence gates.
+
 ## 2026-07-12 — Strict donation money normalization at persistence boundary (P0)
 
 Closed a payment-correctness gap found in the callback audit:

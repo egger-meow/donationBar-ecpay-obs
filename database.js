@@ -1088,6 +1088,13 @@ class Database {
    * Create payment record
    */
   async createPaymentRecord(paymentData) {
+    const amount = parseMinorUnitAmount(paymentData.amount);
+    const currency = normalizeCurrency(paymentData.currency);
+    if (!Number.isInteger(amount) || !currency) throw new Error('Invalid payment money');
+    const totalSuccessAmount = paymentData.totalSuccessAmount == null
+      ? null
+      : parseMinorUnitAmount(paymentData.totalSuccessAmount, { minimum: 0 });
+    if (paymentData.totalSuccessAmount != null && !Number.isInteger(totalSuccessAmount)) throw new Error('Invalid payment total');
     const paymentId = uuidv4();
 
     if (this.isProduction && this.connected) {
@@ -1108,8 +1115,8 @@ class Database {
         paymentId,
         paymentData.subscriptionId,
         paymentData.userId,
-        paymentData.amount,
-        paymentData.currency || 'TWD',
+        amount,
+        currency,
         paymentData.status,
         paymentData.ecpayTradeNo || null,
         paymentData.ecpayMerchantTradeNo || null,
@@ -1129,7 +1136,7 @@ class Database {
         paymentData.frequency || null,
         paymentData.execTimes || null,
         paymentData.totalSuccessTimes || null,
-        paymentData.totalSuccessAmount || null,
+        totalSuccessAmount,
         paymentData.status === 'success' ? (paymentData.paidAt || new Date()) : null
       ]);
       if (result.rows[0]) return { ...this.camelCaseKeys(result.rows[0]), wasDuplicate: false };
@@ -1146,8 +1153,8 @@ class Database {
         id: paymentId,
         subscriptionId: paymentData.subscriptionId,
         userId: paymentData.userId,
-        amount: paymentData.amount,
-        currency: paymentData.currency || 'TWD',
+        amount,
+        currency,
         status: paymentData.status,
         ecpayTradeNo: paymentData.ecpayTradeNo || null,
         ecpayMerchantTradeNo: paymentData.ecpayMerchantTradeNo || null,
@@ -1167,7 +1174,7 @@ class Database {
         frequency: paymentData.frequency || null,
         execTimes: paymentData.execTimes || null,
         totalSuccessTimes: paymentData.totalSuccessTimes || null,
-        totalSuccessAmount: paymentData.totalSuccessAmount || null,
+        totalSuccessAmount,
         createdAt: new Date().toISOString(),
         paidAt: paymentData.status === 'success' ? (paymentData.paidAt || new Date().toISOString()) : null,
         updatedAt: new Date().toISOString()

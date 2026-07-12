@@ -3,11 +3,11 @@
 // adding another provider/currency must be a deliberate adapter decision, not an
 // arbitrary three-letter string.
 export const SUPPORTED_DONATION_CURRENCIES = new Set(['TWD']);
-export function parseMinorUnitAmount(value, { maximum = 1_000_000 } = {}) {
+export function parseMinorUnitAmount(value, { maximum = 1_000_000, minimum = 1 } = {}) {
   const text = typeof value === 'number' ? String(value) : String(value ?? '').trim();
   if (!/^\d+$/.test(text)) return NaN;
   const amount = Number(text);
-  return Number.isSafeInteger(amount) && amount >= 1 && amount <= maximum ? amount : NaN;
+  return Number.isSafeInteger(amount) && amount >= minimum && amount <= maximum ? amount : NaN;
 }
 
 export function normalizeCurrency(value, fallback = 'TWD') {
