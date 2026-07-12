@@ -21,6 +21,7 @@ import { computeActivationSteps } from './activation.js';
 import { buildAccountExport } from './privacy-export.js';
 import { GENERAL_RATE_LIMIT, PROVIDER_CALLBACK_RATE_LIMIT, isProviderCallbackPath } from './rate-limit-policy.js';
 import { getHelmetOptions } from './security-headers.js';
+import { createDonationTradeNo, createSubscriptionTradeNo } from './trade-number.js';
 
 const app = express();
 const __dirname = path.resolve();
@@ -1451,7 +1452,7 @@ app.post('/create-order', requireSameOrigin, async (req, res) => {
   }
   if (normalizedSlug && !/^[a-z0-9-]{1,100}$/.test(normalizedSlug)) return res.status(400).json({ error: 'Invalid workspace' });
 
-  const tradeNo = 'DONATE' + Date.now();           // 長度 <= 20
+  const tradeNo = createDonationTradeNo();
   const tradeDate = formatECPayDate(new Date());     // 正確格式
 
   // Sandbox mode: simulate successful payment without ECPay API
@@ -1892,7 +1893,7 @@ app.post('/subscription/checkout', requireAuth, requireSameOrigin, async (req, r
 
     // Subscription parameters
     const monthlyPrice = getSubscriptionPlan().monthlyPrice;
-    const tradeNo = 'SUB' + Date.now();
+    const tradeNo = createSubscriptionTradeNo();
     const tradeDate = formatECPayDate(new Date());
 
     // ECPay Periodic Payment Parameters (based on official docs)

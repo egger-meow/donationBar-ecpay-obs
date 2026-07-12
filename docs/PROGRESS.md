@@ -5,6 +5,7 @@
 This is an index only; the complete dated entries and building path remain below.
 
 - 2026-07-12 — Bound overlay alerts for short viewports and long text (P1 reliability)
+- 2026-07-12 — Collision-resistant provider trade numbers (P0 payment correctness)
 - 2026-07-12 — Rotate OAuth sessions after authentication (P0 security)
 - 2026-07-12 — Track overlay SSE reconnect handles (P1 reliability)
 - 2026-07-12 — Staging preflight verifies observability and CSP (P0)
@@ -46,6 +47,20 @@ For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edit
 place as work completes or priorities shift.
 
 ---
+
+## 2026-07-12 - Collision-resistant provider trade numbers (P0 payment correctness)
+
+Closed a same-millisecond order-ID collision risk in both payment families:
+
+- Public donation orders now use an alphanumeric ECPay-compatible identifier with a
+  timestamp component plus 40 bits of randomness, capped at 20 characters.
+- Platform subscription checkout orders use the same generator with a bounded prefix
+  and 32 bits of randomness, also within the provider limit.
+- Added deterministic tests for length, character set, entropy sizing, and invalid
+  inputs. This prevents concurrent orders from being mistaken for one idempotent trade.
+
+Verification: `npm.cmd test` passes **83/83** tests and `git diff --check` passes. Real
+provider acceptance and replay evidence remain staging gates.
 
 ## 2026-07-12 - Rotate OAuth sessions after authentication (P0 security)
 
