@@ -1,11 +1,12 @@
 # Beta Recruitment Draft Materials
 
-Status: draft, unsent, 2026-07-11. Nobody has been contacted using this. Prepared per
+Status: draft, unsent, 2026-07-12. Nobody has been contacted using this. Prepared per
 [ROADMAP.md](../../ROADMAP.md) section 13 ("Beta recruitment") and section 17 action 9
-("Recruit first five design partners, then expand to 10–20"). Edit before sending —
+("Recruit exactly one unfamiliar streamer, then expand to five and 10–20 only after the
+first-streamer gate"). Edit before sending —
 especially the bracketed placeholders — and send it yourself; this is drafting only.
 
-## Screening checklist (use before inviting anyone)
+## Screening checklist (use before inviting the first streamer)
 
 Per ROADMAP.md section 13, a good candidate should clear all of these:
 
@@ -22,6 +23,10 @@ Per ROADMAP.md section 13, a good candidate should clear all of these:
       check-in
 
 ## Outreach message draft (Traditional Chinese)
+
+Send this to exactly one qualified stranger first. Do not send a batch invite until that
+person completes the full self-service payment/OBS gate or a documented blocker causes a
+pause.
 
 Fill in `[ ]` placeholders. Keep it short — this is an invite to a conversation, not a
 pitch deck.
@@ -64,7 +69,7 @@ not claim the four-week Beta Operations gate has been met until a real cohort op
 ## What this does not cover
 
 - Actually contacting anyone — that's a real message to a real person and needs to come
-  from you, not an automated agent.
+  from you, not an automated agent. Start with one person, not a cohort blast.
 - Legal terms of the "free 30 days for feedback" exchange — if this ever looks like a
   paid engagement in exchange for services, loop in whoever handles the
   [Legal/data baseline](../../ROADMAP.md) P0 row.

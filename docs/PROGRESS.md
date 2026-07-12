@@ -4,6 +4,7 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-07-12 — Align recruitment draft with one-streamer gate (P1 beta)
 - 2026-07-12 — Clarify real-payment activation evidence (P1 activation)
 - 2026-07-12 — Sandbox SSE test-alert for real OBS verification (P1 activation)
 - 2026-07-12 — Chinese activation test-alert path (P1 activation)
@@ -55,6 +56,18 @@ For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edit
 place as work completes or priorities shift.
 
 ---
+
+## 2026-07-12 - Align recruitment draft with one-streamer gate (P1 beta)
+
+Removed a roadmap contradiction in the outreach material:
+
+- The draft now instructs the owner to contact exactly one qualified unfamiliar streamer
+  first, observe the complete self-service path, and pause or expand only from evidence.
+- Batch recruitment is explicitly deferred until the first-streamer gate passes, then
+  the sequence is five followed by 10–20.
+
+Verification: documentation-only change; `npm.cmd test` remains the required repository
+regression check before commit.
 
 ## 2026-07-12 - Clarify real-payment activation evidence (P1 activation)
 
