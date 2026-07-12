@@ -4,6 +4,7 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-07-12 — Bound Postgres readiness health checks (P0 operations)
 - 2026-07-12 — Roadmap reset around thin ECPay core and first external streamer
 - 2026-07-12 — Explicit Asia/Taipei ECPay order timestamps (P0 payment correctness)
 - 2026-07-12 — Progress index consistency guard
@@ -50,6 +51,18 @@ For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edit
 place as work completes or priorities shift.
 
 ---
+
+## 2026-07-12 - Bound Postgres readiness health checks (P0 operations)
+
+Prevented a half-open PostgreSQL connection from hanging `/health/ready` indefinitely:
+
+- `database.healthCheck()` now bounds its `SELECT 1` probe to three seconds.
+- On timeout, it marks the client disconnected and begins safe client teardown so the
+  readiness route can return `503` and the existing alert path can fire.
+- Added reusable timeout tests for completion, prompt failure/cleanup, and invalid input.
+
+Verification: `npm.cmd test` passes **89/89** tests and `git diff --check` passes. A
+hosted readiness/alert exercise remains a production gate.
 
 ## 2026-07-12 - Roadmap reset around thin ECPay core and first external streamer
 

@@ -6,6 +6,7 @@ import { getSubscriptionPlan, isPlatformAdminEmail } from './config.js';
 import { decryptCredential, encryptCredential } from './credentials.js';
 import { databaseSsl } from './database-ssl.js';
 import { computeActivationFunnel } from './activation.js';
+import { withTimeout } from './promise-timeout.js';
 import { logError, logInfo, logWarn } from './observability.js';
 import { normalizeCurrency, parseMinorUnitAmount } from './money.js';
 
@@ -106,8 +107,12 @@ class Database {
     await this.ready;
     if (this.isProduction) {
       if (!this.connected || !pgClient) return { ok: false, storage: 'postgresql' };
+      const client = pgClient;
       try {
-        await pgClient.query('SELECT 1');
+        await withTimeout(() => client.query('SELECT 1'), 3000, () => {
+          this.connected = false;
+          client.end().catch(() => {});
+        });
         return { ok: true, storage: 'postgresql' };
       } catch {
         this.connected = false;
