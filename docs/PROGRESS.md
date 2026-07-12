@@ -27,7 +27,9 @@ Strengthened the read-only release preflight used before hosted staging exercise
   runbooks to describe the three checks.
 
 Verification: `npm.cmd test` and `git diff --check` pass. The preflight still does not
-prove provider callbacks, hosted database durability, or legal readiness.
+prove provider callbacks, hosted database durability, or legal readiness. A real local
+sandbox HTTP smoke check also returned `200` for `/health/live` and `/api/pricing` with
+request-ID and CSP headers present; hosted staging remains unproven.
 
 ## 2026-07-12 - Same-origin mutation-route audit guard (P0)
 

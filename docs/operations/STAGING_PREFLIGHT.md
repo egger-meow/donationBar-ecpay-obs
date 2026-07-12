@@ -38,8 +38,9 @@ Example output:
   "pass": true,
   "baseUrl": "https://staging.example.com",
   "checks": {
-    "live": { "path": "/health/live", "ok": true, "statusCode": 200, "durationMs": 42 },
-    "ready": { "path": "/health/ready", "ok": true, "statusCode": 200, "durationMs": 55, "status": "ready", "database": "postgresql" }
+    "live": { "path": "/health/live", "ok": true, "statusCode": 200, "durationMs": 42, "requestIdPresent": true, "contentSecurityPolicyPresent": true },
+    "ready": { "path": "/health/ready", "ok": true, "statusCode": 200, "durationMs": 55, "status": "ready", "database": "postgresql" },
+    "pricing": { "path": "/api/pricing", "ok": true, "statusCode": 200, "durationMs": 18, "contentSecurityPolicyPresent": true }
   },
   "alertWebhook": null
 }
