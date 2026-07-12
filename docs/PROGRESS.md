@@ -14,6 +14,25 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-12 — Payment callback/duplicate-webhook route audit (P0)
+
+Completed the production-checklist source review for duplicate webhook routes:
+
+- Added [WEBHOOK_ROUTE_AUDIT.md](operations/WEBHOOK_ROUTE_AUDIT.md), mapping the sole
+  active workspace webhook, donation-result fallbacks, initial/recurring subscription
+  callbacks, and navigation-only subscription success URLs.
+- Confirmed `POST /webhook/:slug` is the only registered workspace webhook. ECPay can
+  independently call notification/return/result URLs; their donation mutations all use
+  the workspace/trade-number idempotency path rather than competing persistence logic.
+- The older `legacyDuplicateWebhookHandler` has no registration or call site, so cannot
+  receive traffic. It is recorded as source-cleanup debt and must not be revived; future
+  webhook work belongs in the canonical active handler.
+- Added regression tests for the single route registration, no legacy call site, and the
+  expected callback inventory/idempotency funnel.
+
+Verification: `npm.cmd test` passes **72/72** tests and `git diff --check` passes. This
+is a source audit, not ECPay staging evidence.
+
 ## 2026-07-11 — Content Security Policy enabled with ECPay compatibility (P0)
 
 Replaced the previous disabled Helmet CSP with an enforced policy tailored to the current
