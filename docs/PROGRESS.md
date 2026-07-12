@@ -14,6 +14,21 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-12 - Same-origin mutation-route audit guard (P0)
+
+Audited every `POST`, `PUT`, `PATCH`, and `DELETE` route in `server.js`:
+
+- Browser-initiated mutations (logout, feedback, public order creation, admin changes,
+  and subscription lifecycle actions) all require `requireSameOrigin`.
+- Provider callbacks and the subscription result navigation are explicitly excluded
+  because ECPay or a browser redirect—not a same-origin application form—invokes them;
+  their own signature or display-only protections remain in place.
+- Added a source-level regression test that flags any future browser mutation route
+  declared without same-origin middleware.
+
+Verification: `npm.cmd test` and `git diff --check` pass. This is route-configuration
+coverage; it does not replace real browser and staging exercises.
+
 ## 2026-07-12 - Remove unregistered legacy payment callbacks (P0)
 
 Completed the source-cleanup debt identified in the callback route audit:
