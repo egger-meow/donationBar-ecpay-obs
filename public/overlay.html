@@ -984,14 +984,14 @@
     function setupSSE() {
       const eventsUrl = workspaceSlug ? `/events?slug=${workspaceSlug}&source=overlay` : '/events?source=overlay';
       console.log('🔌 Connecting to SSE:', eventsUrl);
-      const eventSource = new EventSource(eventsUrl);
+      const connection = new EventSource(eventsUrl);
       
-      eventSource.onopen = function() {
+      connection.onopen = function() {
         console.log('✅ SSE connection established');
         sseReconnectAttempts = 0; // Reset on successful connection
       };
       
-      eventSource.onmessage = function(event) {
+      connection.onmessage = function(event) {
         try {
           const data = JSON.parse(event.data);
           console.log('📡 SSE update received');
@@ -1002,7 +1002,7 @@
       };
 
       // Listen for overlay settings updates
-      eventSource.addEventListener('overlay-settings', function(event) {
+      connection.addEventListener('overlay-settings', function(event) {
         try {
           const newSettings = JSON.parse(event.data);
           console.log('🎨 Overlay settings updated via SSE:', newSettings);
@@ -1012,22 +1012,22 @@
         }
       });
       
-      eventSource.onerror = function(error) {
+      connection.onerror = function(error) {
         console.error('❌ SSE connection error:', error);
         
-        if (eventSource.readyState === EventSource.CLOSED) {
+        if (connection.readyState === EventSource.CLOSED) {
           // Exponential backoff: 2s, 4s, 8s, 16s, 30s (max)
           sseReconnectAttempts++;
           const delay = Math.min(1000 * Math.pow(2, sseReconnectAttempts), MAX_RECONNECT_DELAY);
           console.log(`🔁 Reconnecting in ${delay/1000}s (attempt ${sseReconnectAttempts})...`);
           
           setTimeout(() => {
-            setupSSE();
+            eventSource = setupSSE();
           }, delay);
         }
       };
       
-      return eventSource;
+      return connection;
     }
 
     // Global eventSource variable for cleanup

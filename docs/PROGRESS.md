@@ -4,7 +4,7 @@
 
 - **Product direction:** Taiwan-first, creator-owned ECPay donations routed to reliable OBS alerts; the service does not custody viewer funds.
 - **Shipped proof:** tenant-scoped callbacks, raw-body signatures, idempotency, strict TWD minor-unit money, encrypted provider credentials, same-origin mutation protection, CSP/security headers, isolated callback limits, redacted observability, creator export, and reconnecting SSE overlay.
-- **Current verification:** 78 automated tests pass; production dependency audit is clean; local PostgreSQL migration/restore and local HTTP alert/preflight smoke checks are recorded.
+- **Current verification:** 79 automated tests pass; production dependency audit is clean; local PostgreSQL migration/restore and local HTTP alert/preflight smoke checks are recorded.
 - **Still open before selling:** hosted staging/domain evidence for donation and recurring success/failure/replay/cancel flows, real OAuth, backup/restore and alert vendor exercises, Docker CI result, OBS/browser viewport checks, and Taiwan legal/accounting approval.
 - **Next best work:** close one evidence gate or one measured activation/reliability gap; do not add speculative providers, broad rewrites, or unvalidated features.
 - **Release posture:** not production-ready until the open gates above have named evidence and owners.
@@ -22,6 +22,17 @@ For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edit
 place as work completes or priorities shift.
 
 ---
+
+## 2026-07-12 - Track overlay SSE reconnect handles (P1 reliability)
+
+Fixed an OBS Browser Source lifecycle bug: when an SSE connection closed, the retry
+created a new connection but left the global cleanup handle pointing at the old one.
+Reconnects now assign the replacement connection to the global handle, so unload closes
+the active stream and repeated retries do not leave an orphaned connection behind.
+
+Added a source regression test for the reconnect/cleanup relationship. Verification:
+`npm.cmd test` passes **79/79** tests and `git diff --check` passes. Real OBS viewport,
+network-interruption, and long-text evidence remains a staging gate.
 
 ## 2026-07-12 - Staging preflight verifies observability and CSP (P0)
 
