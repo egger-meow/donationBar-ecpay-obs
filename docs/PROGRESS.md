@@ -14,6 +14,20 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-12 - Remove unregistered legacy payment callbacks (P0)
+
+Completed the source-cleanup debt identified in the callback route audit:
+
+- Removed the unregistered duplicate donation webhook, default-workspace router, and
+  old encrypted recurring-callback implementation from `server.js`.
+- The canonical workspace webhook and subscription callback core are now the only
+  payment callback implementations in the server source; no legacy fallback can be
+  accidentally reconnected without an explicit new route.
+- Updated the route-audit regression to fail if any removed implementation returns.
+
+Verification: `node --check server.js`, `npm.cmd test`, and `git diff --check` are
+required before commit. Real provider callback and staging evidence remains open.
+
 ## 2026-07-12 - CI-equivalent release checks and alert vocabulary sync (P0)
 
 Closed a documentation drift found during the observable-operations audit:

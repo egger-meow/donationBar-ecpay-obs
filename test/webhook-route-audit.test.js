@@ -8,10 +8,11 @@ test('only one workspace webhook route is registered', async () => {
   assert.equal(registrations.length, 1);
 });
 
-test('legacy duplicate webhook implementation has no call site or route registration', async () => {
+test('legacy callback implementations are removed from the server source', async () => {
   const source = await readFile(new URL('../server.js', import.meta.url), 'utf8');
   const occurrences = source.match(/legacyDuplicateWebhookHandler/g) || [];
-  assert.equal(occurrences.length, 1, 'only the function declaration may remain');
+  assert.equal(occurrences.length, 0, 'dead legacy webhook code must not remain');
+  assert.doesNotMatch(source, /legacyDefaultWebhookHandler|legacyEncryptedSubscriptionCallback/);
 });
 
 test('payment callback route inventory keeps state-changing fallbacks idempotent', async () => {

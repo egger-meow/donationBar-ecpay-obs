@@ -20,12 +20,12 @@ because ECPay can invoke notification/return/result URLs independently. They all
 through `addDonation()`, whose workspace/trade-number persistence is idempotent, so a
 later provider callback cannot create a second donation after a valid fallback.
 
-## Dead legacy implementation
+## Legacy implementation cleanup
 
-`legacyDuplicateWebhookHandler` remains in `server.js` as an **unreferenced function**:
-there is no route registration or call site. It cannot process traffic in the current
-application. Treat it as removal debt, not a supported fallback. Do not wire it into a
-new route; extend the canonical `POST /webhook/:slug` handler instead.
+The previously unregistered duplicate donation webhook, default-workspace router, and
+encrypted recurring-callback implementation have been removed from `server.js`. There
+is now no legacy callback implementation available to revive accidentally; future
+webhook work belongs in the canonical routes listed above.
 
 ## Limits of this audit
 
