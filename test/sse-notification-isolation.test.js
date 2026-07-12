@@ -10,7 +10,7 @@ test('SSE admin notifications require an authenticated workspace-owner client', 
 
 test('unpaid webhook notification never broadcasts the provider trade number', async () => {
   const source = await readFile(new URL('../server.js', import.meta.url), 'utf8');
-  const unpaidBlock = source.slice(source.indexOf("'payment_webhook_not_paid'"), source.indexOf('// Add donation to database', source.indexOf("'payment_webhook_not_paid'")));
+  const unpaidBlock = source.slice(source.indexOf("'payment_webhook_not_paid'"), source.indexOf('const donationEvent = normalizeEcpayPaidDonation', source.indexOf("'payment_webhook_not_paid'")));
   assert.ok(unpaidBlock.length > 0, 'expected unpaid webhook branch');
   assert.doesNotMatch(unpaidBlock, /tradeNo|MerchantTradeNo/);
 });

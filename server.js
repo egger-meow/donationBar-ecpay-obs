@@ -23,6 +23,8 @@ import { GENERAL_RATE_LIMIT, PROVIDER_CALLBACK_RATE_LIMIT, isProviderCallbackPat
 import { getHelmetOptions } from './security-headers.js';
 import { createDonationTradeNo, createSubscriptionTradeNo } from './trade-number.js';
 import { formatECPayDate } from './ecpay-date.js';
+import { createTestDonationEvent } from './donation-event.js';
+import { normalizeEcpayPaidDonation, normalizeEcpayReturn } from './providers/ecpay-donation-adapter.js';
 
 const app = express();
 const __dirname = path.resolve();
@@ -595,13 +597,14 @@ async function getProgress(workspaceId = null) {
   };
 }
 
-async function addDonation(workspaceId, { tradeNo, amount, payer, message, paymentProviderId = null }) {
+async function addDonation(workspaceId, donationEvent) {
   const success = await database.addDonation(workspaceId, {
-    tradeNo,
-    amount,
-    payerName: payer,
-    message,
-    paymentProviderId
+    tradeNo: donationEvent.externalId,
+    amount: donationEvent.amount,
+    currency: donationEvent.currency,
+    payerName: donationEvent.payer,
+    message: donationEvent.message,
+    paymentProviderId: donationEvent.providerRecordId
   });
   if (success) {
     await broadcastProgress(workspaceId);
@@ -956,13 +959,7 @@ app.post('/success', async (req, res) => {
 
   if (ok) {
     // Safe fallback: add donation here too (idempotent via trade number)
-    await addDonation(workspace.id, {
-      tradeNo: p.MerchantTradeNo,
-      amount: p.TradeAmt,
-      payer: p.CustomField1 || '匿名',
-      message: p.CustomField2 || '',
-      paymentProviderId: provider?.id
-    });
+    await addDonation(workspace.id, normalizeEcpayReturn(p, { providerRecordId: provider?.id }));
     logInfo('success_post_donation_added');
 
     // Redirect to workspace-specific donate page
@@ -1070,14 +1067,13 @@ app.post('/webhook/:slug', async (req, res) => {
       return res.send('1|OK');
     }
 
-    // Add donation to database using the correct field names from ECPay
-    const donationAdded = await addDonation(workspace.id, {
-      tradeNo: orderInfo.MerchantTradeNo,
-      amount: orderInfo.TradeAmt,
-      payer: decryptedData.PatronName || '匿名',
-      message: decryptedData.PatronNote || '',
-      paymentProviderId: provider?.id
+    const donationEvent = normalizeEcpayPaidDonation({
+      orderInfo,
+      decryptedData,
+      providerRecordId: provider?.id
     });
+    if (!donationEvent) return res.send('1|OK');
+    const donationAdded = await addDonation(workspace.id, donationEvent);
 
     if (donationAdded) {
       logInfo('payment_webhook_donation_processed', { request_id: req.requestId });
@@ -1399,13 +1395,7 @@ app.post('/ecpay/return', async (req, res) => {
   const mine = p.MerchantID === credentials.merchantId;
 
   if (validMac && success && mine) {
-    await addDonation(workspace.id, {
-      tradeNo: p.MerchantTradeNo,
-      amount: p.TradeAmt,
-      payer: p.CustomField1 || '匿名',
-      message: p.CustomField2 || '',
-      paymentProviderId: provider?.id
-    });
+    await addDonation(workspace.id, normalizeEcpayReturn(p, { providerRecordId: provider?.id }));
     logInfo('ecpay_return_donation_added');
     return res.send('1|OK');
   }
@@ -1459,13 +1449,13 @@ app.post('/create-order', requireSameOrigin, async (req, res) => {
     const provider = await database.getPaymentProvider(workspace.id, 'ecpay');
 
     // Add donation directly to database (simulate successful payment)
-    const success = await addDonation(workspace.id, {
-      tradeNo: tradeNo,
+    const success = await addDonation(workspace.id, createTestDonationEvent({
+      externalId: tradeNo,
       amount: amt,
       payer: normalizedNickname,
       message: normalizedMessage,
-      paymentProviderId: provider?.id
-    });
+      providerRecordId: provider?.id
+    }));
 
     if (success) {
       logInfo('sandbox_payment_simulation_succeeded');

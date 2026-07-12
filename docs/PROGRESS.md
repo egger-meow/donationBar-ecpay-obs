@@ -4,6 +4,7 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-07-12 — Thin provider-independent donation event and ECPay adapter (P0/P1 core)
 - 2026-07-12 — Bound Postgres readiness health checks (P0 operations)
 - 2026-07-12 — Roadmap reset around thin ECPay core and first external streamer
 - 2026-07-12 — Explicit Asia/Taipei ECPay order timestamps (P0 payment correctness)
@@ -51,6 +52,21 @@ For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edit
 place as work completes or priorities shift.
 
 ---
+
+## 2026-07-12 - Thin provider-independent donation event and ECPay adapter (P0/P1 core)
+
+Started the roadmap’s thin Payment Core without building a universal provider system:
+
+- Verified ECPay donation return/webhook payloads now normalize into one canonical event
+  (`provider`, `externalId`, integer amount/currency, payer/message, provider record ID)
+  before persistence and OBS broadcast.
+- Added a small ECPay adapter for paid-status normalization and a credential-free test
+  adapter for activation/UI tests; no unimplemented provider is exposed to users.
+- The current scope remains create/verify/normalize/persist/emit/diagnostics/idempotency;
+  refunds, capabilities, reconciliation, and a second real provider remain deferred.
+
+Verification: `npm.cmd test` passes **93/93** tests and `git diff --check` passes. The
+first external streamer must still prove the end-to-end real payment/OBS path.
 
 ## 2026-07-12 - Bound Postgres readiness health checks (P0 operations)
 
