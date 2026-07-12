@@ -4,6 +4,7 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-07-12 — Chinese activation test-alert path (P1 activation)
 - 2026-07-12 — Thin provider-independent donation event and ECPay adapter (P0/P1 core)
 - 2026-07-12 — Bound Postgres readiness health checks (P0 operations)
 - 2026-07-12 — Roadmap reset around thin ECPay core and first external streamer
@@ -52,6 +53,19 @@ For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edit
 place as work completes or priorities shift.
 
 ---
+
+## 2026-07-12 - Chinese activation test-alert path (P1 activation)
+
+Closed the practical first-alert gap in the onboarding flow:
+
+- The admin page now offers one-click OBS URL copy and a one-click visual test-alert
+  window, with Chinese instructions to verify the Browser Source before real payment.
+- Overlay `?test=1` mode is local-only (no SSE or payment callback), emits changing
+  canonical alert IDs/messages, and visibly exercises the same alert renderer.
+- Added UI/source regression coverage for the controls and test event path.
+
+Verification: `npm.cmd test` passes **94/94** tests and `git diff --check` passes. Real
+OBS viewport and first-unfamiliar-streamer evidence remain required.
 
 ## 2026-07-12 - Thin provider-independent donation event and ECPay adapter (P0/P1 core)
 

@@ -1034,8 +1034,12 @@
             <div style="background: #0f1216; padding: 15px; border-radius: 8px; border: 1px solid #2a2f36;">
               <code id="obsUrl" style="color: #454e46; word-break: break-all;"></code>
             </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px;">
+              <button class="btn btn-secondary" type="button" onclick="copyObsUrl()">📋 複製 OBS URL</button>
+              <button class="btn" type="button" onclick="openObsTest()" style="background: #2196F3;">🧪 開啟測試提示</button>
+            </div>
             <p style="color: #a0a0a0; margin-top: 10px; font-size: 14px;">
-              建議尺寸：900 x 150 pixels，啟用透明背景
+              建議尺寸：900 x 150 pixels，啟用透明背景。先開啟測試提示，15 分鐘內確認 OBS 畫面可看到測試斗內，再進行真實付款。
             </p>
           </div>
         </div>
@@ -1330,6 +1334,22 @@
 
         // Setup SSE with fallback
         setupSSE();
+      }
+    }
+
+    function openObsTest() {
+      if (!workspaceUrls.overlay) return showAlert('⚠️ OBS URL 尚未載入', 'error');
+      const separator = workspaceUrls.overlay.includes('?') ? '&' : '?';
+      window.open(`${workspaceUrls.overlay}${separator}test=1`, '_blank', 'noopener');
+    }
+
+    async function copyObsUrl() {
+      if (!workspaceUrls.overlay) return showAlert('⚠️ OBS URL 尚未載入', 'error');
+      try {
+        await navigator.clipboard.writeText(workspaceUrls.overlay);
+        showAlert('✅ OBS URL 已複製，請貼到 OBS Browser Source');
+      } catch {
+        showAlert('⚠️ 無法自動複製，請手動選取上方 URL', 'error');
       }
     }
 

@@ -558,6 +558,7 @@
     }
 
     const workspaceSlug = getWorkspaceSlug();
+    const testMode = new URLSearchParams(window.location.search).get('test') === '1';
     console.log('🎯 Workspace slug:', workspaceSlug || 'default');
 
     // Load overlay settings from server
@@ -1040,8 +1041,10 @@
     
     // Initialize
     loadOverlaySettings().then(() => {
-      loadInitialData();
-      eventSource = setupSSE();
+      if (!testMode) {
+        loadInitialData();
+        eventSource = setupSSE();
+      }
     });
 
     // Clean up on page unload
@@ -1051,23 +1054,23 @@
       }
     });
 
-    // Test mode (if ?test=1 in URL)
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('test') === '1') {
+    // Test mode (if ?test=1 in URL): local-only visual proof, no SSE or payment calls.
+    if (testMode) {
       let testPercent = 0;
       setInterval(() => {
         testPercent = (testPercent + 1) % 101;
+        const alertId = `test-${testPercent}`;
         renderProgress({
           title: '測試目標',
           current: testPercent * 500,
           goal: 50000,
           percent: testPercent,
           donations: [
-            { payer: 'TestUser1', amount: 100, at: new Date().toISOString() },
-            { payer: 'TestUser2', amount: 500, at: new Date().toISOString() }
+            { alertId, payer: '測試觀眾', amount: 100, message: '這是 OBS 測試提示', at: new Date().toISOString() }
           ],
+          latestDonation: { alertId, payer: '測試觀眾', amount: 100, message: '這是 OBS 測試提示' }
         });
-      }, 100);
+      }, 1000);
     }
   </script>
 </body>
