@@ -13,7 +13,7 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import database from './database.js';
 import * as emailService from './email.js';
 import { getBillingECPayCredentials, getECPayCheckoutUrl, getECPayPeriodActionUrl, getSubscriptionPlan, isProduction, validateProductionConfig } from './config.js';
-import { generateCheckMacValueForCredentials, verifyCheckMacValueForCredentials } from './ecpay.js';
+import { generateCheckMacValueForCredentials, verifyCheckMacValueForCredentials, verifyCheckMacValueForRawBody } from './ecpay.js';
 import { requireSameOrigin } from './security.js';
 import { logError, logInfo, logWarn, requestObservability, sendAlert } from './observability.js';
 import { processSubscriptionPaymentCallback as processSubscriptionPaymentCallbackCore } from './subscription-callback.js';
@@ -57,7 +57,14 @@ app.use((req, res, next) => {
   return next();
 });
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.urlencoded({
+  extended: false,
+  verify: (req, res, buffer) => {
+    // Preserve provider bytes before parsing for CheckMacValue verification. Never log
+    // or include this raw body in responses or operational events.
+    req.rawFormBody = Buffer.from(buffer);
+  }
+}));
 app.use(bodyParser.json());
 
 // Session middleware
@@ -655,8 +662,12 @@ async function generateCheckMacValue(params, workspaceId = null) {
   return crypto.createHash('sha256').update(urlEncoded).digest('hex').toUpperCase();
 }
 
-async function verifyCheckMacValue(params, workspaceId = null) {
+async function verifyCheckMacValue(params, workspaceId = null, rawBody = null) {
   if (!params || !params.CheckMacValue) return false;
+  if (rawBody) {
+    const credentials = await getECPayCredentials(workspaceId);
+    return verifyCheckMacValueForRawBody(rawBody, credentials);
+  }
   const mac = await generateCheckMacValue(params, workspaceId);
   return mac === params.CheckMacValue;
 }
@@ -669,11 +680,12 @@ function verifyCheckMacValueWithCredentials(params, credentials) {
   return verifyCheckMacValueForCredentials(params, credentials);
 }
 
-async function processSubscriptionPaymentCallback(payload) {
+async function processSubscriptionPaymentCallback(payload, rawBody = null) {
   return processSubscriptionPaymentCallbackCore(payload, {
     credentials: getBillingECPayCredentials(),
     database,
-    monthlyPrice: getSubscriptionPlan().monthlyPrice
+    monthlyPrice: getSubscriptionPlan().monthlyPrice,
+    rawBody
   });
 }
 
@@ -950,7 +962,7 @@ app.post('/success', async (req, res) => {
   const provider = await database.getPaymentProvider(workspace.id, 'ecpay');
   const ok = String(p.RtnCode) === '1' &&
     p.MerchantID === credentials.merchantId &&
-    await verifyCheckMacValue(p, workspace.id);
+    await verifyCheckMacValue(p, workspace.id, req.rawFormBody);
 
   if (ok) {
     // Safe fallback: add donation here too (idempotent via trade number)
@@ -1014,6 +1026,17 @@ app.post('/webhook/:slug', async (req, res) => {
         transCode: payload.TransCode
       });
       return res.send('1|OK'); // Still acknowledge
+    }
+
+    // Verify ECPay's outer signature against the captured raw form bytes before
+    // decrypting or trusting Data. No callback fields are added or normalized first.
+    if (!await verifyCheckMacValue(payload, workspace.id, req.rawFormBody)) {
+      logWarn('payment_webhook_invalid_signature', { request_id: req.requestId });
+      sendAlert('payment_webhook_invalid_signature', { requestId: req.requestId, route: '/webhook/:slug', statusCode: 400 });
+      broadcastAdminNotification(workspace.id, 'error', 'Webhook: CheckMacValue 驗證失敗', {
+        reason: 'invalid_signature'
+      });
+      return res.status(400).send('0|Invalid checksum');
     }
 
     // Decrypt the Data field
@@ -1336,7 +1359,7 @@ app.post('/ecpay/return', async (req, res) => {
 
   if (String(p?.MerchantID) === String(getBillingECPayCredentials().merchantId)) {
     try {
-      const result = await processSubscriptionPaymentCallback(p);
+      const result = await processSubscriptionPaymentCallback(p, req.rawFormBody);
       return res.status(result.status || 200).send(result.ok ? '1|OK' : result.message);
     } catch (error) {
       logError('subscription_initial_callback_failed', { request_id: req.requestId });
@@ -1366,7 +1389,7 @@ app.post('/ecpay/return', async (req, res) => {
 
   const credentials = await getECPayCredentials(workspace.id);
   const provider = await database.getPaymentProvider(workspace.id, 'ecpay');
-  const validMac = await verifyCheckMacValue(p, workspace.id);
+  const validMac = await verifyCheckMacValue(p, workspace.id, req.rawFormBody);
   const success = p.RtnCode === '1';
   const mine = p.MerchantID === credentials.merchantId;
 
@@ -2042,7 +2065,7 @@ app.post('/subscription/checkout', requireAuth, requireSameOrigin, async (req, r
  */
 app.post('/ecpay/period/callback', async (req, res) => {
   try {
-    const result = await processSubscriptionPaymentCallback(req.body || {});
+    const result = await processSubscriptionPaymentCallback(req.body || {}, req.rawFormBody);
     return res.status(result.status || 200).send(result.ok ? '1|OK' : result.message);
   } catch (error) {
     logError('subscription_callback_unexpected_error', { request_id: req.requestId });

@@ -7,6 +7,7 @@ const DEFAULT_ALERT_TIMEOUT_MS = 3000;
 const ALERTABLE_EVENTS = new Set([
   'readiness_check_failed',
   'payment_webhook_invalid_merchant',
+  'payment_webhook_invalid_signature',
   'payment_webhook_decryption_failed',
   'payment_webhook_unexpected_error',
   'subscription_initial_callback_failed',

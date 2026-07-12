@@ -66,6 +66,12 @@ All three routes always terminate the request (200/400/404/500) and never throw 
 
 ## 5. Severity and ownership
 
+**2026-07-12 signature-alert update:** the active workspace donation webhook now emits
+the allowlisted `payment_webhook_invalid_signature` signal when raw-body
+`CheckMacValue` verification fails. Its redacted external payload follows the same
+`event`, timestamp, request ID, route, and status-code contract as the other callback
+signals; it never includes callback fields or payment references.
+
 | Severity | Trigger | Response target | Owner (placeholder — assign before go-live) |
 |---|---|---|---|
 | Sev1 | `/health/live` unreachable, OR `/health/ready` failing 3+ consecutive checks, OR any 5xx sustained >5 min on `/webhook/:slug` or `/ecpay/period/callback` | Page immediately | On-call engineer — no rotation is defined in this repository; see Gaps |

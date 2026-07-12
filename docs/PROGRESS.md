@@ -14,6 +14,22 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-12 — Raw-body ECPay signature verification across callbacks (P0)
+
+Added the missing active-webhook verification step to the raw-body implementation:
+
+- `POST /webhook/:slug` now rejects invalid outer `CheckMacValue` before decrypting
+  ECPay `Data`, broadcasting diagnostics, or calling `addDonation()`.
+- `POST /ecpay/return`, `/success`, and recurring `/ecpay/period/callback` all pass the
+  captured raw form body through their signature verification paths; duplicate raw form
+  keys fail closed.
+- Added the allowlisted `payment_webhook_invalid_signature` monitoring event with a
+  redacted payload contract and a route-order regression test.
+
+Verification: `npm.cmd test` passes **76/76** tests, including raw-form verification,
+duplicate-key rejection, and active webhook ordering. Body Parser raw-buffer guidance
+was consulted. Staging/provider replay evidence remains open.
+
 ## 2026-07-12 — Strict platform subscription money normalization (P0)
 
 Extended the money invariant to recurring platform billing:

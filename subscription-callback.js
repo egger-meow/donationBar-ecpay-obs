@@ -1,4 +1,4 @@
-import { verifyCheckMacValueForCredentials } from './ecpay.js';
+import { verifyCheckMacValueForCredentials, verifyCheckMacValueForRawBody } from './ecpay.js';
 import { parseMinorUnitAmount } from './money.js';
 
 function nextMonthlyBillingDate(from = new Date()) {
@@ -7,9 +7,12 @@ function nextMonthlyBillingDate(from = new Date()) {
   return next;
 }
 
-export async function processSubscriptionPaymentCallback(payload, { credentials, database, monthlyPrice }) {
+export async function processSubscriptionPaymentCallback(payload, { credentials, database, monthlyPrice, rawBody = null }) {
   if (String(payload?.MerchantID) !== String(credentials.merchantId)) return { ok: false, status: 400, message: '0|Invalid merchant' };
-  if (!verifyCheckMacValueForCredentials(payload, credentials)) return { ok: false, status: 400, message: '0|Invalid checksum' };
+  const validSignature = rawBody
+    ? verifyCheckMacValueForRawBody(rawBody, credentials)
+    : verifyCheckMacValueForCredentials(payload, credentials);
+  if (!validSignature) return { ok: false, status: 400, message: '0|Invalid checksum' };
   if (String(payload.SimulatePaid || '0') === '1') return { ok: true, simulated: true };
 
   const userId = String(payload.CustomField1 || '').trim();

@@ -18,3 +18,21 @@ export function verifyCheckMacValueForCredentials(params, credentials) {
   const received = String(params.CheckMacValue).toUpperCase();
   return expected.length === received.length && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(received));
 }
+
+// Parse the exact URL-encoded bytes captured by body-parser before it normalizes the
+// request. Duplicate keys are rejected because they make signature meaning ambiguous.
+export function parseUnmodifiedFormBody(rawBody) {
+  if (!rawBody) return null;
+  const form = new URLSearchParams(Buffer.isBuffer(rawBody) ? rawBody.toString('utf8') : String(rawBody));
+  const params = {};
+  for (const [key, value] of form.entries()) {
+    if (Object.prototype.hasOwnProperty.call(params, key)) return null;
+    params[key] = value;
+  }
+  return params;
+}
+
+export function verifyCheckMacValueForRawBody(rawBody, credentials) {
+  const params = parseUnmodifiedFormBody(rawBody);
+  return params ? verifyCheckMacValueForCredentials(params, credentials) : false;
+}
