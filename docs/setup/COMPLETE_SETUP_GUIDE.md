@@ -72,7 +72,7 @@ Authentication in this codebase is **Google OAuth only**. There is no local user
 
 Production and staging setup — provisioning PostgreSQL, an HTTPS domain, secrets, encrypted backups, migration rehearsal, and the full launch checklist — is documented in detail in [DEPLOYMENT.md](DEPLOYMENT.md). Do not duplicate that process here; follow it directly, including its backup/restore rehearsal and rollback guidance.
 
-Before relying on a deployed environment, run the read-only reachability check described in [STAGING_PREFLIGHT.md](../operations/STAGING_PREFLIGHT.md) (`npm run preflight:staging`). It only confirms `/health/live` and `/health/ready` (and optionally your alert webhook) are reachable — it is not a substitute for the payment and callback exercises in DEPLOYMENT.md.
+Before relying on a deployed environment, run the read-only check described in [STAGING_PREFLIGHT.md](../operations/STAGING_PREFLIGHT.md) (`npm run preflight:staging`). It confirms `/health/live`, `/health/ready`, `/api/pricing`, request IDs, and CSP (and optionally your alert webhook) — it is not a substitute for the payment and callback exercises in DEPLOYMENT.md.
 
 Once an environment is live, verify alerting is actually wired up by following [MONITORING_AND_INCIDENT_RESPONSE.md](../operations/MONITORING_AND_INCIDENT_RESPONSE.md), including a real alert exercise from [ALERT_EXERCISE_TEMPLATE.md](../operations/ALERT_EXERCISE_TEMPLATE.md).
 

@@ -14,6 +14,21 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-12 - Staging preflight verifies observability and CSP (P0)
+
+Strengthened the read-only release preflight used before hosted staging exercises:
+
+- It now checks `/health/live`, `/health/ready`, and `/api/pricing` without touching
+  payment, OAuth, or mutation endpoints.
+- It requires a response `X-Request-Id` and enforced `Content-Security-Policy`,
+  catching deployments that are reachable but missing the production observability or
+  browser-security middleware.
+- Added redacted pass/fail coverage for missing headers and updated the staging/setup
+  runbooks to describe the three checks.
+
+Verification: `npm.cmd test` and `git diff --check` pass. The preflight still does not
+prove provider callbacks, hosted database durability, or legal readiness.
+
 ## 2026-07-12 - Same-origin mutation-route audit guard (P0)
 
 Audited every `POST`, `PUT`, `PATCH`, and `DELETE` route in `server.js`:

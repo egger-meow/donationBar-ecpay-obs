@@ -7,13 +7,24 @@ function stubFetch(handler) {
   const calls = [];
   global.fetch = async (url, init) => {
     calls.push({ url: String(url), init });
+    if (String(url).endsWith('/api/pricing')) return jsonResponse(200, { currency: 'TWD', monthlyPrice: 70 });
     return handler(String(url), init);
   };
   return { calls, restore: () => { global.fetch = originalFetch; } };
 }
 
-function jsonResponse(status, body) {
-  return { ok: status >= 200 && status < 300, status, json: async () => body };
+function jsonResponse(status, body, headerValues = {}) {
+  const headers = {
+    'x-request-id': 'preflight-test-request-id',
+    'content-security-policy': "default-src 'self'",
+    ...headerValues
+  };
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: name => headers[String(name).toLowerCase()] || null },
+    json: async () => body
+  };
 }
 
 test('parseArgs reads --base-url and --check-alert-webhook', () => {
@@ -64,8 +75,9 @@ test('runPreflight queries only /health/live and /health/ready by default, redac
       env: {}
     });
 
-    assert.equal(stub.calls.length, 2);
+    assert.equal(stub.calls.length, 3);
     assert.deepEqual(stub.calls.map(c => c.url).sort(), [
+      'https://staging.example.com/api/pricing',
       'https://staging.example.com/health/live',
       'https://staging.example.com/health/ready'
     ]);
@@ -76,6 +88,9 @@ test('runPreflight queries only /health/live and /health/ready by default, redac
     assert.equal(result.checks.ready.ok, true);
     assert.equal(result.checks.ready.status, 'ready');
     assert.equal(result.checks.ready.database, 'postgresql');
+    assert.equal(result.checks.live.requestIdPresent, true);
+    assert.equal(result.checks.live.contentSecurityPolicyPresent, true);
+    assert.equal(result.checks.pricing.contentSecurityPolicyPresent, true);
     assert.equal('connectionString' in result.checks.ready, false);
     assert.equal(result.alertWebhook, null);
   } finally {
@@ -99,6 +114,25 @@ test('runPreflight fails when readiness reports not_ready', async () => {
   }
 });
 
+test('runPreflight fails when deployed observability or CSP headers are missing', async () => {
+  const stub = stubFetch(url => {
+    if (url.endsWith('/health/live')) return jsonResponse(200, { status: 'ok' }, {
+      'x-request-id': '',
+      'content-security-policy': ''
+    });
+    if (url.endsWith('/health/ready')) return jsonResponse(200, { status: 'ready', database: 'postgresql' });
+    throw new Error(`unexpected fetch to ${url}`);
+  });
+  try {
+    const result = await runPreflight({ argv: ['--base-url', 'https://staging.example.com'], env: {} });
+    assert.equal(result.pass, false);
+    assert.equal(result.checks.live.requestIdPresent, false);
+    assert.equal(result.checks.live.contentSecurityPolicyPresent, false);
+  } finally {
+    stub.restore();
+  }
+});
+
 test('runPreflight never contacts the alert webhook unless explicitly enabled', async () => {
   const stub = stubFetch(url => {
     if (url.endsWith('/health/live')) return jsonResponse(200, { status: 'ok' });
@@ -110,7 +144,7 @@ test('runPreflight never contacts the alert webhook unless explicitly enabled', 
       argv: ['--base-url', 'https://staging.example.com'],
       env: { ALERT_WEBHOOK_URL: 'https://alerts.example/hook/secret-token' }
     });
-    assert.equal(stub.calls.length, 2);
+    assert.equal(stub.calls.length, 3);
     assert.equal(result.alertWebhook, null);
   } finally {
     stub.restore();
@@ -130,7 +164,7 @@ test('runPreflight checks the alert webhook with a fixed synthetic event when en
       env: { ALERT_WEBHOOK_URL: 'https://alerts.example/hook/secret-token' }
     });
 
-    assert.equal(stub.calls.length, 3);
+    assert.equal(stub.calls.length, 4);
     const alertCall = stub.calls.find(c => c.url === 'https://alerts.example/hook/secret-token');
     assert.ok(alertCall);
     assert.equal(alertCall.init.method, 'POST');
@@ -158,7 +192,7 @@ test('runPreflight skips the alert webhook check with a reason when unconfigured
       argv: ['--base-url', 'https://staging.example.com', '--check-alert-webhook'],
       env: {}
     });
-    assert.equal(stub.calls.length, 2);
+    assert.equal(stub.calls.length, 3);
     assert.equal(result.alertWebhook.skipped, true);
     assert.match(result.alertWebhook.reason, /not configured/i);
     assert.equal(result.pass, true);

@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 const HEALTH_LIVE_PATH = '/health/live';
 const HEALTH_READY_PATH = '/health/ready';
+const PRICING_PATH = '/api/pricing';
 const DEFAULT_TIMEOUT_MS = 5000;
 const SYNTHETIC_ALERT_EVENT = 'staging_preflight_check';
 
@@ -60,7 +61,14 @@ async function fetchWithTimeout(url, { timeoutMs }) {
     const durationMs = Date.now() - startedAt;
     let body;
     try { body = await response.json(); } catch { body = undefined; }
-    return { ok: response.ok, statusCode: response.status, durationMs, body };
+    return {
+      ok: response.ok,
+      statusCode: response.status,
+      durationMs,
+      body,
+      requestId: response.headers?.get?.('x-request-id') || null,
+      contentSecurityPolicy: response.headers?.get?.('content-security-policy') || null
+    };
   } catch (error) {
     return { ok: false, statusCode: null, durationMs: Date.now() - startedAt, error: error.name === 'AbortError' ? 'timeout' : 'network_error' };
   } finally {
@@ -96,7 +104,7 @@ async function checkAlertWebhook(env, timeoutMs) {
   }
 }
 
-// Read-only staging preflight: GETs /health/live and /health/ready, and
+// Read-only staging preflight: GETs /health/live, /health/ready, and /api/pricing, and
 // optionally POSTs one synthetic event to ALERT_WEBHOOK_URL when explicitly
 // enabled. Never touches the database, never calls a payment or OAuth
 // endpoint, and never prints raw secrets or unredacted response bodies.
@@ -107,6 +115,7 @@ export async function runPreflight({ argv = [], env = process.env } = {}) {
 
   const live = await fetchWithTimeout(new URL(HEALTH_LIVE_PATH, baseUrl).toString(), { timeoutMs });
   const ready = await fetchWithTimeout(new URL(HEALTH_READY_PATH, baseUrl).toString(), { timeoutMs });
+  const pricing = await fetchWithTimeout(new URL(PRICING_PATH, baseUrl).toString(), { timeoutMs });
 
   const checks = {
     live: {
@@ -114,6 +123,8 @@ export async function runPreflight({ argv = [], env = process.env } = {}) {
       ok: live.ok,
       statusCode: live.statusCode,
       durationMs: live.durationMs,
+      requestIdPresent: Boolean(live.requestId),
+      contentSecurityPolicyPresent: Boolean(live.contentSecurityPolicy),
       ...(live.error ? { error: live.error } : {})
     },
     ready: {
@@ -126,6 +137,14 @@ export async function runPreflight({ argv = [], env = process.env } = {}) {
         status: pickSafe(ready.body.status),
         database: pickSafe(ready.body.database)
       } : {})
+    },
+    pricing: {
+      path: PRICING_PATH,
+      ok: pricing.ok,
+      statusCode: pricing.statusCode,
+      durationMs: pricing.durationMs,
+      contentSecurityPolicyPresent: Boolean(pricing.contentSecurityPolicy),
+      ...(pricing.error ? { error: pricing.error } : {})
     }
   };
 
@@ -134,7 +153,9 @@ export async function runPreflight({ argv = [], env = process.env } = {}) {
     || env.STAGING_PREFLIGHT_CHECK_ALERT_WEBHOOK === 'true';
   const alertWebhook = shouldCheckAlertWebhook ? await checkAlertWebhook(env, timeoutMs) : null;
 
-  const pass = checks.live.ok && checks.ready.ok && (!alertWebhook || alertWebhook.skipped || alertWebhook.ok);
+  const pass = checks.live.ok && checks.live.requestIdPresent && checks.live.contentSecurityPolicyPresent
+    && checks.ready.ok && checks.pricing.ok && checks.pricing.contentSecurityPolicyPresent
+    && (!alertWebhook || alertWebhook.skipped || alertWebhook.ok);
   return { pass, baseUrl: redactUrl(baseUrl), checks, alertWebhook };
 }
 
