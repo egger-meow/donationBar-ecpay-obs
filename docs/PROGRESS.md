@@ -4,6 +4,7 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-07-12 — Explicit Asia/Taipei ECPay order timestamps (P0 payment correctness)
 - 2026-07-12 — Progress index consistency guard
 - 2026-07-12 — Collision-resistant provider trade numbers (P0 payment correctness)
 - 2026-07-12 — Rotate OAuth sessions after authentication (P0 security)
@@ -48,6 +49,18 @@ For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edit
 place as work completes or priorities shift.
 
 ---
+
+## 2026-07-12 - Explicit Asia/Taipei ECPay order timestamps (P0 payment correctness)
+
+Made `MerchantTradeDate` independent of the host/container timezone:
+
+- Donation and recurring-subscription checkout orders now format the provider-required
+  `yyyy/MM/dd HH:mm:ss` value in `Asia/Taipei`, rather than using whatever local zone
+  the deployment happens to expose.
+- Added fixed-instant tests covering the UTC-to-Taiwan conversion and invalid dates.
+
+Verification: `npm.cmd test` passes **86/86** tests and `git diff --check` passes. Real
+ECPay acceptance remains a staging gate.
 
 ## 2026-07-12 - Progress index consistency guard
 

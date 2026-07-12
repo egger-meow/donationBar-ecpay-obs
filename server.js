@@ -22,6 +22,7 @@ import { buildAccountExport } from './privacy-export.js';
 import { GENERAL_RATE_LIMIT, PROVIDER_CALLBACK_RATE_LIMIT, isProviderCallbackPath } from './rate-limit-policy.js';
 import { getHelmetOptions } from './security-headers.js';
 import { createDonationTradeNo, createSubscriptionTradeNo } from './trade-number.js';
+import { formatECPayDate } from './ecpay-date.js';
 
 const app = express();
 const __dirname = path.resolve();
@@ -607,18 +608,6 @@ async function addDonation(workspaceId, { tradeNo, amount, payer, message, payme
     database.markWorkspaceFirstDonation(workspaceId).catch(() => {});
   }
   return success;
-}
-
-// ECPay date formatting
-function formatECPayDate(d = new Date()) {
-  const pad = (n) => String(n).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  const MM = pad(d.getMonth() + 1);
-  const dd = pad(d.getDate());
-  const HH = pad(d.getHours());
-  const mm = pad(d.getMinutes());
-  const ss = pad(d.getSeconds());
-  return `${yyyy}/${MM}/${dd} ${HH}:${mm}:${ss}`;
 }
 
 // ECPay URL encoding (different from standard encodeURIComponent)
