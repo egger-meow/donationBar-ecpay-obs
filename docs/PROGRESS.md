@@ -4,9 +4,10 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
-- 2026-07-12 — Bound overlay alerts for short viewports and long text (P1 reliability)
+- 2026-07-12 — Progress index consistency guard
 - 2026-07-12 — Collision-resistant provider trade numbers (P0 payment correctness)
 - 2026-07-12 — Rotate OAuth sessions after authentication (P0 security)
+- 2026-07-12 — Bound overlay alerts for short viewports and long text (P1 reliability)
 - 2026-07-12 — Track overlay SSE reconnect handles (P1 reliability)
 - 2026-07-12 — Staging preflight verifies observability and CSP (P0)
 - 2026-07-12 — Same-origin mutation-route audit guard (P0)
@@ -47,6 +48,15 @@ For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edit
 place as work completes or priorities shift.
 
 ---
+
+## 2026-07-12 - Progress index consistency guard
+
+Added a documentation-maintenance regression test that compares the top section-name
+index with every `##` heading in this file. Future progress entries now fail the suite
+until their section name is added to the index, keeping the fast status view aligned
+with the complete build history.
+
+Verification: `npm.cmd test` passes **84/84** tests and `git diff --check` passes.
 
 ## 2026-07-12 - Collision-resistant provider trade numbers (P0 payment correctness)
 
