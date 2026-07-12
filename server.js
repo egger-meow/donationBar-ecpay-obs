@@ -362,7 +362,7 @@ async function getECPayCredentials(workspaceId = null) {
 // Map<Response, { workspaceId: string, canReceiveAdminNotifications: boolean }>
 const sseClients = new Map();
 
-async function broadcastProgress(workspaceId = null) {
+async function broadcastProgress(workspaceId = null, transientDonationEvent = null) {
   try {
     if (!workspaceId) {
       const workspace = await getDefaultWorkspace();
@@ -377,6 +377,25 @@ async function broadcastProgress(workspaceId = null) {
     if (!data) {
       logError('sse_progress_data_unavailable');
       return;
+    }
+
+    // A sandbox activation check can exercise the real OBS/SSE path without
+    // persisting a fake donation or advancing firstDonationAt. The payload is
+    // intentionally shaped like the canonical public donation event.
+    if (transientDonationEvent) {
+      const transientDonation = {
+        alertId: `test-${transientDonationEvent.externalId}`,
+        amount: transientDonationEvent.amount,
+        payer: transientDonationEvent.payer,
+        message: transientDonationEvent.message,
+        at: new Date().toISOString()
+      };
+      data.latestDonation = transientDonation;
+      if (data.donations && data.donations.length > 0) {
+        data.donations = [transientDonation, ...data.donations].slice(0, data.donations.length);
+      } else if (data.donations && data.donations.length === 0 && data.overlaySettings?.donationDisplayMode !== 'hidden') {
+        data.donations = [transientDonation];
+      }
     }
 
     const payload = `data: ${JSON.stringify(data)}\n\n`;
@@ -1561,6 +1580,32 @@ app.get('/admin/activation', requireAdmin, async (req, res) => {
     res.json({ steps });
   } catch (error) {
     logError('admin_activation_fetch_failed', { request_id: req.requestId });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// Send a non-persistent canonical test event through the real SSE/OBS path.
+// This is deliberately unavailable in production so it cannot be mistaken for
+// a payment or alter first-donation activation evidence.
+app.post('/admin/activation/test-alert', requireAdmin, requireSameOrigin, async (req, res) => {
+  if (production) return res.status(404).json({ error: 'not_available' });
+
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+    const externalId = `activation-${Date.now()}-${crypto.randomBytes(5).toString('hex')}`;
+    const donationEvent = createTestDonationEvent({
+      externalId,
+      amount: 100,
+      payer: '測試觀眾',
+      message: '這是 OBS 測試提示'
+    });
+    await broadcastProgress(workspace.id, donationEvent);
+    logInfo('activation_test_alert_broadcast');
+    res.json({ success: true });
+  } catch (error) {
+    logError('activation_test_alert_failed', { request_id: req.requestId });
     res.status(500).json({ error: 'internal_error' });
   }
 });

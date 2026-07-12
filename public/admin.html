@@ -1037,9 +1037,10 @@
             <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px;">
               <button class="btn btn-secondary" type="button" onclick="copyObsUrl()">📋 複製 OBS URL</button>
               <button class="btn" type="button" onclick="openObsTest()" style="background: #2196F3;">🧪 開啟測試提示</button>
+              <button class="btn" type="button" onclick="sendObsTestAlert()" style="background: #16804b;">📺 發送到 OBS</button>
             </div>
             <p style="color: #a0a0a0; margin-top: 10px; font-size: 14px;">
-              建議尺寸：900 x 150 pixels，啟用透明背景。先開啟測試提示，15 分鐘內確認 OBS 畫面可看到測試斗內，再進行真實付款。
+              建議尺寸：900 x 150 pixels，啟用透明背景。先貼入 OBS，再按「發送到 OBS」；15 分鐘內確認畫面可看到測試斗內，再進行真實付款。
             </p>
           </div>
         </div>
@@ -1341,6 +1342,20 @@
       if (!workspaceUrls.overlay) return showAlert('⚠️ OBS URL 尚未載入', 'error');
       const separator = workspaceUrls.overlay.includes('?') ? '&' : '?';
       window.open(`${workspaceUrls.overlay}${separator}test=1`, '_blank', 'noopener');
+    }
+
+    async function sendObsTestAlert() {
+      try {
+        const response = await fetch('/admin/activation/test-alert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        if (!response.ok) throw new Error('test_alert_failed');
+        showAlert('✅ 測試提示已發送，請確認 OBS Browser Source 畫面');
+      } catch {
+        showAlert('⚠️ 測試提示目前只能在 sandbox 發送，或 OBS 尚未連線', 'error');
+      }
     }
 
     async function copyObsUrl() {

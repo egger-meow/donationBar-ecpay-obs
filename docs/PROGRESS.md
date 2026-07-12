@@ -4,6 +4,7 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-07-12 — Sandbox SSE test-alert for real OBS verification (P1 activation)
 - 2026-07-12 — Chinese activation test-alert path (P1 activation)
 - 2026-07-12 — Thin provider-independent donation event and ECPay adapter (P0/P1 core)
 - 2026-07-12 — Bound Postgres readiness health checks (P0 operations)
@@ -53,6 +54,22 @@ For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edit
 place as work completes or priorities shift.
 
 ---
+
+## 2026-07-12 - Sandbox SSE test-alert for real OBS verification (P1 activation)
+
+Closed the remaining gap between a local preview and a real Browser Source check:
+
+- Added an authenticated `/admin/activation/test-alert` route available only outside
+  production. It uses the canonical test adapter and sends a transient event through
+  the real workspace SSE stream.
+- The event is deliberately not persisted, does not increment totals, and does not
+  advance `firstDonationAt`; it is safe to use before a real payment.
+- Added an admin button and Chinese instruction to paste the overlay URL into OBS and
+  verify the test alert within 15 minutes. The existing local preview remains available.
+- Added source regression coverage for the sandbox-only and non-persistent guarantees.
+
+Verification: `npm.cmd test` passes **95/95** tests and `git diff --check` passes. A real
+OBS viewport check and first-unfamiliar-streamer evidence remain required.
 
 ## 2026-07-12 - Chinese activation test-alert path (P1 activation)
 
