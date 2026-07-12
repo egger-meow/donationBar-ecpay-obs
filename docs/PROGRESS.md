@@ -14,6 +14,21 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-12 - CI-equivalent release checks and alert vocabulary sync (P0)
+
+Closed a documentation drift found during the observable-operations audit:
+
+- Updated the monitoring runbook's fixed external-alert vocabulary to include the
+  `payment_webhook_invalid_signature` signal shipped in the raw-body callback slice.
+- Re-ran `npm.cmd test`: **76/76** tests passed.
+- Re-ran `npm.cmd audit --omit=dev --audit-level=high`: **0 vulnerabilities**.
+- The local Docker daemon was unavailable (`/_ping` returned HTTP 500), so the CI
+  container-build check remains unproven and must run in GitHub Actions or a working
+  Docker environment before release.
+
+This is repository-level verification only; hosted staging, provider callbacks, and
+legal/accounting approval remain launch gates.
+
 ## 2026-07-12 — Raw-body ECPay signature verification across callbacks (P0)
 
 Added the missing active-webhook verification step to the raw-body implementation:
