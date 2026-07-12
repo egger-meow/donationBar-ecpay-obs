@@ -5,6 +5,7 @@
 This is an index only; the complete dated entries and building path remain below.
 
 - 2026-07-12 — Bound overlay alerts for short viewports and long text (P1 reliability)
+- 2026-07-12 — Rotate OAuth sessions after authentication (P0 security)
 - 2026-07-12 — Track overlay SSE reconnect handles (P1 reliability)
 - 2026-07-12 — Staging preflight verifies observability and CSP (P0)
 - 2026-07-12 — Same-origin mutation-route audit guard (P0)
@@ -45,6 +46,19 @@ For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edit
 place as work completes or priorities shift.
 
 ---
+
+## 2026-07-12 - Rotate OAuth sessions after authentication (P0 security)
+
+Hardened the Google OAuth callback against session fixation:
+
+- After Passport validates the provider response, the server now regenerates the
+  session identifier and re-establishes the authenticated user before setting session
+  fields or redirecting to the admin area.
+- Added a regression test that requires both session regeneration and the post-rotation
+  `req.logIn` call to remain in the callback chain.
+
+Verification: `npm.cmd test` passes **81/81** tests and `git diff --check` passes. Real
+production-domain OAuth evidence remains a launch gate.
 
 ## 2026-07-12 - Bound overlay alerts for short viewports and long text (P1 reliability)
 

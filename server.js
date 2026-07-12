@@ -1141,6 +1141,20 @@ app.post('/logout', requireSameOrigin, (req, res) => {
 // GOOGLE OAUTH ROUTES
 // =============================================
 
+// Rotate the session identifier after a successful OAuth exchange so an attacker
+// cannot carry a pre-authentication session ID into an authenticated session.
+function regenerateOAuthSession(req, res, next) {
+  const user = req.user;
+  if (!user || !req.session?.regenerate) return next(new Error('OAuth session unavailable'));
+  req.session.regenerate(error => {
+    if (error) return next(error);
+    req.logIn(user, { session: true }, loginError => {
+      if (loginError) return next(loginError);
+      return next();
+    });
+  });
+}
+
 // Google OAuth - Initiate authentication
 app.get('/api/auth/google',
   passport.authenticate('google', {
@@ -1152,6 +1166,7 @@ app.get('/api/auth/google',
 // Google OAuth - Callback
 app.get('/api/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/login?error=oauth_failed', state: true }),
+  regenerateOAuthSession,
   async (req, res) => {
     // Successful authentication - properly set session with user data
     req.session.userId = req.user.id;
