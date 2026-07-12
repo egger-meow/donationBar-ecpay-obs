@@ -1,13 +1,36 @@
 # Progress Log
 
-## Current status snapshot
+## Progress index (section names)
 
-- **Product direction:** Taiwan-first, creator-owned ECPay donations routed to reliable OBS alerts; the service does not custody viewer funds.
-- **Shipped proof:** tenant-scoped callbacks, raw-body signatures, idempotency, strict TWD minor-unit money, encrypted provider credentials, same-origin mutation protection, CSP/security headers, isolated callback limits, redacted observability, creator export, and reconnecting SSE overlay.
-- **Current verification:** 79 automated tests pass; production dependency audit is clean; local PostgreSQL migration/restore and local HTTP alert/preflight smoke checks are recorded.
-- **Still open before selling:** hosted staging/domain evidence for donation and recurring success/failure/replay/cancel flows, real OAuth, backup/restore and alert vendor exercises, Docker CI result, OBS/browser viewport checks, and Taiwan legal/accounting approval.
-- **Next best work:** close one evidence gate or one measured activation/reliability gap; do not add speculative providers, broad rewrites, or unvalidated features.
-- **Release posture:** not production-ready until the open gates above have named evidence and owners.
+This is an index only; the complete dated entries and building path remain below.
+
+- 2026-07-12 — Bound overlay alerts for short viewports and long text (P1 reliability)
+- 2026-07-12 — Track overlay SSE reconnect handles (P1 reliability)
+- 2026-07-12 — Staging preflight verifies observability and CSP (P0)
+- 2026-07-12 — Same-origin mutation-route audit guard (P0)
+- 2026-07-12 — Remove unregistered legacy payment callbacks (P0)
+- 2026-07-12 — CI-equivalent release checks and alert vocabulary sync (P0)
+- 2026-07-12 — Raw-body ECPay signature verification across callbacks (P0)
+- 2026-07-12 — Strict platform subscription money normalization (P0)
+- 2026-07-12 — Strict donation money normalization at persistence boundary (P0)
+- 2026-07-12 — Payment callback/duplicate-webhook route audit (P0)
+- 2026-07-11 — Content Security Policy enabled with ECPay compatibility (P0)
+- 2026-07-11 — Public progress payload minimization and overlay console redaction (P0)
+- 2026-07-11 — Same-origin protection for public donation order creation (P0)
+- 2026-07-11 — Production dependency audit clean (P0 evidence)
+- 2026-07-11 — P0 callback rate-limit isolation
+- 2026-07-11 — P0 SSE notification isolation and webhook-reference redaction
+- 2026-07-11 — P0 sensitive logging remediation in database and email paths
+- 2026-07-11 — Authenticated creator data export, privacy-operation boundaries (P0 support)
+- 2026-07-11 — Beta operations runbook prepared (P1)
+- 2026-07-11 — Configuration-backed, public closed-beta pricing
+- 2026-07-11 — Guided activation funnel timing and ordered live-alert heuristic
+- 2026-07-11 — Real local PostgreSQL migration/backup/restore rehearsal, two real bugs found and fixed
+- 2026-07-11 — Mobile/desktop verification of this session's UI changes, beta recruitment draft
+- 2026-07-11 — Guided activation checklist (P1, first slice)
+- 2026-07-11 — Real (unmocked) local alert-delivery exercise
+- 2026-07-11 — Observability cleanup, doc corrections, repo tidy-up
+- Project history (reconstructed from commit history and now-removed docs)
 
 This is the single running record of what has actually shipped. It replaces the old
 pattern of one-off `*_SUMMARY.md` / `*_UPDATE.md` docs that used to accumulate under
@@ -22,6 +45,18 @@ For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edit
 place as work completes or priorities shift.
 
 ---
+
+## 2026-07-12 - Bound overlay alerts for short viewports and long text (P1 reliability)
+
+Improved OBS/browser-source rendering without changing the donation payload:
+
+- Alert placement now scales with viewport height instead of assuming a tall canvas.
+- The alert card is bounded to the viewport with internal scrolling, and long localized
+  donor messages are capped and scrollable rather than pushing the overlay off-screen.
+- Added a source regression test for the short-viewport and long-message CSS guards.
+
+Verification: `npm.cmd test` passes **80/80** tests and `git diff --check` passes. Real
+transparent OBS viewport screenshots and interruption tests remain open evidence.
 
 ## 2026-07-12 - Track overlay SSE reconnect handles (P1 reliability)
 
