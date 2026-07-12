@@ -14,6 +14,25 @@ place as work completes or priorities shift.
 
 ---
 
+## 2026-07-12 — Strict donation money normalization at persistence boundary (P0)
+
+Closed a payment-correctness gap found in the callback audit:
+
+- `database.addDonation()` now validates every path before opening a PostgreSQL
+  transaction or writing JSON: amount must be a positive integer minor-unit value within
+  the existing donation maximum, and currency must be an explicitly supported code.
+- DonationBar's current ECPay settlement allowlist is only `TWD`; arbitrary three-letter
+  strings and unsupported currencies are rejected rather than silently persisted.
+- The normalized amount/currency and bounded payer/message values are reused for the
+  donation row and workspace totals, preventing a float or malformed value from making
+  the aggregate disagree with the recorded donation.
+- Added pure money tests covering decimals, signs, scientific notation, bounds, case,
+  and unsupported currencies. Invalid provider callback money raises before persistence,
+  allowing the callback error path/provider retry behavior to remain visible.
+
+Verification: `npm.cmd test` passes **74/74** tests and `git diff --check` passes. Real
+provider callback fixtures and staged currency behavior remain open release evidence.
+
 ## 2026-07-12 — Payment callback/duplicate-webhook route audit (P0)
 
 Completed the production-checklist source review for duplicate webhook routes:

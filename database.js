@@ -7,6 +7,7 @@ import { decryptCredential, encryptCredential } from './credentials.js';
 import { databaseSsl } from './database-ssl.js';
 import { computeActivationFunnel } from './activation.js';
 import { logError, logInfo, logWarn } from './observability.js';
+import { normalizeCurrency, parseMinorUnitAmount } from './money.js';
 
 const { Client } = pg;
 
@@ -671,6 +672,11 @@ class Database {
    * Add a new donation
    */
   async addDonation(workspaceId, donationData) {
+    const amount = parseMinorUnitAmount(donationData.amount);
+    const currency = normalizeCurrency(donationData.currency);
+    if (!Number.isInteger(amount) || !currency) throw new Error('Invalid donation money');
+    const payerName = String(donationData.payerName || '匿名').trim().slice(0, 80) || '匿名';
+    const message = String(donationData.message || '').trim().slice(0, 300);
     if (this.isProduction && this.connected) {
       try {
         await pgClient.query('BEGIN');
@@ -698,10 +704,10 @@ class Database {
           workspaceId,
           donationData.paymentProviderId || null,
           donationData.tradeNo,
-          Number(donationData.amount),
-          donationData.currency || 'TWD',
-          donationData.payerName || 'Anonymous',
-          donationData.message || ''
+          amount,
+          currency,
+          payerName,
+          message
         ]);
 
         // Update totals
@@ -711,7 +717,7 @@ class Database {
               total_donations_count = total_donations_count + 1,
               updated_at = NOW()
           WHERE workspace_id = $2
-        `, [Number(donationData.amount), workspaceId]);
+        `, [amount, workspaceId]);
 
         await pgClient.query('COMMIT');
         logInfo('donation_persisted');
@@ -743,10 +749,10 @@ class Database {
         workspaceId,
         paymentProviderId: donationData.paymentProviderId || null,
         tradeNo: donationData.tradeNo,
-        amount: Number(donationData.amount),
-        currency: donationData.currency || 'TWD',
-        payerName: donationData.payerName || 'Anonymous',
-        message: donationData.message || '',
+        amount,
+        currency,
+        payerName,
+        message,
         status: 'completed',
         paymentMethod: null,
         metadata: {},
@@ -758,7 +764,7 @@ class Database {
       // Update totals
       const settingsIdx = data.workspaceSettings.findIndex(s => s.workspaceId === workspaceId);
       if (settingsIdx !== -1) {
-        data.workspaceSettings[settingsIdx].totalAmount += Number(donationData.amount);
+        data.workspaceSettings[settingsIdx].totalAmount += amount;
         data.workspaceSettings[settingsIdx].totalDonationsCount += 1;
         data.workspaceSettings[settingsIdx].updatedAt = new Date().toISOString();
       }
