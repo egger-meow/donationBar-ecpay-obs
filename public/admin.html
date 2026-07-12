@@ -802,7 +802,7 @@
       <ul id="activationChecklist" style="list-style: none; padding: 0; margin: 15px 0 0;">
         <li id="activationStepEcpay" style="padding: 8px 0;">⬜ 設定 ECPay 收款方式</li>
         <li id="activationStepObs" style="padding: 8px 0;">⬜ 在 OBS 加入斗內條 Browser Source</li>
-        <li id="activationStepDonation" style="padding: 8px 0;">⬜ 收到第一筆捐款（可用測試模式）</li>
+        <li id="activationStepDonation" style="padding: 8px 0;">⬜ 完成第一筆付款（測試提示不會計入）</li>
         <li id="activationStepAlert" style="padding: 8px 0;">⬜ 確認直播畫面有跳出即時提示</li>
       </ul>
     </div>
@@ -2347,7 +2347,7 @@
       document.getElementById('activationStepObs').textContent =
         (steps.obsConnected.done ? '✅' : '⬜') + ' 在 OBS 加入斗內條 Browser Source';
       document.getElementById('activationStepDonation').textContent =
-        (steps.firstDonation.done ? '✅' : '⬜') + ' 收到第一筆捐款（可用測試模式）';
+        (steps.firstDonation.done ? '✅' : '⬜') + ' 完成第一筆付款（測試提示不會計入）';
       document.getElementById('activationStepAlert').textContent =
         (steps.liveAlertDelivered.done ? '✅' : '⬜') + ' 確認直播畫面有跳出即時提示';
 

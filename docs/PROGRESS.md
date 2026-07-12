@@ -4,6 +4,7 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-07-12 — Clarify real-payment activation evidence (P1 activation)
 - 2026-07-12 — Sandbox SSE test-alert for real OBS verification (P1 activation)
 - 2026-07-12 — Chinese activation test-alert path (P1 activation)
 - 2026-07-12 — Thin provider-independent donation event and ECPay adapter (P0/P1 core)
@@ -54,6 +55,19 @@ For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edit
 place as work completes or priorities shift.
 
 ---
+
+## 2026-07-12 - Clarify real-payment activation evidence (P1 activation)
+
+Corrected the checklist so a sandbox visual test cannot be mistaken for a real
+payment milestone:
+
+- The first-payment step now explicitly says the non-persistent test alert does not
+  count toward `firstDonationAt`.
+- The checklist still lets a creator verify OBS first, then requires an actual payment
+  for the activation metric and first-streamer gate.
+- Added a regression assertion for the wording so future UI edits preserve the boundary.
+
+Verification: `npm.cmd test` passes **95/95** tests and `git diff --check` passes.
 
 ## 2026-07-12 - Sandbox SSE test-alert for real OBS verification (P1 activation)
 

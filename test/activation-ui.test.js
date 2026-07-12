@@ -9,6 +9,7 @@ test('activation UI exposes copy/test controls and overlay test mode emits an al
   assert.match(admin, /onclick="openObsTest\(\)"/);
   assert.match(admin, /onclick="sendObsTestAlert\(\)"/);
   assert.match(admin, /15 分鐘|15分鐘/);
+  assert.match(admin, /第一筆付款（測試提示不會計入）/);
   assert.match(admin, /\/admin\/activation\/test-alert/);
   assert.match(overlay, /const testMode = new URLSearchParams/);
   assert.match(overlay, /latestDonation:\s*\{\s*alertId/);
