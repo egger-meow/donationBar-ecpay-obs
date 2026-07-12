@@ -4,6 +4,7 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-07-12 — Roadmap reset around thin ECPay core and first external streamer
 - 2026-07-12 — Explicit Asia/Taipei ECPay order timestamps (P0 payment correctness)
 - 2026-07-12 — Progress index consistency guard
 - 2026-07-12 — Collision-resistant provider trade numbers (P0 payment correctness)
@@ -49,6 +50,24 @@ For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edit
 place as work completes or priorities shift.
 
 ---
+
+## 2026-07-12 - Roadmap reset around thin ECPay core and first external streamer
+
+Updated `ROADMAP.md` to make the launch sequence evidence-driven:
+
+- Weeks 1–2 remain the production gate: hosted staging, OAuth, migrations/restore,
+  ECPay callback lifecycle, monitoring, and legal baseline.
+- Weeks 3–4 now deliver only the thin ECPay payment core plus activation path; weeks
+  5–6 require one unfamiliar streamer to self-serve the complete real-payment/OBS flow
+  before any 5- or 10–20-person cohort.
+- Weeks 7–8 now test a concrete Founder Plan at NT$199/299/399 with recorded acceptance
+  and refusal reasons, and the architecture/product/business DoD makes the provider-
+  independent event boundary explicit.
+- Refunds, partial refunds, capability matrices, complex reconciliation, and a second
+  real provider remain deliberately deferred until user evidence supports them.
+
+This changes sequencing and definitions of done; it does not claim any external gate is
+complete.
 
 ## 2026-07-12 - Explicit Asia/Taipei ECPay order timestamps (P0 payment correctness)
 

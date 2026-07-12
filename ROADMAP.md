@@ -69,16 +69,55 @@ Release stays blocked until staged payment evidence exists; migrations and resto
 
 | Weeks / outcome | Why and impact | Difficulty | Dependency | Definition of done |
 |---|---|---|---|---|
-| 1–2 Launch-evidence gate | Prevents beta payment/data incidents | High | Hosting and sandbox credentials | Every P0 exercise has evidence, owner, rollback and pass/fail |
-| 3–4 Activation-ready beta | Enables nontechnical self-install | Medium | Gate passed | 5 activations complete; median test-alert time measured; critical Traditional Chinese path reviewed |
-| 5–6 10–20 streamer cohort | Establishes workflow/support evidence | Medium | Recruitment | 10 onboard, 7 stream, blockers severity-ranked weekly |
-| 7–8 Paid offer experiment | Tests value and price | Medium | Retained users | 5 qualified users see offer; conversion/objections recorded; billing lifecycle passes |
+| 1–2 Production gate | Prevents beta payment/data incidents before any external user | High | Hosted staging and provider sandbox | Hosted staging, production-style OAuth, migrations/restore, ECPay callback lifecycle, monitoring, and legal baseline each have redacted evidence, owner, rollback, and pass/fail |
+| 3–4 Payment Core + Activation | Makes one ECPay path reliable without premature universal architecture | High | Production gate scope and current ECPay flow | Thin payment abstraction, ECPay adapter, safe test adapter, normalized provider-independent donation event, Chinese onboarding checklist, OBS connection verification, and a 15-minute test-alert path |
+| 5–6 First external streamer | Proves self-service value with a real person outside the build team | High | Payment Core + Activation | One completely unfamiliar streamer, without database edits or remote developer operation, self-configures ECPay, adds the OBS Browser Source, succeeds with a test alert, completes a real payment, and sees a real OBS alert; only then expand to five and then 10–20 |
+| 7–8 Founder paid validation | Tests willingness to pay with a concrete offer | Medium | First external streamer evidence | Founder price is shown; refusal reasons and willingness reasons are recorded; at least one creator subscribes or makes a clear payment commitment; NT$199 / 299 / 399 acceptance is compared |
 | 9–10 One retention release | Avoids feature sprawl | Medium | Usage/interview evidence | One evidence-backed interaction ships with tests, OBS proof and usage tracking |
 | 11–12 Public-launch decision | Makes launch evidence-based | High | 4 stable beta weeks | Go/no-go covers reliability, activation, retention, conversion, support, legal, restore and economics |
 
+## Architecture and product/business definition of done
+
+### Thin payment core (build now)
+
+ECPay stays behind a small provider boundary. The current scope is deliberately limited
+to `create payment`, `verify callback`, `normalize status`, `persist donation`, `emit
+OBS event`, `query diagnostics`, and idempotency. The canonical internal donation event
+is provider-independent, so donation history, goals, OBS rendering, and diagnostics do
+not consume ECPay-specific payloads. A safe test adapter may exercise that event without
+real payment credentials.
+
+Refunds, partial refunds, provider capability matrices, and complex reconciliation get
+explicit boundaries but are not prerequisites for this first external-streamer test.
+Do not build a second real provider until user evidence proves the demand; an
+unimplemented provider must never appear in the user-facing product.
+
+### Architecture DoD
+
+- ECPay is behind the provider adapter boundary.
+- Donation, OBS, goals, and history consume the normalized donation event only.
+- A second provider can later target the same event without rewriting OBS.
+- The test adapter is safe and cannot reach live payment credentials.
+
+### Product DoD
+
+- One unfamiliar streamer completes onboarding without database edits or remote developer operation.
+- The streamer sees a test alert within 15 minutes, completes a real payment, and sees the real alert in OBS.
+- Donation history is correct after the real payment and callback replay.
+
+### Business DoD
+
+- The creator sees a real Founder Plan offer.
+- Reasons for willingness and refusal are recorded.
+- At least one creator starts or clearly commits to a monthly payment.
+
 ## 12. Pricing and profitability
 
-Pricing experiment: 30-day free closed beta; constrained Starter/free setup experience; Pro hypothesis NT$299/month; Agency hypothesis NT$899 only after validation. The current NT$70 configuration is a beta/validation price, not an evidence-backed public price.
+Pricing experiment: 30-day free closed beta followed by a Founder Plan test at NT$199,
+NT$299, and NT$399/month. Show the actual founder offer, record acceptance/refusal
+reasons, and keep the current NT$70 configuration explicitly as a sandbox/beta
+validation price—not a public-launch promise. Agency pricing remains deferred until
+the founder experiment and retained-user evidence justify it.
 
 ECPay periodic billing requires eligible merchant arrangements and fixed TWD periodic charges; contracted fees must be confirmed before publishing margins ([recurring documentation](https://developers.ecpay.com.tw/2868/), [eligibility guidance](https://support.ecpay.com.tw/25120/)).
 
@@ -90,7 +129,11 @@ Costs: hosting/database/backups, monitoring/email, payment fees, support, accoun
 
 Recruit via the confirming professional streamer, Taiwan Twitch/YouTube communities, creator managers, and referrals. Offer 30 free days, assisted setup, and a feedback agreement—not lifetime discounts. Screen streaming frequency, monetization, ECPay eligibility, and pain. Observe onboarding; check in week one; interview biweekly and at exit.
 
-Success threshold: 10 activate, 7 stream, 5 remain weekly active in week four, no unresolved critical payment/data incident, support effort trends down, and 3 credibly intend to pay NT$299.
+Success threshold: first pass requires one unfamiliar streamer to complete the full
+self-service path and produce a real OBS alert. Only after that pass should the cohort
+expand to five and then 10–20; the later cohort target remains 7 streaming and 5 weekly
+active in week four, with no unresolved critical payment/data incident and recorded
+pricing objections.
 
 ## 14. Metrics
 
@@ -123,6 +166,6 @@ Each action inherits the rationale, impact, difficulty, dependency and DoD of it
 5. Exercise recurring initial payment, renewal, failed renewal, and cancellation.
 6. Install monitoring and test readiness/callback/5xx alerts.
 7. Obtain Taiwan legal/accounting review for terms, privacy, retention, tax/e-invoice, and merchant eligibility.
-8. Repair the Traditional Chinese activation path and measure the onboarding checklist.
-9. Recruit first five design partners, then expand to 10–20.
-10. Hold the week-2 release gate before paid cohort or retention work.
+8. Finish the thin normalized payment event, ECPay adapter, safe test adapter, and Chinese onboarding/OBS verification.
+9. Recruit exactly one unfamiliar streamer and observe the complete no-database-edit, no-remote-operation journey.
+10. Hold the production gate, then the first-streamer gate, before expanding the cohort or showing Founder pricing.
