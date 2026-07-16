@@ -3,7 +3,7 @@
  * Shows the complete database schema, relationships, and data flow
  */
 
-import database from './database.js';
+import database from '../lib/database.js';
 
 async function showSchema() {
   console.log('Loading database schema...\n');

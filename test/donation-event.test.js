@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTestDonationEvent, normalizeDonationEvent } from '../donation-event.js';
+import { createTestDonationEvent, normalizeDonationEvent } from '../lib/donation-event.js';
 import { normalizeEcpayPaidDonation, normalizeEcpayReturn } from '../providers/ecpay-donation-adapter.js';
 
 test('ECPay adapter emits the canonical provider-independent donation event', () => {

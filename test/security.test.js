@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { expectedRequestOrigin, isSameOriginRequest, requestOrigin } from '../security.js';
+import { expectedRequestOrigin, isSameOriginRequest, requestOrigin } from '../lib/security.js';
 
 function request(headers = {}, protocol = 'https') {
   return { protocol, get(name) { return headers[name.toLowerCase()]; } };

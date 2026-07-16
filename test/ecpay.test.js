@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateCheckMacValueForCredentials, verifyCheckMacValueForCredentials, verifyCheckMacValueForRawBody } from '../ecpay.js';
+import { generateCheckMacValueForCredentials, verifyCheckMacValueForCredentials, verifyCheckMacValueForRawBody } from '../lib/ecpay.js';
 
 const credentials = { hashKey: '5294y06JbISpM5x9', hashIV: 'v77hoKGq4kWxNNIS' };
 const fixture = {

@@ -26,12 +26,12 @@ npm run migrate  # runs migrations/migrate.js, run-subscription-migration.js, ru
 
 ### Storage: JSON-or-Postgres abstraction
 
-[database.js](database.js) exports a single `Database` class instance used everywhere as `import database from './database.js'`. It transparently switches backend based on environment:
+[lib/database.js](lib/database.js) exports a single `Database` class instance used everywhere as `import database from './database.js'`. It transparently switches backend based on environment:
 - `ENVIRONMENT=sandbox` → always uses local `db.json` (dev/testing only).
-- `DATABASE_URL` set (or `ENVIRONMENT`/`NODE_ENV=production`) → PostgreSQL via `pg`, with SSL config from [database-ssl.js](database-ssl.js).
+- `DATABASE_URL` set (or `ENVIRONMENT`/`NODE_ENV=production`) → PostgreSQL via `pg`, with SSL config from [lib/database-ssl.js](lib/database-ssl.js).
 - In production, a missing `DATABASE_URL` is a hard startup failure — JSON fallback is intentionally disabled in production (never silently degrade).
 
-Payment provider credentials (per-workspace ECPay `HashKey`/`HashIV`) are encrypted at rest via [credentials.js](credentials.js) (`aes-256-gcm`, key from `CREDENTIAL_ENCRYPTION_KEY`). `decryptCredential` throws if a value isn't in the `enc:v1:` envelope format, which is what forces `npm run migrate`'s `encrypt-provider-credentials.js` step to run before production start.
+Payment provider credentials (per-workspace ECPay `HashKey`/`HashIV`) are encrypted at rest via [lib/credentials.js](lib/credentials.js) (`aes-256-gcm`, key from `CREDENTIAL_ENCRYPTION_KEY`). `decryptCredential` throws if a value isn't in the `enc:v1:` envelope format, which is what forces `npm run migrate`'s `encrypt-provider-credentials.js` step to run before production start.
 
 ### Multi-tenant workspace model
 
@@ -41,17 +41,17 @@ Every stream/overlay/donation flow is scoped to a **workspace**, identified by a
 
 [server.js](server.js) is a single large Express app (routes, auth, ECPay flows, subscriptions, webhooks, SSE all in one file — see AGENTS.md guidance below on not doing unrelated rewrites of it). Key pieces, top to bottom:
 - Security middleware: `helmet`, rate limiting, a static-file guard that 404s direct access to `admin.html`/`overlay.html`/`donate.html` (must be reached through their authenticated/slugged routes, not as raw static assets), `express-session` (Postgres-backed store in production via `connect-pg-simple`), Passport (session + Google OAuth strategy).
-- Auth/authorization middlewares: `requireAdmin`, `requireAuth`, `requirePlatformAdmin` (platform-wide admin, gated by `PLATFORM_ADMIN_EMAILS` in [config.js](config.js)), `requireActiveSubscription` (workspace-level paywall gate), `requireSameOrigin` ([security.js](security.js), origin/referer check for state-changing POSTs).
-- Donation flow: `/create-order` builds an ECPay checkout request; `/success` and `/ecpay/return` handle the buyer-facing redirect back; `/webhook/:slug` is the async ECPay payment notification (must verify `CheckMacValue` via [ecpay.js](ecpay.js) and be idempotent).
+- Auth/authorization middlewares: `requireAdmin`, `requireAuth`, `requirePlatformAdmin` (platform-wide admin, gated by `PLATFORM_ADMIN_EMAILS` in [lib/config.js](lib/config.js)), `requireActiveSubscription` (workspace-level paywall gate), `requireSameOrigin` ([lib/security.js](lib/security.js), origin/referer check for state-changing POSTs).
+- Donation flow: `/create-order` builds an ECPay checkout request; `/success` and `/ecpay/return` handle the buyer-facing redirect back; `/webhook/:slug` is the async ECPay payment notification (must verify `CheckMacValue` via [lib/ecpay.js](lib/ecpay.js) and be idempotent).
 - Subscription flow (recurring billing for the streamer's own DonationBar subscription, separate from one-off viewer donations): `/subscription/checkout`, `/ecpay/period/callback`, `/subscription/cancel`, `/subscription/pause`, `/subscription/resume`, `/api/subscription/status`, `/api/subscription/payment-history`. Uses a separate "billing" ECPay credential pair (`BILLING_ECPAY_*` env vars / `getBillingECPayCredentials()`), distinct from a workspace's own donation-collection ECPay credentials.
 - Real-time overlay updates: `/events` (SSE) and `/progress`, both scoped by workspace slug.
 - Health checks: `/health/live` (liveness) and `/health/ready` (checks `database.healthCheck()`).
 
-### ECPay integration ([ecpay.js](ecpay.js))
+### ECPay integration ([lib/ecpay.js](lib/ecpay.js))
 
 `generateCheckMacValueForCredentials` / `verifyCheckMacValueForCredentials` implement ECPay's official CheckMacValue algorithm (URL-encode per ECPay's custom rules, SHA-256, uppercase). Always verify webhook/callback payloads against the *unmodified* payload using `crypto.timingSafeEqual`-based comparison (already done in `verifyCheckMacValueForCredentials` — don't replace with a naive `===`).
 
-### Config & validation ([config.js](config.js))
+### Config & validation ([lib/config.js](lib/config.js))
 
 `validateProductionConfig()` runs at server startup and throws with an aggregated list of errors if any production requirement is missing: `DATABASE_URL`, a strong non-placeholder `SESSION_SECRET` (32+ chars), HTTPS `BASE_URL`, a valid `CREDENTIAL_ENCRYPTION_KEY`, Google OAuth + billing ECPay credentials, at least one `PLATFORM_ADMIN_EMAILS` entry, and `ECPAY_ENVIRONMENT` being `stage` or `production`. When adding new required production config, extend this function rather than checking ad hoc at the call site.
 
@@ -61,11 +61,11 @@ Dependency-free HTML/CSS/JS — no build step, no framework. `admin.html`, `dona
 
 ### Migrations ([migrations/](migrations/))
 
-Plain Node scripts (not a migration framework) run in sequence by `npm run migrate`: `migrate.js` (base schema + initial admin user from `ADMIN_*` env vars), `run-subscription-migration.js`, `run-payment-idempotency-migration.js`, `encrypt-provider-credentials.js`. There is no rollback tooling — document rollback steps manually with any schema change.
+Plain Node scripts (not a migration framework) run in sequence by `npm run migrate`: `migrate.js` (base schema + initial admin user from `ADMIN_*` env vars), `run-subscription-migration.js`, `run-payment-idempotency-migration.js`, `encrypt-provider-credentials.js`. There is no rollback tooling — document rollback steps manually with any schema change. `migrations/show-schema.js` is a standalone dev utility (`node migrations/show-schema.js`) that prints the current database schema; it is not part of the `npm run migrate` sequence.
 
-### Legacy/reference files — do not extend
+### Library modules ([lib/](lib/))
 
-`database-old-backup.js`, `server-old-backup.js`, `db.json.backup` are historical references only.
+`server.js` stays at the repo root as the entry point (`package.json` `main`, `npm start`, `Dockerfile` `CMD`). Every other non-route module it depends on — `database.js`, `database-ssl.js`, `config.js`, `credentials.js`, `ecpay.js`, `ecpay-date.js`, `security.js`, `security-headers.js`, `activation.js`, `donation-event.js`, `email.js`, `money.js`, `observability.js`, `privacy-export.js`, `promise-timeout.js`, `rate-limit-policy.js`, `trade-number.js`, `subscription-callback.js` — lives under `lib/`, imported as `./lib/<name>.js` from root-level files (`server.js`, `migrations/*.js` import as `../lib/<name>.js`) or `./<name>.js` between `lib/` modules themselves. `providers/` (provider adapters) and `operations/` (backup/restore/preflight scripts) stay as their own top-level directories, consistent with `migrations/`.
 
 ## Working Rules
 
@@ -78,7 +78,7 @@ Plain Node scripts (not a migration framework) run in sequence by `npm run migra
 - Keep OBS browser-source compatibility in mind: overlays must reconnect after network interruption, avoid layout shifts, and remain readable at common canvas sizes.
 - Keep user-facing text ready for localization; don't embed locale assumptions in payment or date/number formatting logic.
 - Prefer focused modules when changing a large concern in `server.js`; avoid unrelated rewrites of the monolith.
-- Do not edit backup (`*-old-backup.js`, `db.json.backup`) files as part of normal implementation.
+- New non-route modules belong in `lib/`, not the repo root; `server.js` is the only module intended to stay at root.
 - Add automated tests when changing authentication, authorization, workspace resolution, payment signatures, webhook idempotency, subscription state, money calculations, or database migrations. Tests must use sandbox credentials/fixtures, never live payment credentials.
 - For UI work, verify both desktop and mobile layouts. For overlay work, also verify the exact OBS-style viewport, transparent background, initial load, SSE reconnect, and long localized text. Report checks that could not be run.
 

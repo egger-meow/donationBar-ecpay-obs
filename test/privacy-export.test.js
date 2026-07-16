@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildAccountExport } from '../privacy-export.js';
+import { buildAccountExport } from '../lib/privacy-export.js';
 
 test('account export includes only allowlisted account and workspace data', () => {
   const exported = buildAccountExport({

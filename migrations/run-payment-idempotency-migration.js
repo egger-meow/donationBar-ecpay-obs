@@ -2,7 +2,7 @@ import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
 import pg from 'pg';
-import { databaseSsl } from '../database-ssl.js';
+import { databaseSsl } from '../lib/database-ssl.js';
 
 const { Client } = pg;
 const databaseUrl = process.env.DATABASE_URL;

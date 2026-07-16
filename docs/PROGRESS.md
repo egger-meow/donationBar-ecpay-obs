@@ -4,6 +4,7 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-07-16 — Move non-route modules into lib/, drop dead legacy backup files
 - 2026-07-16 — Actionable activation-checklist diagnostics, first slice (P1 diagnostics)
 - 2026-07-16 — Premium dark UI overhaul across all creator/viewer pages (P1 conversion)
 - 2026-07-16 — Competitive reset: Nekolive Network analysis and roadmap revision
@@ -57,6 +58,50 @@ delete a past entry — if something it describes later changes or turns out wro
 in a new entry instead. This file records *what happened*; it is not a priority list.
 For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edited in
 place as work completes or priorities shift.
+
+---
+
+## 2026-07-16 - Move non-route modules into lib/, drop dead legacy backup files
+
+Pure repo-hygiene change, no behavior change. The repo root had accumulated 19 flat
+`.js` files alongside `package.json`/`Dockerfile`/etc., making it hard to tell app code
+from project config at a glance, plus two `*-old-backup.js` files (54KB, explicitly
+"historical references only, do not extend" per this file) and a stray 2-byte
+`db.json.backup` that added no value since git history already preserves every prior
+version.
+
+- Moved 18 non-route modules into `lib/` via `git mv` (history preserved):
+  `database.js`, `database-ssl.js`, `config.js`, `credentials.js`, `ecpay.js`,
+  `ecpay-date.js`, `security.js`, `security-headers.js`, `activation.js`,
+  `donation-event.js`, `email.js`, `money.js`, `observability.js`, `privacy-export.js`,
+  `promise-timeout.js`, `rate-limit-policy.js`, `trade-number.js`,
+  `subscription-callback.js`. `server.js` stays at root as the entry point
+  (`package.json` `main`, `Dockerfile` `CMD`, unaffected). Moved `show-schema.js` (a
+  standalone dev utility, not part of `npm run migrate`) into `migrations/`, matching
+  the existing `migrations/`/`providers/`/`operations/` top-level-directory pattern.
+- Deleted `server-old-backup.js`, `database-old-backup.js`, `db.json.backup` — confirmed
+  with the user before removing them since it's a destructive action; content remains
+  recoverable via git history.
+- Rewrote every relative import specifier repo-wide (server.js, all of `lib/`'s
+  internal cross-imports, `migrations/*.js`, `providers/ecpay-donation-adapter.js`, and
+  every affected `test/*.js` file) to the new paths, plus two `readFile(new URL(...))`
+  source-inspection test paths that a plain import-statement rewrite doesn't catch.
+  Updated stale file links/mentions in `CLAUDE.md`, `AGENTS.md`, and `.dockerignore`.
+- Caught and fixed a scripting mistake mid-refactor: the first import-rewrite pass
+  walked into `.claude/worktrees/donationbar-lane-b-b5bd32/` (a separate git worktree)
+  and edited 14 files there by accident. Verified via `git diff` that each touched file
+  in that worktree had exactly one hunk — the accidental rewrite, nothing else — before
+  reverting, then removed that worktree entirely per the user's explicit instruction.
+
+Verification: `npm test` passes (95/95). `node --check` on every entry point and moved
+module. Actually booted the dev server (not just the test runner) and confirmed
+`/health/ready` responds correctly with the new paths — proving Node's ESM resolver,
+not just the test harness's mocking, is happy. Also executed `migrations/show-schema.js`
+directly from its new location: it resolved `lib/database.js` correctly (proving the
+path fix works) but then hit `database.printDatabaseSchema is not a function` — a
+pre-existing bug unrelated to this move (those methods never existed on the Database
+class, and the script isn't covered by any test), flagged separately rather than fixed
+here since it's out of scope for a pure layout refactor.
 
 ---
 

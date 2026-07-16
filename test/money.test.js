@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeCurrency, parseMinorUnitAmount } from '../money.js';
+import { normalizeCurrency, parseMinorUnitAmount } from '../lib/money.js';
 
 test('donation amounts accept only positive integer minor units within the provider limit', () => {
   assert.equal(parseMinorUnitAmount('70'), 70);

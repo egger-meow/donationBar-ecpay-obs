@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateCheckMacValueForCredentials } from '../ecpay.js';
-import { processSubscriptionPaymentCallback } from '../subscription-callback.js';
+import { generateCheckMacValueForCredentials } from '../lib/ecpay.js';
+import { processSubscriptionPaymentCallback } from '../lib/subscription-callback.js';
 
 const credentials = { merchantId: 'merchant-1', hashKey: '12345678901234567890123456789012', hashIV: '1234567890123456' };
 

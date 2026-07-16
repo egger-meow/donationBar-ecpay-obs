@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { databaseSsl } from '../database-ssl.js';
+import { databaseSsl } from '../lib/database-ssl.js';
 
 test('production database connections verify TLS certificates', () => {
   assert.deepEqual(databaseSsl({ NODE_ENV: 'production' }), { rejectUnauthorized: true, ca: undefined });

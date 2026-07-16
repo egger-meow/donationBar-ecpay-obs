@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { computeActivationFunnel, computeActivationSteps } from '../activation.js';
+import { computeActivationFunnel, computeActivationSteps } from '../lib/activation.js';
 
 const configuredProvider = { merchantId: 'm-1', hashKey: 'k'.repeat(32), hashIV: 'i'.repeat(16) };
 

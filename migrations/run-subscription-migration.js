@@ -8,7 +8,7 @@ import 'dotenv/config';
 import pg from 'pg';
 import fs from 'fs';
 import path from 'path';
-import { databaseSsl } from '../database-ssl.js';
+import { databaseSsl } from '../lib/database-ssl.js';
 
 const { Client } = pg;
 const __dirname = path.resolve();

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createDonationTradeNo, createProviderTradeNo, createSubscriptionTradeNo } from '../trade-number.js';
+import { createDonationTradeNo, createProviderTradeNo, createSubscriptionTradeNo } from '../lib/trade-number.js';
 
 test('provider trade numbers stay alphanumeric, bounded, and entropy-backed', () => {
   const requestedSizes = [];

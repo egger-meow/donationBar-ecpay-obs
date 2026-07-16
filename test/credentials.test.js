@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { decryptCredential, encryptCredential, isEncryptedCredential } from '../credentials.js';
+import { decryptCredential, encryptCredential, isEncryptedCredential } from '../lib/credentials.js';
 
 const env = { CREDENTIAL_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64') };
 

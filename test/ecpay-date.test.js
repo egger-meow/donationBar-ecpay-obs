@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { formatECPayDate } from '../ecpay-date.js';
+import { formatECPayDate } from '../lib/ecpay-date.js';
 
 test('ECPay order dates use Taiwan time regardless of host timezone', () => {
   assert.equal(formatECPayDate(new Date('2026-01-01T00:00:00.000Z')), '2026/01/01 08:00:00');

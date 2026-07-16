@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import pg from 'pg';
-import { encryptCredential, isEncryptedCredential } from '../credentials.js';
-import { databaseSsl } from '../database-ssl.js';
+import { encryptCredential, isEncryptedCredential } from '../lib/credentials.js';
+import { databaseSsl } from '../lib/database-ssl.js';
 
 const { Client } = pg;
 if (process.env.ENVIRONMENT === 'sandbox') process.exit(0);

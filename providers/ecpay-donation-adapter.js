@@ -1,4 +1,4 @@
-import { normalizeDonationEvent } from '../donation-event.js';
+import { normalizeDonationEvent } from '../lib/donation-event.js';
 
 // Translate only after the caller has verified the ECPay signature and decrypted Data.
 // No ECPay-shaped object leaves this module.

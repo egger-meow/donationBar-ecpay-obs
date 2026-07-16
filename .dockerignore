@@ -8,8 +8,6 @@ node_modules
 .env.*
 !.env.example
 db.json
-db.json.backup
-*-old-backup.js
 *.log
 docs
 test

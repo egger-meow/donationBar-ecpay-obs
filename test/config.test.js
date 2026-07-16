@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getECPayCheckoutUrl, getECPayPeriodActionUrl, getSubscriptionPlan, isPlatformAdminEmail, platformAdminEmails, validateProductionConfig } from '../config.js';
+import { getECPayCheckoutUrl, getECPayPeriodActionUrl, getSubscriptionPlan, isPlatformAdminEmail, platformAdminEmails, validateProductionConfig } from '../lib/config.js';
 
 const validProduction = { NODE_ENV: 'production', DATABASE_URL: 'postgres://example/db', SESSION_SECRET: 'a'.repeat(32), CREDENTIAL_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString('base64'), BASE_URL: 'https://donationbar.example', GOOGLE_CLIENT_ID: 'client', GOOGLE_CLIENT_SECRET: 'secret', BILLING_ECPAY_MERCHANT_ID: 'merchant', BILLING_ECPAY_HASH_KEY: 'key', BILLING_ECPAY_HASH_IV: 'iv', PLATFORM_ADMIN_EMAILS: 'owner@example.com', ECPAY_ENVIRONMENT: 'production' };
 

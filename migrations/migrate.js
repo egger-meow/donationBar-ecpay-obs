@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
-import { databaseSsl } from '../database-ssl.js';
+import { databaseSsl } from '../lib/database-ssl.js';
 import { assertLegacySingleUserSandboxData } from './sandbox-shape.js';
 
 const { Client } = pg;

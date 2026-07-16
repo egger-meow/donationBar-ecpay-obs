@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GENERAL_RATE_LIMIT, PROVIDER_CALLBACK_RATE_LIMIT, isProviderCallbackPath } from '../rate-limit-policy.js';
+import { GENERAL_RATE_LIMIT, PROVIDER_CALLBACK_RATE_LIMIT, isProviderCallbackPath } from '../lib/rate-limit-policy.js';
 
 test('provider callback paths are isolated from the general rate-limit bucket', () => {
   assert.equal(isProviderCallbackPath('/webhook'), true);

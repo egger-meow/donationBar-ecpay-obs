@@ -6,13 +6,15 @@ Build DonationBar into a production-grade SaaS that streamers worldwide can pay 
 
 ## Repository Map
 
-- `server.js`: Express application, authentication, routes, ECPay flows, subscriptions, webhooks, and SSE.
-- `database.js`: JSON/PostgreSQL persistence abstraction and schema initialization.
-- `email.js`: SMTP email delivery.
+- `server.js`: Express application, authentication, routes, ECPay flows, subscriptions, webhooks, and SSE. Stays at repo root as the entry point; everything below lives in `lib/`.
+- `lib/database.js`: JSON/PostgreSQL persistence abstraction and schema initialization.
+- `lib/email.js`: SMTP email delivery.
+- `lib/`: every other non-route module `server.js` depends on (config, credentials, ECPay signing, security, activation, money, observability, etc.).
 - `public/`: dependency-free HTML/CSS/JavaScript pages for admin, donation, login, and OBS overlay views.
-- `migrations/`: PostgreSQL schema and migration scripts.
+- `migrations/`: PostgreSQL schema and migration scripts, plus `show-schema.js` (dev-only schema viewer).
+- `providers/`: payment-provider adapters (ECPay donation-event normalization today).
+- `operations/`: backup, restore, and staging-preflight scripts.
 - `docs/`: setup, architecture, API, deployment, and feature notes. Some documents may be stale; verify behavior in code.
-- `*-old-backup.js` and `db.json.backup`: historical references only. Do not extend them.
 
 ## Commands
 

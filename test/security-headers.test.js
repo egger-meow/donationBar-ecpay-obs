@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getHelmetOptions } from '../security-headers.js';
+import { getHelmetOptions } from '../lib/security-headers.js';
 
 test('CSP confines browser resources while allowing existing inline pages and ECPay checkout', () => {
   const directives = getHelmetOptions({ production: true }).contentSecurityPolicy.directives;
