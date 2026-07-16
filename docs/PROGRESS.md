@@ -4,6 +4,8 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-07-16 — Premium dark UI overhaul across all creator/viewer pages (P1 conversion)
+- 2026-07-16 — Competitive reset: Nekolive Network analysis and roadmap revision
 - 2026-07-12 — Align recruitment draft with one-streamer gate (P1 beta)
 - 2026-07-12 — Clarify real-payment activation evidence (P1 activation)
 - 2026-07-12 — Sandbox SSE test-alert for real OBS verification (P1 activation)
@@ -56,6 +58,102 @@ For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edit
 place as work completes or priorities shift.
 
 ---
+
+## 2026-07-16 - Premium dark UI overhaul across all creator/viewer pages (P1 conversion)
+
+Rebuilt the visual layer of every user-facing page around a single design system
+(OLED-dark background `#030712`, emerald money-accent `#34d399`, Noto Sans TC via Google
+Fonts with system-font fallback, shared CSS custom-property tokens, SVG icons replacing
+emoji in structural UI). Motivation: the competitive reset (previous entry) bets on
+perceived quality and conversion — the pages must feel better than the incumbent's to
+justify a fixed subscription.
+
+- `public/login.html` — rewritten as a two-column sales page: brand panel with an
+  animated donation-bar demo and four positioning claims (15-minute self-service
+  activation, direct-to-creator ECPay settlement, actionable diagnostics, flat pricing)
+  plus the auth card. Removed the now-false "市場唯一串接綠界" claim (Nekolive also
+  aggregates ECPay); copy now matches ROADMAP.md positioning. Google OAuth flow,
+  `oauth_failed` alert, coming-soon handlers, contact info, and legal links preserved.
+- `public/donate.html` — rewritten in the same system: progress hero with live
+  percent/amounts, preset amount chips (44px+ touch targets), message character counter,
+  inline amount validation (replacing `alert()`), loading state on submit. Form POST to
+  `/create-order`, slug detection, `/progress` + `/events` SSE wiring unchanged.
+- `public/overlay.html` — visual polish only where safe for OBS: glass highlight and
+  glow on the progress fill, dark-glass donation alert card accented by the configurable
+  `--bar` color (replacing the hardcoded red gradient), `prefers-reduced-motion`
+  support. Two functional fixes: (1) the SSE `overlay-settings` listener called an
+  undefined `applyOverlaySettings()` — live settings pushes from the admin page would
+  throw; the function now exists (merge + re-apply). (2) The README/CLAUDE.md-documented
+  `fg`/`bg`/`bar`/`bar_light` query-param color overrides were not implemented at all;
+  they now parse (hex-validated) and take precedence over server settings. Avoided
+  `color-mix()` and other post-CEF-103 CSS so OBS's embedded Chromium renders it.
+  Transparent background, element IDs, alert queue, celebration, SSE reconnect backoff,
+  and `?test=1` mode all preserved.
+- `public/admin.html` — full `<style>` block replaced with the token system (every class
+  name and keyframe kept so the 1,200-line JS layer is untouched); clashing inline
+  styles converted to semantic classes (`btn-info`/`btn-accent`), the unreadable
+  `#454e46` OBS-URL code color fixed to the accent token, light-blue-on-dark info alert
+  fixed, `<select>` elements now styled by the shared rules, decorative emoji stripped
+  from static buttons/headings.
+- `public/pricing.html`, `public/subscription-required.html` — rewritten in the same
+  system; dynamic `/api/pricing` loading and `?from=` copy switching preserved.
+- `test/activation-ui.test.js` — updated one assertion to the refactored overlay
+  test-mode expression (`queryParams.get('test') === '1'`); assertion intent (test mode
+  derived from URL) unchanged.
+- Added `.claude/launch.json` (local dev-server launch config for preview tooling).
+- Added `docs/setup/GO_LIVE_FREE_CHECKLIST.md` — the NT$0-first deployment path
+  (accounts to register, production env vars with generation commands, and the
+  CP值-ordered triggers for when to start paying), linked from `docs/README.md`.
+
+Verification: `npm test` passes (95/95). Live-browser checks against the sandbox server:
+login (desktop 1280px two-column and mobile 375px single-column, no horizontal
+overflow), donate (real `/progress` data rendering, SSE connected, zero console errors),
+overlay at `?test=1&fg=…&bar=…&bar_light=…&bg=…` (transparent body confirmed, query
+overrides applied, test alerts cycling), pricing (live `/api/pricing` values), and
+subscription-required (`?from=donate` variant). Admin verified for layout/tokens via a
+throwaway static copy (Google-OAuth-gated route not exercised); its API-driven states
+still need an authenticated pass during the next real activation run. OBS-native
+rendering of the polished overlay not yet re-verified inside OBS itself — covered by the
+existing activation-evidence gate.
+
+---
+
+## 2026-07-16 - Competitive reset: Nekolive Network analysis and roadmap revision
+
+A direct, operating competitor (Nekolive Network) was identified: Taiwan-local payment
+aggregation across six providers, OBS donation alerts, progress bars, alert replay,
+donation cards, leaderboards, media requests, Discord notifications, Twitch bot
+integrations, and an overtime timer. This invalidates "Taiwan-local payment connected to
+OBS" as a standalone differentiator.
+
+- Added [docs/competitive/NEKOLIVE_ANALYSIS.md](competitive/NEKOLIVE_ANALYSIS.md): a
+  sourced comparison (onboarding, pricing, providers, OBS tooling, reliability signals,
+  support model, customization, target customer), the fixed-vs-revenue-share pricing
+  crossover math (flat NT$199–399/month beats Nekolive's 3%-above-NT$10,000-cap-NT$1,500
+  fee only above roughly NT$6,600–13,300/month net donation revenue), and an audit
+  confirming no currently-listed roadmap item reproduces Nekolive's broader feature set.
+- Added [docs/beta/STREAMER_INTERVIEW_GUIDE.md](beta/STREAMER_INTERVIEW_GUIDE.md):
+  question set across five segments (current/former Nekolive users, rejected
+  applicants, direct-ECPay creators, other-platform creators) to validate or reject the
+  competitive hypotheses before further roadmap decisions.
+- Revised [ROADMAP.md](../ROADMAP.md): target customer narrowed from beginner creators
+  to already-monetized Taiwanese streamers; positioning restated as self-service speed,
+  no manual approval, actionable diagnostics, and fixed pricing rather than feature
+  parity; added measurable competitive targets (sub-15-minute signup-to-test-alert,
+  zero developer intervention, real unmocked OBS payment, full diagnostic coverage,
+  pricing shown with its crossover context); formalized a do-not-build-now list; added
+  a P1 "Actionable failure diagnostics" row; added an "Undifferentiated vs. incumbent"
+  risk row; replaced the "build more creator features" next milestone with a proof
+  milestone gated on one external monetized streamer's real evidence.
+- Updated [docs/next-direction.md](next-direction.md) and [docs/README.md](README.md)
+  to reflect the same reset and link the new documents.
+
+No code changed. Broad feature expansion remains paused per this reset; the roadmap's
+existing production-gate and first-streamer-gate sequencing (staging proof, then one
+external streamer, then founder pricing) is unchanged — this entry adds competitive
+context and measurable targets to that sequencing, not a new sequence.
+
+Verification: documentation-only change; `npm test` run and passes (95/95).
 
 ## 2026-07-12 - Align recruitment draft with one-streamer gate (P1 beta)
 

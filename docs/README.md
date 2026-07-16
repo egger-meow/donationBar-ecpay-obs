@@ -10,6 +10,8 @@ when; use it (and `git log`) as the source of truth over any single feature doc.
 - [Taiwan-first roadmap](../ROADMAP.md) — priorities, what's shipped vs. proven, next actions.
 - [Next direction](next-direction.md) — short framing of the current focus.
 - [Progress log](PROGRESS.md) — running, append-only record of what has shipped.
+- [Nekolive competitive analysis](competitive/NEKOLIVE_ANALYSIS.md) — direct-competitor comparison and the resulting do-not-build list.
+- [Streamer interview guide](beta/STREAMER_INTERVIEW_GUIDE.md) — market-validation questions across five streamer segments.
 
 ---
 
@@ -27,6 +29,7 @@ when; use it (and `git log`) as the source of truth over any single feature doc.
 Location: `docs/setup/`
 
 - **[Complete Setup Guide](setup/COMPLETE_SETUP_GUIDE.md)** - End-to-end setup
+- **[Go-Live Free Checklist](setup/GO_LIVE_FREE_CHECKLIST.md)** - Accounts to register, production env vars, and the NT$0-first path to deployment
 - **[Google OAuth Setup](setup/GOOGLE_OAUTH_SETUP.md)** - Google OAuth 2.0 config (the only supported login method)
 - **[Deployment Guide](setup/DEPLOYMENT.md)** - Production deployment
 
@@ -75,6 +78,16 @@ Location: `docs/operations/`
 Location: `docs/development/`
 
 - **[Sandbox Mode](development/SANDBOX.md)** - Testing in sandbox environment
+
+### 🥊 Competitive analysis
+Location: `docs/competitive/`
+
+- **[Nekolive Network analysis](competitive/NEKOLIVE_ANALYSIS.md)** - Direct-competitor comparison, pricing crossover, and the resulting do-not-build list
+
+### 🧪 Beta
+Location: `docs/beta/`
+
+- **[Streamer interview guide](beta/STREAMER_INTERVIEW_GUIDE.md)** - Market-validation questions across current/former Nekolive users, rejected applicants, direct-ECPay creators, and other-platform creators
 
 ---
 

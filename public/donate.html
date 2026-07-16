@@ -3,267 +3,405 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>支持直播 - 捐款</title>
+  <title>支持直播 - 斗內</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    :root {
+      --bg: #030712;
+      --surface: #0b1120;
+      --surface-2: #111a2e;
+      --border: rgba(148, 163, 184, 0.16);
+      --border-strong: rgba(148, 163, 184, 0.28);
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent: #34d399;
+      --accent-strong: #10b981;
+      --accent-dim: rgba(52, 211, 153, 0.12);
+      --danger: #f87171;
+      --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.55);
+      --ease: cubic-bezier(0.22, 1, 0.36, 1);
     }
 
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { color-scheme: dark; }
+
     body {
-      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #ffffff;
+      font-family: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 20px;
+      padding: 24px 16px;
+      line-height: 1.6;
+      position: relative;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 55% 40% at 50% 0%, rgba(16, 185, 129, 0.09) 0%, transparent 65%),
+        radial-gradient(ellipse 40% 30% at 85% 90%, rgba(56, 189, 248, 0.05) 0%, transparent 60%);
+      pointer-events: none;
     }
 
     .container {
-      background: rgba(27, 31, 38, 0.95);
-      backdrop-filter: blur(20px);
-      padding: 40px;
-      border-radius: 20px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: linear-gradient(180deg, rgba(17, 26, 46, 0.85), rgba(11, 17, 32, 0.95));
+      border: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      padding: 36px 32px;
+      border-radius: 22px;
+      box-shadow: var(--shadow-lg);
       width: 100%;
-      max-width: 450px;
-      animation: slideIn 0.6s ease;
+      max-width: 480px;
+      position: relative;
+      z-index: 1;
+      animation: rise 0.6s var(--ease) both;
     }
 
-    @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateY(30px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     h1 {
       text-align: center;
-      margin-bottom: 10px;
-      font-size: 28px;
-      font-weight: 700;
-      background: linear-gradient(135deg, #46e65a, #5ef56d);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      margin-bottom: 6px;
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: -0.01em;
     }
 
     .subtitle {
       text-align: center;
-      color: #a0a0a0;
-      margin-bottom: 30px;
-      font-size: 16px;
+      color: var(--text-muted);
+      margin-bottom: 26px;
+      font-size: 14.5px;
     }
 
-    .form-group {
-      margin-bottom: 20px;
+    /* ===== Progress hero ===== */
+    .progress-preview {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px 22px;
+      margin-bottom: 26px;
     }
+
+    .progress-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .progress-title strong {
+      font-size: 15.5px;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+
+    .progress-percent {
+      color: var(--accent);
+      font-weight: 900;
+      font-size: 15px;
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 14px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent-strong), #6ee7b7);
+      border-radius: 999px;
+      box-shadow: 0 0 14px rgba(52, 211, 153, 0.45);
+      transition: width 0.6s var(--ease);
+    }
+
+    .progress-amounts {
+      display: flex;
+      justify-content: center;
+      align-items: baseline;
+      gap: 6px;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-muted);
+      font-size: 13.5px;
+    }
+
+    .progress-amounts .current {
+      color: var(--accent);
+      font-size: 20px;
+      font-weight: 900;
+    }
+
+    /* ===== Alerts ===== */
+    .message {
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+      font-weight: 500;
+      font-size: 14px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+    }
+    .message svg { width: 20px; height: 20px; flex-shrink: 0; }
+    .message.visible { display: flex; }
+
+    .success-message {
+      background: var(--accent-dim);
+      border: 1px solid rgba(52, 211, 153, 0.35);
+      color: var(--accent);
+    }
+
+    .error-message {
+      background: rgba(248, 113, 113, 0.1);
+      border: 1px solid rgba(248, 113, 113, 0.35);
+      color: var(--danger);
+    }
+
+    /* ===== Form ===== */
+    .form-group { margin-bottom: 20px; }
 
     label {
       display: block;
       margin-bottom: 8px;
-      font-weight: 500;
-      color: #e0e0e0;
+      font-weight: 700;
+      font-size: 13.5px;
+      color: var(--text);
+    }
+
+    label .optional {
+      font-weight: 400;
+      color: var(--text-dim);
+      font-size: 12.5px;
+      margin-left: 4px;
     }
 
     input[type="text"],
     input[type="number"],
-    select,
     textarea {
       width: 100%;
-      padding: 15px;
+      padding: 14px 16px;
       border-radius: 12px;
-      border: 2px solid #2a2f36;
-      background: #0f1216;
-      color: #ffffff;
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      color: var(--text);
       font-size: 16px;
-      transition: all 0.3s ease;
-      font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      font-family: inherit;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
     }
 
-    textarea {
-      resize: vertical;
-      min-height: 80px;
-    }
+    input::placeholder, textarea::placeholder { color: var(--text-dim); }
 
-    input[type="text"]:focus,
-    input[type="number"]:focus,
-    select:focus,
-    textarea:focus {
+    textarea { resize: vertical; min-height: 76px; }
+
+    input:focus, textarea:focus {
       outline: none;
-      border-color: #46e65a;
-      box-shadow: 0 0 0 3px rgba(70, 230, 90, 0.1);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.18);
+    }
+
+    .char-hint {
+      font-size: 12px;
+      color: var(--text-dim);
+      text-align: right;
+      margin-top: 4px;
+      font-variant-numeric: tabular-nums;
     }
 
     .amount-buttons {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 10px;
-      margin-top: 10px;
+      margin-top: 12px;
     }
 
     .amount-btn {
-      padding: 12px;
-      border: 2px solid #2a2f36;
-      background: transparent;
-      color: #ffffff;
-      border-radius: 8px;
+      min-height: 46px;
+      padding: 10px 8px;
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      color: var(--text-muted);
+      border-radius: 12px;
       cursor: pointer;
       font-size: 14px;
-      font-weight: 500;
-      transition: all 0.3s ease;
+      font-weight: 700;
+      font-family: inherit;
+      font-variant-numeric: tabular-nums;
+      transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.15s var(--ease);
     }
 
-    .amount-btn:hover,
+    .amount-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .amount-btn:focus-visible {
+      outline: 3px solid rgba(52, 211, 153, 0.55);
+      outline-offset: 2px;
+    }
+
     .amount-btn.active {
-      border-color: #46e65a;
-      background: rgba(70, 230, 90, 0.1);
-      color: #46e65a;
+      border-color: var(--accent);
+      background: var(--accent-dim);
+      color: var(--accent);
+      box-shadow: 0 0 12px rgba(52, 211, 153, 0.18);
     }
 
     .donate-btn {
       width: 100%;
-      padding: 18px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #46e65a, #5ef56d);
+      min-height: 56px;
+      padding: 16px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--accent-strong), #34d399);
       border: none;
-      color: #000000;
-      font-size: 18px;
-      font-weight: 700;
+      color: #022c22;
+      font-size: 17px;
+      font-weight: 900;
+      font-family: inherit;
       cursor: pointer;
-      transition: all 0.3s ease;
-      margin-top: 10px;
+      transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease), opacity 0.18s ease;
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 6px 24px rgba(16, 185, 129, 0.28);
     }
+
+    .donate-btn svg { width: 20px; height: 20px; }
 
     .donate-btn:hover {
       transform: translateY(-2px);
-      box-shadow: 0 10px 25px rgba(70, 230, 90, 0.3);
+      box-shadow: 0 12px 32px rgba(16, 185, 129, 0.4);
     }
 
-    .donate-btn:active {
-      transform: translateY(0);
+    .donate-btn:active { transform: translateY(0); }
+
+    .donate-btn:focus-visible {
+      outline: 3px solid rgba(52, 211, 153, 0.55);
+      outline-offset: 3px;
     }
 
     .donate-btn:disabled {
-      opacity: 0.6;
+      opacity: 0.55;
       cursor: not-allowed;
       transform: none;
+      box-shadow: none;
     }
 
-    .progress-preview {
-      background: rgba(0, 0, 0, 0.3);
-      border-radius: 15px;
-      padding: 20px;
-      margin-bottom: 25px;
-      text-align: center;
+    .form-error {
+      color: var(--danger);
+      font-size: 13px;
+      font-weight: 500;
+      margin-top: 8px;
+      display: none;
     }
-
-    .progress-bar {
-      width: 100%;
-      height: 12px;
-      background: #2a2f36;
-      border-radius: 6px;
-      overflow: hidden;
-      margin: 15px 0;
-    }
-
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #46e65a, #5ef56d);
-      border-radius: 6px;
-      transition: width 0.5s ease;
-    }
+    .form-error.visible { display: block; }
 
     .footer {
       text-align: center;
-      margin-top: 25px;
-      font-size: 14px;
-      color: #808080;
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      font-size: 12.5px;
+      color: var(--text-dim);
     }
+    .footer p { margin-bottom: 4px; }
+    .footer a { color: var(--text-muted); text-decoration: none; }
+    .footer a:hover { color: var(--accent); }
 
-    .success-message {
-      background: rgba(70, 230, 90, 0.1);
-      border: 2px solid #46e65a;
-      border-radius: 12px;
-      padding: 15px;
-      margin-bottom: 20px;
-      text-align: center;
-      color: #46e65a;
-      font-weight: 500;
+    .secure-note {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 10px;
+      color: var(--text-muted);
     }
+    .secure-note svg { width: 14px; height: 14px; color: var(--accent); }
 
-    .error-message {
-      background: rgba(255, 107, 107, 0.1);
-      border: 2px solid #ff6b6b;
-      border-radius: 12px;
-      padding: 15px;
-      margin-bottom: 20px;
-      text-align: center;
-      color: #ff6b6b;
-      font-weight: 500;
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
     }
 
     @media (max-width: 480px) {
-      .container {
-        padding: 25px;
-        margin: 10px;
-      }
-      
-      h1 {
-        font-size: 24px;
-      }
-      
-      .amount-buttons {
-        grid-template-columns: repeat(2, 1fr);
-      }
+      .container { padding: 28px 20px; }
+      h1 { font-size: 23px; }
+      .amount-buttons { grid-template-columns: repeat(2, 1fr); }
     }
   </style>
 </head>
 <body>
-  <div class="container">
+  <main class="container">
     <h1>支持這個直播</h1>
-    <p class="subtitle">幫助實況主達成目標！</p>
-    
-    <div id="successMessage" class="success-message" style="display: none;">
-      感謝您的支持！付款已完成。
+    <p class="subtitle">你的斗內會即時出現在直播畫面上</p>
+
+    <div id="successMessage" class="message success-message" role="status">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+      <span>感謝您的支持！付款已完成，進度條馬上就會更新。</span>
     </div>
-    
-    <div id="errorMessage" class="error-message" style="display: none;">
-      付款過程中發生錯誤，請重試。
+
+    <div id="errorMessage" class="message error-message" role="alert">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span>付款過程中發生錯誤，請重試。若持續失敗，可換一張卡或稍後再試。</span>
     </div>
-    
-    <div class="progress-preview" id="progressPreview">
-      <div><strong id="goalTitle">Loading...</strong></div>
-      <div class="progress-bar">
-        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+
+    <section class="progress-preview" id="progressPreview" aria-live="polite">
+      <div class="progress-title">
+        <strong id="goalTitle">載入中…</strong>
+        <span class="progress-percent"><span id="progressPercent">0</span>%</span>
       </div>
-      <div>NT$ <span id="currentAmount">0</span> / NT$ <span id="goalAmount">0</span> (<span id="progressPercent">0</span>%)</div>
-    </div>
+      <div class="progress-bar" role="progressbar" aria-labelledby="goalTitle" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progressTrack">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-amounts">
+        <span class="current">NT$ <span id="currentAmount">0</span></span>
+        <span>/ NT$ <span id="goalAmount">0</span></span>
+      </div>
+    </section>
 
     <form id="donationForm" method="post" action="/create-order">
       <div class="form-group">
-        <label for="nickname">暱稱 (可選)</label>
-        <input type="text" id="nickname" name="nickname" placeholder="在進度條上顯示的名稱" maxlength="20">
+        <label for="nickname">暱稱<span class="optional">（可選，會顯示在直播畫面上）</span></label>
+        <input type="text" id="nickname" name="nickname" placeholder="想被實況主看到的名字" maxlength="20" autocomplete="nickname">
       </div>
 
       <div class="form-group">
-        <label for="message">留言 (可選)</label>
-        <textarea id="message" name="message" placeholder="寫下您的留言..." maxlength="100" rows="3"></textarea>
+        <label for="message">留言<span class="optional">（可選）</span></label>
+        <textarea id="message" name="message" placeholder="想對實況主說的話…" maxlength="100" rows="3"></textarea>
+        <div class="char-hint"><span id="messageCount">0</span>/100</div>
       </div>
 
       <div class="form-group">
-        <label for="amount">捐款金額 (NT$)</label>
-        <input type="number" id="amount" name="amount" min="1" max="999999" value="100" required>
-        
-        <div class="amount-buttons">
+        <label for="amount">斗內金額（NT$）</label>
+        <input type="number" id="amount" name="amount" min="1" max="999999" value="100" required inputmode="numeric">
+
+        <div class="amount-buttons" role="group" aria-label="常用金額">
           <button type="button" class="amount-btn" data-amount="50">NT$ 50</button>
           <button type="button" class="amount-btn active" data-amount="100">NT$ 100</button>
           <button type="button" class="amount-btn" data-amount="200">NT$ 200</button>
@@ -271,80 +409,87 @@
           <button type="button" class="amount-btn" data-amount="1000">NT$ 1,000</button>
           <button type="button" class="amount-btn" data-amount="2000">NT$ 2,000</button>
         </div>
+        <div class="form-error" id="amountError" role="alert"></div>
       </div>
 
       <button type="submit" class="donate-btn" id="donateBtn">
-        💳 前往綠界付款
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        <span id="donateBtnText">前往綠界安全付款</span>
       </button>
     </form>
 
     <div class="footer">
-      <p>※ 使用綠界金流服務，支援信用卡付款</p>
-      <p>※ 付款完成後會自動更新直播進度條</p>
-      <p><a href="/terms.html">Terms</a> · <a href="/privacy.html">Privacy</a></p>
+      <p class="secure-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        由綠界 ECPay 金流處理，支援信用卡付款
+      </p>
+      <p>付款完成後會自動更新直播進度條</p>
+      <p><a href="/terms.html">服務條款</a> · <a href="/privacy.html">隱私權政策</a></p>
     </div>
-  </div>
+  </main>
 
   <script>
     // Extract workspace slug from URL path (/donate/:slug)
     function getWorkspaceSlug() {
-      const path = window.location.pathname;
-      const match = path.match(/^\/donate\/([^\/]+)$/);
+      const match = window.location.pathname.match(/^\/donate\/([^\/]+)$/);
       return match ? match[1] : null; // null means use default workspace
     }
 
     const workspaceSlug = getWorkspaceSlug();
-    console.log('🎯 Workspace slug:', workspaceSlug || 'default');
 
     // Elements
     const form = document.getElementById('donationForm');
     const amountInput = document.getElementById('amount');
     const amountButtons = document.querySelectorAll('.amount-btn');
     const donateBtn = document.getElementById('donateBtn');
+    const donateBtnText = document.getElementById('donateBtnText');
     const successMessage = document.getElementById('successMessage');
     const errorMessage = document.getElementById('errorMessage');
-    
+    const amountError = document.getElementById('amountError');
+    const messageInput = document.getElementById('message');
+    const messageCount = document.getElementById('messageCount');
+
     // Progress elements
     const goalTitle = document.getElementById('goalTitle');
     const currentAmount = document.getElementById('currentAmount');
     const goalAmount = document.getElementById('goalAmount');
     const progressPercent = document.getElementById('progressPercent');
     const progressFill = document.getElementById('progressFill');
+    const progressTrack = document.getElementById('progressTrack');
 
     // Check URL parameters for success/error messages
     const urlParams = new URLSearchParams(window.location.search);
-    console.log('URL params:', urlParams.toString());
-    console.log('Success param:', urlParams.get('success'));
-    
+
     if (urlParams.get('success') === '1') {
-      console.log('Showing success message');
-      successMessage.style.display = 'block';
-      // Scroll to top to ensure success message is visible
+      successMessage.classList.add('visible');
       window.scrollTo(0, 0);
-      // Update the page title
       document.title = '付款成功 - 支持直播';
     }
     if (urlParams.get('error') === '1') {
-      console.log('Showing error message');
-      errorMessage.style.display = 'block';
+      errorMessage.classList.add('visible');
       window.scrollTo(0, 0);
+    }
+
+    function renderProgress(data) {
+      const percent = Math.max(0, Math.min(100, Number(data.percent) || 0));
+      goalTitle.textContent = data.title || '斗內目標';
+      currentAmount.textContent = formatNumber(data.current);
+      goalAmount.textContent = formatNumber(data.goal);
+      progressPercent.textContent = Number(data.percent) || 0;
+      progressFill.style.width = `${percent}%`;
+      progressTrack.setAttribute('aria-valuenow', String(percent));
     }
 
     // Load current progress
     async function loadProgress() {
       try {
-        // Use workspace-specific progress endpoint if slug is present
-        const url = workspaceSlug ? `/progress?slug=${workspaceSlug}` : '/progress';
+        const url = workspaceSlug ? `/progress?slug=${encodeURIComponent(workspaceSlug)}` : '/progress';
         const response = await fetch(url);
         const data = await response.json();
-        
-        goalTitle.textContent = data.title || 'Donation Goal';
-        currentAmount.textContent = formatNumber(data.current);
-        goalAmount.textContent = formatNumber(data.goal);
-        progressPercent.textContent = data.percent || 0;
-        progressFill.style.width = `${Math.min(100, data.percent || 0)}%`;
+        renderProgress(data);
       } catch (error) {
         console.error('Failed to load progress:', error);
+        goalTitle.textContent = '斗內目標';
       }
     }
 
@@ -359,66 +504,69 @@
       slugInput.name = 'slug';
       slugInput.value = workspaceSlug;
       form.appendChild(slugInput);
-      console.log('✅ Added slug to form:', workspaceSlug);
     }
 
     // Amount button handlers
     amountButtons.forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
-        
-        // Remove active class from all buttons
         amountButtons.forEach(b => b.classList.remove('active'));
-        
-        // Add active class to clicked button
         btn.classList.add('active');
-        
-        // Set amount input value
-        const amount = btn.dataset.amount;
-        amountInput.value = amount;
+        amountInput.value = btn.dataset.amount;
+        amountError.classList.remove('visible');
       });
     });
 
-    // Custom amount input handler
+    // Custom amount input handler — sync active state with presets
     amountInput.addEventListener('input', () => {
-      // Clear active state from preset buttons if custom amount is entered
       const currentValue = parseInt(amountInput.value);
       let hasActiveButton = false;
-      
+
       amountButtons.forEach(btn => {
-        const btnAmount = parseInt(btn.dataset.amount);
-        if (btnAmount === currentValue) {
+        if (parseInt(btn.dataset.amount) === currentValue) {
           amountButtons.forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
           hasActiveButton = true;
         }
       });
-      
+
       if (!hasActiveButton) {
         amountButtons.forEach(b => b.classList.remove('active'));
       }
+      amountError.classList.remove('visible');
     });
+
+    // Message character counter
+    messageInput.addEventListener('input', () => {
+      messageCount.textContent = String(messageInput.value.length);
+    });
+
+    function showAmountError(text) {
+      amountError.textContent = text;
+      amountError.classList.add('visible');
+      amountInput.focus();
+    }
 
     // Form submission
     form.addEventListener('submit', (e) => {
       const amount = parseInt(amountInput.value);
-      
+
       if (!amount || amount < 1) {
         e.preventDefault();
-        alert('請輸入有效的捐款金額');
+        showAmountError('請輸入有效的斗內金額（至少 NT$1）。');
         return;
       }
-      
+
       if (amount > 999999) {
         e.preventDefault();
-        alert('單次捐款金額不能超過 NT$999,999');
+        showAmountError('單次斗內金額不能超過 NT$999,999。');
         return;
       }
-      
+
       // Show loading state
       donateBtn.disabled = true;
-      donateBtn.textContent = '處理中...';
-      
+      donateBtnText.textContent = '前往綠界中…';
+
       // Form will submit normally to /create-order
     });
 
@@ -426,16 +574,11 @@
     loadProgress();
 
     // Real-time updates via SSE - use workspace-specific endpoint if slug is present
-    const eventsUrl = workspaceSlug ? `/events?slug=${workspaceSlug}` : '/events';
+    const eventsUrl = workspaceSlug ? `/events?slug=${encodeURIComponent(workspaceSlug)}` : '/events';
     const eventSource = new EventSource(eventsUrl);
     eventSource.onmessage = function(event) {
       try {
-        const data = JSON.parse(event.data);
-        currentAmount.textContent = formatNumber(data.current);
-        goalAmount.textContent = formatNumber(data.goal);
-        goalTitle.textContent = data.title || 'Donation Goal';
-        progressPercent.textContent = data.percent || 0;
-        progressFill.style.width = `${Math.min(100, data.percent || 0)}%`;
+        renderProgress(JSON.parse(event.data));
       } catch (error) {
         console.error('Error parsing SSE data:', error);
       }

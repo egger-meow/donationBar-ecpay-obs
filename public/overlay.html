@@ -1,14 +1,22 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-TW">
 <head>
   <meta charset="utf-8">
   <title>Donation Goal Overlay</title>
   <style>
+    /* CSS Variables with defaults (overridable via overlay settings + query params) */
+    :root {
+      --fg: #ffffff;
+      --bg: #0b1120;
+      --bar: #34d399;
+      --bar-light: #6ee7b7;
+    }
+
     html, body {
       margin: 0;
       padding: 0;
       background: transparent;
-      font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      font-family: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', 'Segoe UI', system-ui, -apple-system, sans-serif;
       overflow: hidden;
       width: 100vw;
       height: 100vh;
@@ -29,11 +37,12 @@
 
     .title {
       font-size: 32px;
-      font-weight: 700;
+      font-weight: 900;
       margin-bottom: 12px;
       color: var(--fg);
-      text-shadow: 0 0 8px rgba(0,0,0,0.5);
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7), 0 0 12px rgba(0,0,0,0.4);
       text-align: center;
+      letter-spacing: -0.01em;
       opacity: 1;
       animation: fadeInUp 1s ease forwards;
       white-space: nowrap;
@@ -58,9 +67,10 @@
       background: var(--bg);
       border-radius: 30px;
       overflow: hidden;
-      box-shadow: 
-        inset 0 0 0 3px rgba(255,255,255,0.1),
-        0 4px 20px rgba(0,0,0,0.3);
+      box-shadow:
+        inset 0 0 0 2px rgba(255,255,255,0.14),
+        inset 0 2px 6px rgba(0,0,0,0.4),
+        0 6px 24px rgba(0,0,0,0.35);
       position: relative;
     }
 
@@ -71,6 +81,20 @@
       transition: width 1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
       position: relative;
       overflow: hidden;
+      box-shadow: 0 0 18px var(--bar);
+    }
+
+    /* Glass highlight along the top of the fill */
+    .progress-fill::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 45%;
+      background: linear-gradient(180deg, rgba(255,255,255,0.28), transparent);
+      border-radius: inherit;
+      pointer-events: none;
     }
 
     .progress-fill::before {
@@ -80,8 +104,8 @@
       left: -100%;
       width: 100%;
       height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-      /* Shimmer only on hover/active for performance */
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+      /* Shimmer only on donation events for performance */
       animation: none;
       will-change: transform;
       transform: translateZ(0);
@@ -91,16 +115,16 @@
       animation: shimmer 1.5s ease-out;
     }
 
-    /* Cute liquid-filled circle gauge */
+    /* Liquid-filled circle gauge */
     .percentage-circle {
       position: relative;
       width: 60px;
       height: 60px;
       border-radius: 50%;
-      background: rgba(0, 0, 0, 0.3);
-      border: 4px solid rgba(255, 255, 255, 0.2);
-      box-shadow: 
-        0 4px 15px rgba(0, 0, 0, 0.3),
+      background: var(--bg);
+      border: 3px solid rgba(255, 255, 255, 0.18);
+      box-shadow:
+        0 4px 15px rgba(0, 0, 0, 0.35),
         inset 0 2px 5px rgba(0, 0, 0, 0.5);
       overflow: hidden;
       flex-shrink: 0;
@@ -117,7 +141,7 @@
       transition: height 1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
 
-    /* Wave effect on liquid - simplified for performance */
+    /* Wave crest on liquid - static for performance */
     .liquid-fill::before {
       content: '';
       position: absolute;
@@ -125,22 +149,15 @@
       left: 0;
       width: 100%;
       height: 12px;
-      background: rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.25);
       border-radius: 50%;
-      /* Removed infinite animation for performance */
     }
 
-    .liquid-fill::after {
-      display: none; /* Disabled second wave for performance */
-    }
+    .liquid-fill::after { display: none; }
 
     @keyframes wave {
-      0%, 100% {
-        transform: translateX(0) translateY(0);
-      }
-      50% {
-        transform: translateX(-50%) translateY(-3px);
-      }
+      0%, 100% { transform: translateX(0) translateY(0); }
+      50% { transform: translateX(-50%) translateY(-3px); }
     }
 
     /* Percentage text inside circle */
@@ -149,27 +166,28 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      font-size: 20px;
+      font-size: 18px;
       color: #ffffff;
-      font-weight: 700;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
       text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
       z-index: 10;
       white-space: nowrap;
     }
 
-    /* Shimmer effect on circle when progress updates */
+    /* Glow pulse on circle when progress updates */
     .percentage-circle.update {
       animation: circleShimmer 0.6s ease;
     }
 
     @keyframes circleShimmer {
       0%, 100% {
-        box-shadow: 
-          0 4px 15px rgba(0, 0, 0, 0.3),
+        box-shadow:
+          0 4px 15px rgba(0, 0, 0, 0.35),
           inset 0 2px 5px rgba(0, 0, 0, 0.5);
       }
       50% {
-        box-shadow: 
+        box-shadow:
           0 4px 20px var(--bar),
           inset 0 2px 5px rgba(0, 0, 0, 0.5),
           0 0 20px var(--bar);
@@ -181,8 +199,9 @@
       text-align: center;
       color: var(--fg);
       font-size: 20px;
-      font-weight: 500;
-      text-shadow: 0 0 6px rgba(0,0,0,0.5);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7), 0 0 10px rgba(0,0,0,0.4);
       opacity: 0;
       animation: fadeInUp 1s ease 0.4s forwards;
     }
@@ -202,14 +221,14 @@
     }
 
     .donation-item {
-      background: rgba(0,0,0,0.7);
-      border-radius: 15px;
-      padding: 8px 15px;
+      background: rgba(5, 8, 16, 0.78);
+      border-radius: 14px;
+      padding: 8px 16px;
       margin: 5px 0;
       color: var(--fg);
       font-size: 14px;
-      /* Removed backdrop-filter: blur() for performance */
-      border: 1px solid rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
       animation: slideInRight 0.5s ease;
       text-align: center;
       display: inline-block;
@@ -224,28 +243,17 @@
     .donation-amount {
       color: var(--bar);
       font-weight: 700;
+      font-variant-numeric: tabular-nums;
     }
 
     @keyframes fadeInUp {
-      from {
-        opacity: 0;
-        transform: translateY(20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     @keyframes slideInRight {
-      from {
-        opacity: 0;
-        transform: translateX(50px);
-      }
-      to {
-        opacity: 1;
-        transform: translateX(0);
-      }
+      from { opacity: 0; transform: translateX(50px); }
+      to { opacity: 1; transform: translateX(0); }
     }
 
     @keyframes shimmer {
@@ -270,12 +278,8 @@
     }
 
     @keyframes goalCompleteGlow {
-      0%, 100% {
-        box-shadow: 0 0 10px var(--bar);
-      }
-      50% {
-        box-shadow: 0 0 20px var(--bar);
-      }
+      0%, 100% { box-shadow: 0 0 10px var(--bar); }
+      50% { box-shadow: 0 0 24px var(--bar); }
     }
 
     @keyframes confetti {
@@ -283,9 +287,7 @@
         transform: translateY(-100vh) rotate(0deg);
         opacity: 1;
       }
-      25% {
-        opacity: 1;
-      }
+      25% { opacity: 1; }
       100% {
         transform: translateY(100vh) rotate(720deg);
         opacity: 1;
@@ -327,56 +329,32 @@
       will-change: transform;
     }
 
-    .confetti:nth-child(odd) {
-      background: #ff6b6b;
-      border-radius: 50%;
-    }
+    .confetti:nth-child(odd) { background: #ff6b6b; border-radius: 50%; }
+    .confetti:nth-child(even) { background: #4ecdc4; transform: rotate(45deg); }
+    .confetti:nth-child(3n) { background: #45b7d1; border-radius: 50%; }
+    .confetti:nth-child(4n) { background: #f9ca24; }
+    .confetti:nth-child(5n) { background: #6c5ce7; border-radius: 50%; }
 
-    .confetti:nth-child(even) {
-      background: #4ecdc4;
-      transform: rotate(45deg);
-    }
-
-    .confetti:nth-child(3n) {
-      background: #45b7d1;
-      border-radius: 50%;
-    }
-
-    .confetti:nth-child(4n) {
-      background: #f9ca24;
-    }
-
-    .confetti:nth-child(5n) {
-      background: #6c5ce7;
-      border-radius: 50%;
-    }
-
-    /* CSS Variables with defaults */
-    :root {
-      --fg: #ffffff;
-      --bg: #1a1a1a;
-      --bar: #46e65a;
-      --bar-light: #5ef56d;
-    }
-
-    /* Donation Alert Popup */
+    /* Donation Alert Popup — dark glass card accented by the bar color */
     .donation-alert {
       position: absolute;
       top: clamp(20px, 22vh, 170px);
       left: 50%;
       right: auto;
-      background: linear-gradient(135deg, #ff4757, #ff3838);
+      background: linear-gradient(160deg, rgba(13, 20, 36, 0.92), rgba(5, 8, 16, 0.94));
       color: white;
-      padding: 25px 35px;
+      padding: 26px 38px;
       border-radius: 20px;
-      box-shadow: 0 15px 35px rgba(255, 71, 87, 0.5);
-      font-family: 'Segoe UI', system-ui, sans-serif;
+      box-shadow:
+        0 18px 45px rgba(0, 0, 0, 0.55),
+        0 0 26px var(--bar),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      font-family: inherit;
       z-index: 1000;
       transform: translateX(-50%) translateY(-50px) scale(0.8);
       opacity: 0;
       transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
-      border: 2px solid rgba(255, 255, 255, 0.5);
-      /* Removed backdrop-filter for performance */
+      border: 1px solid rgba(255, 255, 255, 0.22);
       min-width: 300px;
       max-width: 90%;
       max-height: calc(100vh - 20px);
@@ -403,40 +381,41 @@
     }
 
     .alert-header {
-      font-size: 18px;
-      font-weight: 600;
-      margin-bottom: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 10px;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      color: rgba(255, 255, 255, 0.9);
+      letter-spacing: 3px;
+      color: var(--bar-light);
     }
 
     .alert-donor {
       font-size: 28px;
-      font-weight: 800;
-      margin-bottom: 5px;
+      font-weight: 900;
+      margin-bottom: 4px;
       color: white;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
       overflow-wrap: anywhere;
       word-break: break-word;
     }
 
     .alert-amount {
-      font-size: 36px;
+      font-size: 38px;
       font-weight: 900;
-      color: #fff200;
-      text-shadow: 
+      font-variant-numeric: tabular-nums;
+      color: var(--bar-light);
+      text-shadow:
         0 2px 4px rgba(0, 0, 0, 0.5),
-        0 0 20px rgba(255, 242, 0, 0.5);
+        0 0 22px var(--bar);
       margin-bottom: 8px;
     }
 
     .alert-user-message {
-      font-size: 28px;
+      font-size: 24px;
       color: rgba(255, 255, 255, 0.95);
       font-weight: 600;
       margin: 10px 0 8px 0;
-      line-height: 1.3;
+      line-height: 1.4;
       max-width: 100%;
       max-height: 30vh;
       overflow-y: auto;
@@ -446,22 +425,31 @@
     }
 
     .alert-message {
-      font-size: 14px;
-      color: rgba(255, 255, 255, 0.8);
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.65);
       font-weight: 500;
     }
 
     @keyframes alertPulse {
-      0%, 100% {
-        transform: translateX(-50%) scale(1);
-      }
-      50% {
-        transform: translateX(-50%) scale(1.02);
-      }
+      0%, 100% { transform: translateX(-50%) scale(1); }
+      50% { transform: translateX(-50%) scale(1.02); }
     }
 
     .donation-alert.pulse {
       animation: alertPulse 0.6s ease-in-out;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .progress-fill, .liquid-fill { transition-duration: 0.01ms; }
+      .title, .progress-wrapper, .amount-info, .recent-donations {
+        animation-duration: 0.01ms;
+        opacity: 1;
+      }
+      .confetti, .goal-completed, .celebration-text, .donation-alert.pulse,
+      .percentage-circle.update, .progress-container.new-donation,
+      .progress-fill.animate::before, .donation-item {
+        animation: none;
+      }
     }
 
     /* Responsive design */
@@ -469,15 +457,15 @@
       #wrap { width: 100%; padding: 15px; }
       .title { font-size: 24px; }
       .progress-wrapper { gap: 10px; }
-      .percentage-circle { 
-        width: 60px; 
+      .percentage-circle {
+        width: 60px;
         height: 60px;
-        border: 3px solid rgba(255, 255, 255, 0.2);
+        border: 3px solid rgba(255, 255, 255, 0.18);
       }
-      .percentage { font-size: 16px; }
+      .percentage { font-size: 15px; }
       .progress-container { height: 45px; }
       .amount-info { font-size: 16px; }
-      
+
       .donation-alert {
         top: 10px;
         left: 50vw;
@@ -486,11 +474,9 @@
         padding: 20px;
         max-width: calc(100vw - 40px);
       }
-      
-      body {
-        padding-top: 20px;
-      }
-      
+
+      body { padding-top: 20px; }
+
       .alert-donor { font-size: 24px; }
       .alert-amount { font-size: 28px; }
     }
@@ -514,11 +500,11 @@
 
   <!-- Donation Alert Popup -->
   <div class="donation-alert" id="donationAlert">
-    <div class="alert-header">感謝斗內！</div>
+    <div class="alert-header">感謝斗內</div>
     <div class="alert-donor" id="alertDonor">Anonymous</div>
     <div class="alert-amount" id="alertAmount">NT$ 100</div>
     <div class="alert-user-message" id="alertUserMessage"></div>
-    <div class="alert-message">感謝您的支持！💖</div>
+    <div class="alert-message">感謝您的支持！</div>
   </div>
 
   <!-- Audio for donation sound -->
@@ -539,8 +525,8 @@
     let overlaySettings = {
       fontSize: 16,
       fontColor: '#ffffff',
-      backgroundColor: '#1a1a1a',
-      progressBarColor: '#46e65a',
+      backgroundColor: '#0b1120',
+      progressBarColor: '#34d399',
       progressBarHeight: 30,
       progressBarCornerRadius: 15,
       alertDuration: 5000,
@@ -558,14 +544,30 @@
     }
 
     const workspaceSlug = getWorkspaceSlug();
-    const testMode = new URLSearchParams(window.location.search).get('test') === '1';
-    console.log('🎯 Workspace slug:', workspaceSlug || 'default');
+    const queryParams = new URLSearchParams(window.location.search);
+    const testMode = queryParams.get('test') === '1';
+
+    // Query-param color overrides (fg/bg/bar/bar_light) — documented in README.md.
+    // They take precedence over server-side overlay settings.
+    const HEX_COLOR = /^(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+    function getColorOverride(name) {
+      const raw = queryParams.get(name);
+      if (!raw) return null;
+      const value = raw.replace(/^#/, '');
+      return HEX_COLOR.test(value) ? `#${value}` : null;
+    }
+    const colorOverrides = {
+      fg: getColorOverride('fg'),
+      bg: getColorOverride('bg'),
+      bar: getColorOverride('bar'),
+      barLight: getColorOverride('bar_light')
+    };
 
     // Load overlay settings from server
     async function loadOverlaySettings() {
       try {
-        const url = workspaceSlug 
-          ? `/overlay-settings?slug=${workspaceSlug}` 
+        const url = workspaceSlug
+          ? `/overlay-settings?slug=${encodeURIComponent(workspaceSlug)}`
           : '/overlay-settings';
         const response = await fetch(url);
         const settings = await response.json();
@@ -578,21 +580,28 @@
       }
     }
 
+    // Merge settings pushed over SSE and re-apply
+    function applyOverlaySettings(newSettings) {
+      overlaySettings = { ...overlaySettings, ...newSettings };
+      applySettings();
+    }
+
     // Apply settings to the overlay
     function applySettings() {
-      // Apply CSS custom properties
-      document.documentElement.style.setProperty('--fg', overlaySettings.fontColor);
-      document.documentElement.style.setProperty('--bg', overlaySettings.backgroundColor);
-      document.documentElement.style.setProperty('--bar', overlaySettings.progressBarColor);
-      document.documentElement.style.setProperty('--bar-light', overlaySettings.progressBarColor);
+      // Apply CSS custom properties (query-param overrides win over settings)
+      const root = document.documentElement.style;
+      root.setProperty('--fg', colorOverrides.fg || overlaySettings.fontColor);
+      root.setProperty('--bg', colorOverrides.bg || overlaySettings.backgroundColor);
+      root.setProperty('--bar', colorOverrides.bar || overlaySettings.progressBarColor);
+      root.setProperty('--bar-light', colorOverrides.barLight || colorOverrides.bar || overlaySettings.progressBarColor);
 
       // Apply position styling
       const wrap = document.getElementById('wrap');
       const body = document.body;
-      
+
       // Reset positioning classes
       body.className = '';
-      
+
       // Apply position-specific styling
       switch(overlaySettings.position) {
         case 'top-left':
@@ -636,18 +645,18 @@
           body.style.paddingRight = '20px';
           break;
       }
-      
+
       // Apply width
       if (wrap) {
         wrap.style.width = `${overlaySettings.width}px`;
       }
-      
+
       // Apply font size to title
       const title = document.getElementById('title');
       if (title) {
         title.style.fontSize = `${Math.max(overlaySettings.fontSize * 2, 24)}px`;
       }
-      
+
       // Apply progress bar height and corner radius
       const progressContainer = document.getElementById('progressContainer');
       if (progressContainer) {
@@ -670,7 +679,7 @@
     let alertQueue = [];
     let isShowingAlert = false;
     let currentGoal = 1000; // Default goal amount
-    
+
     // New tracking variables for reliable donation detection
     let initialized = false;
     let lastSeenAlertId = null;
@@ -739,7 +748,7 @@
       // Update content
       donorEl.textContent = donor || '匿名';
       amountEl.textContent = `NT$ ${formatNumber(amount)}`;
-      
+
       // Display message if it exists
       if (message && message.trim()) {
         messageEl.textContent = message;
@@ -756,26 +765,23 @@
 
       // Force a reflow to ensure CSS is applied
       alertEl.offsetHeight;
-      
+
       // Show alert with animation
       alertEl.classList.remove('hide');
       alertEl.classList.add('show', 'pulse');
-      
-      // Debug log
-      console.log('Showing donation alert');
 
       // Use configured duration or calculate dynamic duration
-      const duration =  calculateAlertDuration(amount) || overlaySettings.alertDuration;
-      
+      const duration = calculateAlertDuration(amount) || overlaySettings.alertDuration;
+
       // Hide after calculated duration
       setTimeout(() => {
         alertEl.classList.remove('show', 'pulse');
         alertEl.classList.add('hide');
-        
+
         // Reset after hide animation
         setTimeout(() => {
           isShowingAlert = false;
-          
+
           // Show next alert in queue
           if (alertQueue.length > 0) {
             const next = alertQueue.shift();
@@ -788,11 +794,11 @@
     // Goal completion celebration functions - optimized for performance
     function createConfetti() {
       const container = document.getElementById('confettiContainer');
-      const confettiCount = 25; // Reduced from 50 for better performance
-      
+      const confettiCount = 25; // Kept low for render performance inside OBS
+
       // Clear existing confetti
       container.innerHTML = '';
-      
+
       // Use DocumentFragment for batch DOM insertion
       const fragment = document.createDocumentFragment();
       for (let i = 0; i < confettiCount; i++) {
@@ -804,7 +810,7 @@
         fragment.appendChild(confetti);
       }
       container.appendChild(fragment);
-      
+
       // Remove confetti after animation
       setTimeout(() => {
         container.innerHTML = '';
@@ -813,24 +819,23 @@
 
     function celebrateGoalComplete(goalTitle) {
       if (celebrationPlayed) return;
-      
+
       celebrationPlayed = true;
-      console.log('🎉 Goal completed! Starting celebration...');
-      
+
       // Play celebration sound
       playGoalCompleteSound();
-      
+
       // Create confetti animation
       createConfetti();
-      
+
       // Add celebration classes
       progressContainerEl.classList.add('goal-completed');
       titleEl.classList.add('celebration-text');
-      
+
       // Change title text using the actual goal title
-      titleEl.textContent = '🎉 ' + (goalTitle || '我愛jjmow') + ' 🎉';
-      
-      // Optional: Remove celebration effects after some time
+      titleEl.textContent = '🎉 ' + (goalTitle || '目標達成！') + ' 🎉';
+
+      // Remove celebration effects after some time
       setTimeout(() => {
         progressContainerEl.classList.remove('goal-completed');
         // Keep celebration text for longer visibility
@@ -861,13 +866,12 @@
 
     function renderProgress(data) {
       const { title, current, goal, percent, donations, latestDonation, actualDonations, startFrom } = data;
-      console.log('📊 Rendering progress:', { current, goal, percent, donationCount: donations?.length || 0, lastTotal });
-      
+
       // Update current goal for normalization calculations
       if (goal) {
         currentGoal = goal;
       }
-      
+
       // Check for goal completion
       const isGoalComplete = percent >= 100;
       if (isGoalComplete && !goalCompleted) {
@@ -879,22 +883,22 @@
         celebrationPlayed = false;
         titleEl.classList.remove('celebration-text');
       }
-      
+
       // Update title (only if not celebrating)
       if (!goalCompleted) {
         titleEl.textContent = title || '斗內目標';
       }
-      
+
       // Update progress bar with animation
       const clampedPercent = Math.min(100, Math.max(0, percent || 0));
       progressFillEl.style.width = `${clampedPercent}%`;
       percentageEl.textContent = `${clampedPercent}%`;
-      
+
       // Update liquid fill in circle (0-100% fills the circle from bottom to top)
       if (liquidFillEl) {
         liquidFillEl.style.height = `${clampedPercent}%`;
       }
-      
+
       // Add shimmer effect to circle on progress update
       if (percentageCircleEl && current > lastTotal && lastTotal > 0) {
         percentageCircleEl.classList.add('update');
@@ -902,21 +906,21 @@
           percentageCircleEl.classList.remove('update');
         }, 600);
       }
-      
+
       // Update amount info - show total (including startFrom) vs goal
       if (isGoalComplete) {
         amountInfoEl.innerHTML = `🎉 <strong>目標達成！</strong> NT$ ${formatNumber(current)} / NT$ ${formatNumber(goal)} 🎉`;
       } else {
         amountInfoEl.textContent = `NT$ ${formatNumber(current)} / NT$ ${formatNumber(goal)}`;
       }
-      
+
       // Check for donation change (animate if total changed)
       if (current !== lastTotal && lastTotal >= 0) {
         // Animate on increase
         if (current > lastTotal) {
           progressContainerEl.classList.add('new-donation');
           progressFillEl.classList.add('animate');
-          
+
           setTimeout(() => {
             progressContainerEl.classList.remove('new-donation');
             progressFillEl.classList.remove('animate');
@@ -924,7 +928,7 @@
         }
       }
       lastTotal = current;
-      
+
       // Check for new donations and show alerts (fixed detection)
       if (latestDonation) {
         if (initialized) {
@@ -938,13 +942,13 @@
 
         lastSeenAlertId = latestDonation.alertId || lastSeenAlertId;
       }
-      
+
       // Render donations (server handles filtering based on donationDisplayMode)
       if (donations && donations.length > 0) {
         const donationHTML = donations
           .map(donation => {
             const amountColor = getDonationAmountColor(donation.amount);
-            const messageHTML = donation.message && donation.message.trim() 
+            const messageHTML = donation.message && donation.message.trim()
               ? `<div style="font-size: 13px; margin-top: 4px; opacity: 0.9;">${escapeHtml(donation.message)}</div>`
               : '';
             return `
@@ -956,7 +960,7 @@
               ${messageHTML}
             </div>
           `}).join('');
-        
+
         recentDonationsEl.innerHTML = donationHTML;
       } else {
         // Clear UI and internal trackers when no donations to display
@@ -970,8 +974,8 @@
     // Initial load
     async function loadInitialData() {
       try {
-        const url = workspaceSlug 
-          ? `/progress?slug=${workspaceSlug}` 
+        const url = workspaceSlug
+          ? `/progress?slug=${encodeURIComponent(workspaceSlug)}`
           : '/progress';
         const response = await fetch(url);
         const data = await response.json();
@@ -985,22 +989,19 @@
     // SSE reconnection with exponential backoff
     let sseReconnectAttempts = 0;
     const MAX_RECONNECT_DELAY = 30000; // 30 seconds max
-    
+
     // Server-Sent Events for real-time updates
     function setupSSE() {
-      const eventsUrl = workspaceSlug ? `/events?slug=${workspaceSlug}&source=overlay` : '/events?source=overlay';
-      console.log('🔌 Connecting to SSE:', eventsUrl);
+      const eventsUrl = workspaceSlug ? `/events?slug=${encodeURIComponent(workspaceSlug)}&source=overlay` : '/events?source=overlay';
       const connection = new EventSource(eventsUrl);
-      
+
       connection.onopen = function() {
-        console.log('✅ SSE connection established');
         sseReconnectAttempts = 0; // Reset on successful connection
       };
-      
+
       connection.onmessage = function(event) {
         try {
           const data = JSON.parse(event.data);
-          console.log('📡 SSE update received');
           renderProgress(data);
         } catch (error) {
           console.error('Error parsing SSE data:', error);
@@ -1011,34 +1012,32 @@
       connection.addEventListener('overlay-settings', function(event) {
         try {
           const newSettings = JSON.parse(event.data);
-          console.log('🎨 Overlay settings updated via SSE:', newSettings);
           applyOverlaySettings(newSettings);
         } catch (error) {
           console.error('Error parsing overlay settings:', error);
         }
       });
-      
+
       connection.onerror = function(error) {
-        console.error('❌ SSE connection error:', error);
-        
+        console.error('SSE connection error:', error);
+
         if (connection.readyState === EventSource.CLOSED) {
           // Exponential backoff: 2s, 4s, 8s, 16s, 30s (max)
           sseReconnectAttempts++;
           const delay = Math.min(1000 * Math.pow(2, sseReconnectAttempts), MAX_RECONNECT_DELAY);
-          console.log(`🔁 Reconnecting in ${delay/1000}s (attempt ${sseReconnectAttempts})...`);
-          
+
           setTimeout(() => {
             eventSource = setupSSE();
           }, delay);
         }
       };
-      
+
       return connection;
     }
 
     // Global eventSource variable for cleanup
     let eventSource = null;
-    
+
     // Initialize
     loadOverlaySettings().then(() => {
       if (!testMode) {

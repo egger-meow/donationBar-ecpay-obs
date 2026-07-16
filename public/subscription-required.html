@@ -4,157 +4,183 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>需要訂閱 - DonationBar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    :root {
+      --bg: #030712;
+      --surface: #0b1120;
+      --surface-2: #111a2e;
+      --border: rgba(148, 163, 184, 0.16);
+      --border-strong: rgba(148, 163, 184, 0.28);
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent: #34d399;
+      --accent-strong: #10b981;
+      --accent-dim: rgba(52, 211, 153, 0.12);
+      --warning: #fbbf24;
+      --ease: cubic-bezier(0.22, 1, 0.36, 1);
+      color-scheme: dark;
     }
 
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
     body {
-      font-family: 'Segoe UI', 'Microsoft JhengHei', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif;
+      background: var(--bg);
       min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #fff;
-      padding: 20px;
+      color: var(--text);
+      padding: 24px;
+      line-height: 1.6;
+      position: relative;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse 50% 40% at 50% 0%, rgba(16, 185, 129, 0.09) 0%, transparent 65%);
+      pointer-events: none;
     }
 
     .container {
-      background: rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
-      border-radius: 20px;
-      padding: 60px 40px;
+      background: linear-gradient(180deg, rgba(17, 26, 46, 0.9), rgba(11, 17, 32, 0.95));
+      border: 1px solid var(--border-strong);
+      border-radius: 22px;
+      padding: 48px 40px;
       text-align: center;
       max-width: 500px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      width: 100%;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+      position: relative;
+      z-index: 1;
+      animation: rise 0.6s var(--ease) both;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     .icon {
-      font-size: 80px;
-      margin-bottom: 20px;
-      animation: pulse 2s ease-in-out infinite;
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 20px;
+      border-radius: 18px;
+      background: var(--accent-dim);
+      border: 1px solid rgba(52, 211, 153, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.1); }
-    }
+    .icon svg { width: 30px; height: 30px; color: var(--accent); }
 
     h1 {
-      font-size: 32px;
-      margin-bottom: 15px;
-      font-weight: 700;
+      font-size: 26px;
+      margin-bottom: 12px;
+      font-weight: 900;
+      letter-spacing: -0.01em;
     }
 
     p {
-      font-size: 18px;
+      font-size: 15.5px;
       line-height: 1.6;
-      margin-bottom: 10px;
-      opacity: 0.9;
+      margin-bottom: 8px;
+      color: var(--text-muted);
     }
 
     .feature-list {
       text-align: left;
-      margin: 30px 0;
-      padding: 20px;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 10px;
+      margin: 26px 0;
+      padding: 20px 22px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
     }
+
+    .feature-list ul { list-style: none; }
 
     .feature-list li {
-      margin: 10px 0;
-      padding-left: 25px;
+      margin: 9px 0;
+      padding-left: 26px;
       position: relative;
-      font-size: 16px;
+      font-size: 14.5px;
+      color: var(--text);
     }
 
-    .feature-list li:before {
-      content: "✓";
+    .feature-list li::before {
+      content: '';
       position: absolute;
       left: 0;
-      color: #4ade80;
-      font-weight: bold;
-      font-size: 18px;
-    }
-
-    .buttons {
-      display: flex;
-      gap: 15px;
-      justify-content: center;
-      margin-top: 30px;
-      flex-wrap: wrap;
-    }
-
-    .btn {
-      padding: 15px 30px;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      text-decoration: none;
-      display: inline-block;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
-      color: white;
-      box-shadow: 0 4px 15px rgba(74, 222, 128, 0.4);
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(74, 222, 128, 0.6);
-    }
-
-    .btn-secondary {
-      background: rgba(255, 255, 255, 0.2);
-      color: white;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-    }
-
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.3);
-      transform: translateY(-2px);
+      top: 4px;
+      width: 15px;
+      height: 15px;
+      background-color: var(--accent);
+      -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>') center / contain no-repeat;
+      mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>') center / contain no-repeat;
     }
 
     .price {
-      font-size: 24px;
+      font-size: 17px;
       font-weight: 700;
-      color: #4ade80;
-      margin: 20px 0;
+      margin: 18px 0;
     }
+
+    .price a {
+      color: var(--accent);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(52, 211, 153, 0.4);
+      padding-bottom: 1px;
+      transition: border-color 0.15s ease;
+    }
+    .price a:hover { border-color: var(--accent); }
 
     .trial-badge {
       display: inline-block;
-      background: #fbbf24;
-      color: #78350f;
-      padding: 5px 15px;
-      border-radius: 20px;
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 10px;
+      background: rgba(251, 191, 36, 0.12);
+      color: var(--warning);
+      border: 1px solid rgba(251, 191, 36, 0.35);
+      padding: 6px 16px;
+      border-radius: 999px;
+      font-size: 13.5px;
+      font-weight: 700;
+      margin-top: 6px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .container { padding: 36px 24px; }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="icon">🔒</div>
+    <div class="icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </div>
     <h1>需要訂閱才能使用</h1>
     <p>您的試用期已結束</p>
     <p>請訂閱付費方案以繼續使用此服務</p>
 
     <div class="price">
-      <a href="/pricing.html" style="color: inherit;">查看目前方案與價格</a>
+      <a href="/pricing.html">查看目前方案與價格</a>
     </div>
 
     <div class="feature-list">
-      <ul style="list-style: none;">
+      <ul>
         <li>無限制斗內接收</li>
         <li>即時 OBS 斗內條顯示</li>
         <li>客製化斗內頁面與疊加層</li>
@@ -173,7 +199,7 @@
     // Auto-detect if user came from specific page
     const urlParams = new URLSearchParams(window.location.search);
     const from = urlParams.get('from');
-    
+
     if (from === 'overlay') {
       document.querySelector('h1').textContent = '斗內條疊加層需要訂閱';
       document.querySelector('p').textContent = '此功能需要付費訂閱才能使用';

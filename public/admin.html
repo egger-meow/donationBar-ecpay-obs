@@ -4,25 +4,55 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>管理後台 - 捐款目標管理</title>
+  <title>管理後台 - DonationBar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --bg: #030712;
+      --surface: #0b1120;
+      --surface-2: #111a2e;
+      --surface-3: #16213a;
+      --border: rgba(148, 163, 184, 0.16);
+      --border-strong: rgba(148, 163, 184, 0.28);
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent: #34d399;
+      --accent-strong: #10b981;
+      --accent-dim: rgba(52, 211, 153, 0.12);
+      --danger: #f87171;
+      --danger-dim: rgba(248, 113, 113, 0.12);
+      --info: #38bdf8;
+      --info-dim: rgba(56, 189, 248, 0.12);
+      --warning: #fbbf24;
+      --warning-dim: rgba(251, 191, 36, 0.12);
+      --radius: 16px;
+      --shadow-lg: 0 18px 45px rgba(0, 0, 0, 0.45);
+      --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
     }
 
+    html { color-scheme: dark; }
+
     body {
-      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #ffffff;
+      font-family: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
-      padding: 20px;
+      padding: 24px 20px 60px;
       position: relative;
       overflow-x: hidden;
+      line-height: 1.6;
     }
 
-    /* Static background overlay - optimized for performance */
+    /* Ambient background glow */
     body::before {
       content: '';
       position: fixed;
@@ -31,10 +61,8 @@
       width: 100%;
       height: 100%;
       background:
-        radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
-        radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.08) 0%, transparent 50%);
-      /* Removed infinite animation for performance */
-      opacity: 0.8;
+        radial-gradient(ellipse 50% 35% at 20% 0%, rgba(16, 185, 129, 0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 30% at 90% 90%, rgba(56, 189, 248, 0.05) 0%, transparent 60%);
       pointer-events: none;
       z-index: 0;
     }
@@ -47,267 +75,321 @@
     }
 
     .header {
-      text-align: center;
-      margin-bottom: 40px;
+      text-align: left;
+      margin-bottom: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
     }
 
     .header h1 {
-      font-size: 42px;
-      font-weight: 800;
-      color: #ffffff;
-      margin-bottom: 10px;
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 0;
     }
 
     .header p {
-      color: rgba(255, 255, 255, 0.9);
-      font-size: 18px;
-      font-weight: 500;
+      color: var(--text-muted);
+      font-size: 14.5px;
+      font-weight: 400;
     }
 
     .dashboard {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 30px;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
       margin-bottom: 40px;
     }
 
     .card {
-      background: rgba(27, 31, 38, 0.98);
-      /* Removed backdrop-filter for performance */
-      border-radius: 20px;
-      padding: 30px;
-      box-shadow: 0 15px 30px rgba(0, 0, 0, 0.25);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      animation: slideIn 0.4s ease-out;
-      color: #1f2937;
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 26px;
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--border);
+      animation: slideIn 0.4s var(--ease);
+      color: var(--text);
     }
 
     @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateY(30px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
-    .card.full-width {
-      grid-column: 1 / -1;
-    }
+    .card.full-width { grid-column: 1 / -1; }
 
     .card h2 {
-      font-size: 24px;
+      font-size: 17px;
       font-weight: 700;
-      margin-bottom: 20px;
-      color: #46e65a;
+      margin-bottom: 18px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
     }
 
-    .form-group {
-      margin-bottom: 20px;
-    }
+    .form-group { margin-bottom: 18px; }
 
     .form-group label {
       display: block;
-      margin-bottom: 8px;
-      font-weight: 600;
-      color: #4b5563;
+      margin-bottom: 7px;
+      font-weight: 500;
+      font-size: 13.5px;
+      color: var(--text-muted);
     }
 
     .form-group input,
-    .form-group textarea {
+    .form-group textarea,
+    .form-group select {
       width: 100%;
-      padding: 12px 15px;
-      border-radius: 8px;
-      border: 2px solid #2a2f36;
-      background: #0f1216;
-      color: #ffffff;
+      padding: 11px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border-strong);
+      background: var(--bg);
+      color: var(--text);
       font-size: 14px;
-      transition: all 0.3s ease;
+      font-family: inherit;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .form-group input::placeholder,
+    .form-group textarea::placeholder { color: var(--text-dim); }
+
+    .form-group input[type="checkbox"] {
+      width: auto;
+      accent-color: var(--accent);
+      transform: scale(1.15);
+      margin-right: 6px;
+      cursor: pointer;
+    }
+
+    .form-group input[type="color"] {
+      height: 42px;
+      padding: 4px 6px;
+      cursor: pointer;
     }
 
     .form-group input:focus,
-    .form-group textarea:focus {
+    .form-group textarea:focus,
+    .form-group select:focus {
       outline: none;
-      border-color: #46e65a;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.16);
     }
 
     .btn {
-      padding: 12px 24px;
-      border-radius: 8px;
-      border: none;
+      padding: 11px 20px;
+      border-radius: 10px;
+      border: 1px solid transparent;
       font-size: 14px;
-      font-weight: 600;
+      font-weight: 700;
+      font-family: inherit;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: transform 0.16s var(--ease), box-shadow 0.16s var(--ease), background 0.16s ease, border-color 0.16s ease;
       text-decoration: none;
       display: inline-block;
       text-align: center;
+      min-height: 42px;
+    }
+
+    .btn:focus-visible {
+      outline: 3px solid rgba(52, 211, 153, 0.55);
+      outline-offset: 2px;
     }
 
     .btn-primary {
-      background: linear-gradient(135deg, #46e65a, #5ef56d);
-      color: #000000;
+      background: linear-gradient(135deg, var(--accent-strong), var(--accent));
+      color: #022c22;
+      box-shadow: 0 4px 16px rgba(16, 185, 129, 0.25);
     }
 
     .btn-primary:hover {
       transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(70, 230, 90, 0.3);
+      box-shadow: 0 8px 22px rgba(16, 185, 129, 0.38);
     }
 
     .btn-danger {
-      background: linear-gradient(135deg, #ff6b6b, #ee5a52);
-      color: #ffffff;
+      background: var(--danger-dim);
+      color: var(--danger);
+      border-color: rgba(248, 113, 113, 0.4);
     }
 
     .btn-danger:hover {
       transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(255, 107, 107, 0.3);
+      background: rgba(248, 113, 113, 0.2);
+      box-shadow: 0 6px 18px rgba(248, 113, 113, 0.2);
     }
 
     .btn-secondary {
-      background: #2a2f36;
-      color: #ffffff;
+      background: var(--surface-2);
+      color: var(--text);
+      border-color: var(--border);
     }
 
     .btn-secondary:hover {
-      background: #3a3f46;
+      background: var(--surface-3);
+      border-color: var(--border-strong);
+    }
+
+    .btn-info {
+      background: var(--info-dim);
+      color: var(--info);
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+
+    .btn-info:hover {
+      transform: translateY(-2px);
+      background: rgba(56, 189, 248, 0.2);
+    }
+
+    .btn-accent {
+      background: var(--accent-dim);
+      color: var(--accent);
+      border-color: rgba(52, 211, 153, 0.4);
+    }
+
+    .btn-accent:hover {
+      transform: translateY(-2px);
+      background: rgba(52, 211, 153, 0.2);
     }
 
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 20px;
-      margin-bottom: 30px;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
     }
 
     .stat-item {
-      background: rgba(0, 0, 0, 0.3);
+      background: var(--surface-2);
       border-radius: 12px;
-      padding: 20px;
+      padding: 16px 12px;
       text-align: center;
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      border: 1px solid var(--border);
     }
 
     .stat-value {
-      font-size: 28px;
-      font-weight: 700;
-      color: #46e65a;
-      margin-bottom: 5px;
+      font-size: 24px;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+      color: var(--accent);
+      margin-bottom: 4px;
+      letter-spacing: -0.01em;
     }
 
     .stat-label {
-      font-size: 14px;
-      color: #a0a0a0;
+      font-size: 12.5px;
+      color: var(--text-muted);
     }
 
     .progress-bar {
       width: 100%;
-      height: 20px;
-      background: #2a2f36;
-      border-radius: 10px;
+      height: 16px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
       overflow: hidden;
-      margin: 20px 0;
+      margin: 16px 0;
     }
 
     .progress-fill {
       height: 100%;
-      background: linear-gradient(90deg, #46e65a, #5ef56d);
-      border-radius: 10px;
-      transition: width 0.5s ease;
+      background: linear-gradient(90deg, var(--accent-strong), #6ee7b7);
+      border-radius: 999px;
+      box-shadow: 0 0 12px rgba(52, 211, 153, 0.4);
+      transition: width 0.5s var(--ease);
     }
 
     .donations-list {
       max-height: 400px;
       overflow-y: auto;
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 10px;
-      padding: 15px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
     }
 
     .donation-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 12px;
-      margin-bottom: 10px;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 8px;
-      border-left: 4px solid #46e65a;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      background: var(--surface-2);
+      border-radius: 10px;
+      border-left: 3px solid var(--accent);
     }
 
-    .donation-info {
-      flex: 1;
-    }
+    .donation-info { flex: 1; }
 
     .donation-amount {
       font-weight: 700;
-      color: #46e65a;
-      font-size: 16px;
+      color: var(--accent);
+      font-size: 15px;
+      font-variant-numeric: tabular-nums;
     }
 
     .donation-payer {
-      color: #ffffff;
+      color: var(--text);
       margin-bottom: 2px;
+      font-weight: 500;
     }
 
     .donation-time {
       font-size: 12px;
-      color: #a0a0a0;
+      color: var(--text-dim);
     }
 
     .quick-links {
       display: flex;
-      gap: 0;
+      gap: 8px;
       flex-wrap: wrap;
-      margin-bottom: 30px;
-      background: rgba(27, 31, 38, 0.98);
-      /* Removed backdrop-filter for performance */
-      border-radius: 12px;
+      margin-bottom: 24px;
+      background: var(--surface);
+      border-radius: 14px;
       padding: 10px;
-      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--border);
       align-items: center;
     }
 
     .quick-links .btn {
-      border-radius: 8px;
-      margin: 0 5px;
-      transition: all 0.3s ease;
-      font-size: 14px;
-      padding: 10px 20px;
+      border-radius: 10px;
+      margin: 0;
+      font-size: 13.5px;
+      padding: 9px 16px;
+      min-height: 40px;
     }
 
-    .quick-links .btn:hover {
-      transform: translateY(-2px);
-    }
+    .quick-links .btn:hover { transform: translateY(-1px); }
 
     .quick-links .btn-secondary {
-      background: rgba(255, 255, 255, 0.1);
-      color: #ffffff;
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid transparent;
     }
 
     .quick-links .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.15);
-      border-color: rgba(255, 255, 255, 0.3);
+      background: var(--surface-2);
+      color: var(--text);
+      border-color: var(--border);
     }
 
-    .quick-links .btn-danger {
-      margin-left: auto;
-    }
+    .quick-links .btn-danger { margin-left: auto; }
 
     .alert {
-      padding: 15px 20px;
-      border-radius: 10px;
-      margin-bottom: 20px;
-      font-weight: 600;
-      animation: slideInDown 0.3s ease-out;
+      padding: 14px 18px;
+      border-radius: 12px;
+      margin-bottom: 18px;
+      font-weight: 500;
+      font-size: 14px;
+      animation: slideInDown 0.3s var(--ease);
       position: relative;
       overflow: hidden;
-      /* Removed backdrop-filter for performance */
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
     }
 
@@ -323,30 +405,28 @@
     }
 
     .alert-success {
-      background: rgba(27, 31, 38, 0.98);
-      border: 2px solid #46e65a;
-      color: #46e65a;
-      border-left: 5px solid #46e65a;
+      background: var(--accent-dim);
+      border: 1px solid rgba(52, 211, 153, 0.35);
+      color: var(--accent);
     }
 
     .alert-error {
-      background: rgba(27, 31, 38, 0.98);
-      border: 2px solid #ff6b6b;
-      color: #ff6b6b;
-      border-left: 5px solid #ff6b6b;
+      background: var(--danger-dim);
+      border: 1px solid rgba(248, 113, 113, 0.35);
+      color: var(--danger);
     }
 
     .alert-info {
-      background: rgba(27, 31, 38, 0.98);
-      border: 2px solid #3498db;
-      color: #3498db;
-      border-left: 5px solid #3498db;
+      background: var(--info-dim);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: var(--info);
     }
 
     .btn:disabled {
-      opacity: 0.6;
+      opacity: 0.55;
       cursor: not-allowed;
       transform: none !important;
+      box-shadow: none !important;
     }
 
     .btn.loading {
@@ -368,146 +448,121 @@
       animation: spin 1s linear infinite;
     }
 
-    .btn.loading.btn-primary::after {
-      border-top-color: #000000;
-    }
-
-    .btn.loading.btn-danger::after {
-      border-top-color: #ffffff;
-    }
+    .btn.loading.btn-primary::after { border-top-color: #022c22; }
+    .btn.loading.btn-danger::after { border-top-color: var(--danger); }
 
     .form-feedback {
-      margin-top: 5px;
-      font-size: 12px;
+      margin-top: 6px;
+      font-size: 12.5px;
       min-height: 16px;
     }
 
-    .form-feedback.success {
-      color: #46e65a;
-    }
-
-    .form-feedback.error {
-      color: #ff6b6b;
-    }
+    .form-feedback.success { color: var(--accent); }
+    .form-feedback.error { color: var(--danger); }
 
     @keyframes slideInDown {
-      from {
-        opacity: 0;
-        transform: translateY(-20px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      from { opacity: 0; transform: translateY(-16px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     @keyframes progressBar {
-      from {
-        left: -100%;
-      }
-
-      to {
-        left: 100%;
-      }
+      from { left: -100%; }
+      to { left: 100%; }
     }
 
     @keyframes spin {
-      0% {
-        transform: rotate(0deg);
-      }
-
-      100% {
-        transform: rotate(360deg);
-      }
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
 
     /* Subscription Status Styles */
     .subscription-badge {
       display: inline-block;
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 12px;
+      padding: 5px 14px;
+      border-radius: 999px;
+      font-size: 11.5px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.06em;
     }
 
     .subscription-badge.free {
-      background: rgba(160, 160, 160, 0.2);
-      color: #a0a0a0;
-      border: 1px solid #a0a0a0;
+      background: rgba(148, 163, 184, 0.15);
+      color: var(--text-muted);
+      border: 1px solid var(--border-strong);
     }
 
     .subscription-badge.free_pass {
-      background: rgba(138, 43, 226, 0.2);
-      color: #BA55D3;
-      border: 1px solid #BA55D3;
+      background: rgba(168, 85, 247, 0.15);
+      color: #c084fc;
+      border: 1px solid rgba(192, 132, 252, 0.4);
     }
 
     .subscription-badge.trial {
-      background: rgba(52, 152, 219, 0.2);
-      color: #3498db;
-      border: 1px solid #3498db;
+      background: var(--info-dim);
+      color: var(--info);
+      border: 1px solid rgba(56, 189, 248, 0.4);
     }
 
     .subscription-badge.basic,
     .subscription-badge.pro,
     .subscription-badge.enterprise {
-      background: rgba(70, 230, 90, 0.2);
-      color: #46e65a;
-      border: 1px solid #46e65a;
+      background: var(--accent-dim);
+      color: var(--accent);
+      border: 1px solid rgba(52, 211, 153, 0.4);
     }
 
     .subscription-badge.expired,
     .subscription-badge.canceled {
-      background: rgba(255, 107, 107, 0.2);
-      color: #ff6b6b;
-      border: 1px solid #ff6b6b;
+      background: var(--danger-dim);
+      color: var(--danger);
+      border: 1px solid rgba(248, 113, 113, 0.4);
     }
 
     .trial-warning {
-      background: rgba(255, 165, 0, 0.1);
-      border-left: 4px solid #FFA500;
-      padding: 15px;
-      border-radius: 8px;
-      margin: 15px 0;
-      color: #FFA500;
+      background: var(--warning-dim);
+      border-left: 3px solid var(--warning);
+      padding: 14px 16px;
+      border-radius: 10px;
+      margin: 14px 0;
+      color: var(--warning);
+      font-size: 14px;
     }
 
     .trial-warning.urgent {
-      background: rgba(255, 107, 107, 0.1);
-      border-left-color: #ff6b6b;
-      color: #ff6b6b;
+      background: var(--danger-dim);
+      border-left-color: var(--danger);
+      color: var(--danger);
     }
 
     .plan-features {
       list-style: none;
-      margin: 15px 0;
+      margin: 14px 0;
     }
 
     .plan-features li {
-      padding: 8px 0;
+      padding: 7px 0;
       display: flex;
       align-items: center;
-      color: #e0e0e0;
+      color: var(--text);
+      font-size: 14px;
     }
 
     .plan-features li::before {
       content: '✓';
-      color: #46e65a;
+      color: var(--accent);
       font-weight: bold;
       margin-right: 10px;
-      font-size: 16px;
+      font-size: 15px;
     }
 
     .plan-features li.disabled::before {
       content: '✗';
-      color: #666;
+      color: var(--text-dim);
     }
 
     .plan-features li.disabled {
-      color: #666;
+      color: var(--text-dim);
       text-decoration: line-through;
     }
 
@@ -519,73 +574,55 @@
     .user-info {
       display: flex;
       align-items: center;
-      gap: 15px;
-      padding: 15px;
-      background: rgba(70, 230, 90, 0.1);
-      border-radius: 10px;
-      margin-bottom: 20px;
+      gap: 14px;
+      padding: 16px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 18px;
     }
 
     .user-avatar {
-      width: 50px;
-      height: 50px;
+      width: 48px;
+      height: 48px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #46e65a, #5ef56d);
+      background: linear-gradient(135deg, var(--accent-strong), #0d9488);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 24px;
+      font-size: 22px;
       font-weight: bold;
-      color: #000;
+      color: #022c22;
+      flex-shrink: 0;
     }
 
     .user-details h3 {
       margin: 0;
-      font-size: 18px;
-      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
     }
 
     .user-details p {
-      margin: 5px 0 0 0;
-      font-size: 13px;
-      color: #a0a0a0;
+      margin: 3px 0 0 0;
+      font-size: 12.5px;
+      color: var(--text-muted);
     }
 
     @keyframes pulse-success {
-      0% {
-        box-shadow: 0 0 0 0 rgba(70, 230, 90, 0.7);
-      }
-
-      70% {
-        box-shadow: 0 0 0 10px rgba(70, 230, 90, 0);
-      }
-
-      100% {
-        box-shadow: 0 0 0 0 rgba(70, 230, 90, 0);
-      }
+      0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(52, 211, 153, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
     }
 
     @keyframes pulse-error {
-      0% {
-        box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.7);
-      }
-
-      70% {
-        box-shadow: 0 0 0 10px rgba(255, 107, 107, 0);
-      }
-
-      100% {
-        box-shadow: 0 0 0 0 rgba(255, 107, 107, 0);
-      }
+      0% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(248, 113, 113, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0); }
     }
 
-    .pulse-success {
-      animation: pulse-success 0.6s;
-    }
-
-    .pulse-error {
-      animation: pulse-error 0.6s;
-    }
+    .pulse-success { animation: pulse-success 0.6s; }
+    .pulse-error { animation: pulse-error 0.6s; }
 
     /* Modal Overlay Styles */
     .modal-overlay {
@@ -594,8 +631,7 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(0, 0, 0, 0.9);
-      /* Removed backdrop-filter for performance */
+      background: rgba(2, 6, 16, 0.8);
       z-index: 1000;
       display: none;
       align-items: center;
@@ -604,31 +640,29 @@
       animation: fadeIn 0.2s ease;
     }
 
-    .modal-overlay.active {
-      display: flex;
-    }
+    .modal-overlay.active { display: flex; }
 
     .modal-content {
-      background: rgba(27, 31, 38, 0.98);
-      border-radius: 20px;
+      background: var(--surface);
+      border-radius: 18px;
       padding: 30px;
       max-width: 1000px;
       width: 100%;
       max-height: 90vh;
       overflow-y: auto;
-      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6);
+      border: 1px solid var(--border-strong);
       position: relative;
-      animation: slideUp 0.3s ease;
+      animation: slideUp 0.3s var(--ease);
     }
 
     .modal-close {
       position: absolute;
-      top: 20px;
-      right: 20px;
-      background: rgba(255, 107, 107, 0.2);
-      border: 2px solid #ff6b6b;
-      color: #ff6b6b;
+      top: 18px;
+      right: 18px;
+      background: var(--surface-2);
+      border: 1px solid var(--border-strong);
+      color: var(--text-muted);
       width: 40px;
       height: 40px;
       border-radius: 50%;
@@ -638,60 +672,50 @@
       justify-content: center;
       font-size: 20px;
       font-weight: bold;
-      transition: all 0.3s ease;
+      transition: all 0.2s ease;
     }
 
     .modal-close:hover {
-      background: #ff6b6b;
-      color: #ffffff;
+      background: var(--danger-dim);
+      border-color: rgba(248, 113, 113, 0.4);
+      color: var(--danger);
       transform: rotate(90deg);
     }
 
     @keyframes fadeIn {
-      from {
-        opacity: 0;
-      }
-
-      to {
-        opacity: 1;
-      }
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
 
     @keyframes slideUp {
-      from {
-        opacity: 0;
-        transform: translateY(30px);
-      }
+      from { opacity: 0; transform: translateY(26px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
 
-      to {
-        opacity: 1;
-        transform: translateY(0);
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
       }
     }
 
     @media (max-width: 768px) {
-      .dashboard {
-        grid-template-columns: 1fr;
-      }
+      .dashboard { grid-template-columns: 1fr; }
 
       .quick-links {
         flex-direction: column;
-        gap: 5px;
+        gap: 6px;
         padding: 8px;
       }
 
       .quick-links .btn {
         width: 100%;
-        margin: 3px 0;
+        margin: 0;
       }
 
-      .quick-links .btn-danger {
-        margin-left: 0;
-      }
+      .quick-links .btn-danger { margin-left: 0; }
 
-      .btn {
-        width: 100%;
-      }
+      .btn { width: 100%; }
 
       .modal-content {
         padding: 20px;
@@ -701,32 +725,32 @@
 
     /* Webhook Notification Styles */
     .webhook-notification {
-      padding: 15px 20px;
-      border-radius: 10px;
+      padding: 14px 18px;
+      border-radius: 12px;
       margin-bottom: 10px;
       display: flex;
       align-items: flex-start;
       gap: 12px;
-      animation: slideInDown 0.3s ease-out;
-      border-left: 4px solid;
+      animation: slideInDown 0.3s var(--ease);
+      border-left: 3px solid;
     }
 
     .webhook-notification.warning {
-      background: rgba(255, 193, 7, 0.15);
-      border-left-color: #ffc107;
-      color: #ffc107;
+      background: var(--warning-dim);
+      border-left-color: var(--warning);
+      color: var(--warning);
     }
 
     .webhook-notification.error {
-      background: rgba(255, 107, 107, 0.15);
-      border-left-color: #ff6b6b;
-      color: #ff6b6b;
+      background: var(--danger-dim);
+      border-left-color: var(--danger);
+      color: var(--danger);
     }
 
     .webhook-notification.info {
-      background: rgba(52, 152, 219, 0.15);
-      border-left-color: #3498db;
-      color: #3498db;
+      background: var(--info-dim);
+      border-left-color: var(--info);
+      color: var(--info);
     }
 
     .webhook-notification .icon {
@@ -734,9 +758,7 @@
       flex-shrink: 0;
     }
 
-    .webhook-notification .content {
-      flex: 1;
-    }
+    .webhook-notification .content { flex: 1; }
 
     .webhook-notification .message {
       font-weight: 600;
@@ -746,10 +768,10 @@
     .webhook-notification .details {
       font-size: 12px;
       opacity: 0.85;
-      font-family: monospace;
-      background: rgba(0, 0, 0, 0.2);
+      font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+      background: rgba(0, 0, 0, 0.3);
       padding: 6px 10px;
-      border-radius: 5px;
+      border-radius: 6px;
       margin-top: 6px;
       white-space: pre-wrap;
     }
@@ -771,9 +793,7 @@
       line-height: 1;
     }
 
-    .webhook-notification .close-btn:hover {
-      opacity: 1;
-    }
+    .webhook-notification .close-btn:hover { opacity: 1; }
   </style>
 </head>
 
@@ -785,13 +805,13 @@
     </div>
 
     <div class="quick-links">
-      <a href="/overlay" class="btn btn-secondary" target="_blank">📊 查看斗內條</a>
-      <button class="btn btn-secondary" onclick="toggleDonationMethodsModal()">💰 捐款方式</button>
-      <button class="btn btn-secondary" onclick="toggleSubscriptionModal()">💎 訂閱方案</button>
-      <button class="btn btn-secondary" onclick="toggleFeedbackModal()">💬 意見回饋</button>
-      <a class="btn btn-secondary" href="/account/export">🗂️ 匯出我的資料</a>
-      <button class="btn btn-secondary" onclick="window.location.reload()">🔄 重新整理</button>
-      <button class="btn btn-danger" onclick="logout()">🚪 登出</button>
+      <a href="/overlay" class="btn btn-secondary" target="_blank">查看斗內條</a>
+      <button class="btn btn-secondary" onclick="toggleDonationMethodsModal()">捐款方式</button>
+      <button class="btn btn-secondary" onclick="toggleSubscriptionModal()">訂閱方案</button>
+      <button class="btn btn-secondary" onclick="toggleFeedbackModal()">意見回饋</button>
+      <a class="btn btn-secondary" href="/account/export">匯出我的資料</a>
+      <button class="btn btn-secondary" onclick="window.location.reload()">重新整理</button>
+      <button class="btn btn-danger" onclick="logout()">登出</button>
     </div>
 
     <div id="alertContainer"></div>
@@ -873,12 +893,12 @@
             <label for="goalStartFromInput">起始金額 (NT$)</label>
             <input type="number" id="goalStartFromInput" min="0" value="0" placeholder="0">
             <div
-              style="background: #ff6b6b; color: white; padding: 10px; border-radius: 5px; margin-top: 8px; font-size: 12px; line-height: 1.4;">
+              style="background: var(--warning-dim); border: 1px solid rgba(251, 191, 36, 0.35); color: var(--warning); padding: 10px 12px; border-radius: 8px; margin-top: 8px; font-size: 12px; line-height: 1.5;">
               ⚠️ <strong>道德提醒：</strong>設定起始金額可能會誤導觀眾，讓他們以為您已經收到更多捐款。請謹慎使用此功能，並考慮透明度對於建立觀眾信任的重要性。
             </div>
           </div>
 
-          <button type="submit" class="btn btn-primary" id="goalSubmitBtn">💾 更新目標</button>
+          <button type="submit" class="btn btn-primary" id="goalSubmitBtn">更新目標</button>
           <div class="form-feedback" id="goalFeedback"></div>
         </form>
       </div>
@@ -897,9 +917,9 @@
       <div class="card">
         <h2>ECPay 金流設定</h2>
         <div class="alert alert-info"
-          style="background-color: #e7f3ff; border-left: 4px solid #2196F3; padding: 12px; margin-bottom: 20px; border-radius: 4px;">
+          style="margin-bottom: 20px;">
           <strong>⚠️ 重要提醒：</strong> 無論您想使用哪種斗內方式，都<strong>必須</strong>正確設定以下 ECPay 金流資料，觀眾的斗內才能成功處理！
-          <br><small style="color: #666; margin-top: 8px; display: block;">請至 ECPay 商店後台取得這些資料。</small>
+          <br><small style="opacity: 0.8; margin-top: 8px; display: block;">請至 ECPay 商店後台取得這些資料。</small>
         </div>
         <form id="ecpayForm">
           <div class="form-group">
@@ -917,7 +937,7 @@
             <input type="password" id="hashIVInput" placeholder="請輸入 ECPay HashIV">
           </div>
 
-          <button type="submit" class="btn btn-primary" id="ecpaySubmitBtn">💾 更新 ECPay 設定</button>
+          <button type="submit" class="btn btn-primary" id="ecpaySubmitBtn">更新 ECPay 設定</button>
           <div class="form-feedback" id="ecpayFeedback"></div>
         </form>
       </div>
@@ -994,8 +1014,7 @@
 
           <div class="form-group">
             <label for="donationDisplayModeInput">進度條下方捐款顯示模式</label>
-            <select id="donationDisplayModeInput"
-              style="width: 100%; padding: 12px 15px; border-radius: 8px; border: 2px solid #2a2f36; background: #0f1216; color: #ffffff; font-size: 14px;">
+            <select id="donationDisplayModeInput">
               <option value="top">顯示金額前 N 名 (從高到低)</option>
               <option value="latest">顯示最近 N 筆 (從新到舊)</option>
               <option value="hidden">不顯示</option>
@@ -1013,7 +1032,7 @@
             </div>
           </div>
 
-          <button type="submit" class="btn btn-primary" id="overlaySubmitBtn">💾 更新斗內條設定</button>
+          <button type="submit" class="btn btn-primary" id="overlaySubmitBtn">更新斗內條設定</button>
           <div class="form-feedback" id="overlayFeedback"></div>
         </form>
       </div>
@@ -1023,7 +1042,7 @@
         <h2>管理操作</h2>
         <div style="display: flex; flex-direction: column; gap: 15px;">
           <button class="btn btn-danger" onclick="resetProgress()">
-            🗑️ 重置進度 (清空所有捐款記錄)
+            重置進度（清空所有捐款記錄）
           </button>
 
           <div style="margin-top: 20px;">
@@ -1031,13 +1050,13 @@
             <p style="color: #a0a0a0; margin-bottom: 10px;">
               在 OBS 中添加 Browser Source，使用以下 URL：
             </p>
-            <div style="background: #0f1216; padding: 15px; border-radius: 8px; border: 1px solid #2a2f36;">
-              <code id="obsUrl" style="color: #454e46; word-break: break-all;"></code>
+            <div style="background: var(--bg); padding: 15px; border-radius: 10px; border: 1px solid var(--border-strong);">
+              <code id="obsUrl" style="color: var(--accent); word-break: break-all;"></code>
             </div>
             <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px;">
-              <button class="btn btn-secondary" type="button" onclick="copyObsUrl()">📋 複製 OBS URL</button>
-              <button class="btn" type="button" onclick="openObsTest()" style="background: #2196F3;">🧪 開啟測試提示</button>
-              <button class="btn" type="button" onclick="sendObsTestAlert()" style="background: #16804b;">📺 發送到 OBS</button>
+              <button class="btn btn-secondary" type="button" onclick="copyObsUrl()">複製 OBS URL</button>
+              <button class="btn btn-info" type="button" onclick="openObsTest()">開啟測試提示</button>
+              <button class="btn btn-accent" type="button" onclick="sendObsTestAlert()">發送到 OBS</button>
             </div>
             <p style="color: #a0a0a0; margin-top: 10px; font-size: 14px;">
               建議尺寸：900 x 150 pixels，啟用透明背景。先貼入 OBS，再按「發送到 OBS」；15 分鐘內確認畫面可看到測試斗內，再進行真實付款。
@@ -1048,12 +1067,12 @@
 
       <!-- Overlay Preview -->
       <div class="card full-width">
-        <h2>🎥 斗內條即時預覽</h2>
+        <h2>斗內條即時預覽</h2>
         <p style="color: #a0a0a0; margin-bottom: 15px;">
           以下是您的斗內條即時預覽。調整設定後會自動反映在此預覽中。
         </p>
         <div
-          style="background: #000; border-radius: 8px; overflow: hidden; border: 2px solid #2a2f36; position: relative;">
+          style="background: #000; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-strong); position: relative;">
           <div
             style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 5px; font-size: 12px; color: #4CAF50; z-index: 10;">
             ● LIVE
@@ -1064,14 +1083,14 @@
           </iframe>
         </div>
         <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
-          <button class="btn" onclick="refreshOverlayPreview()" style="background: #2196F3;">
-            🔄 重新整理預覽
+          <button class="btn btn-info" onclick="refreshOverlayPreview()">
+            重新整理預覽
           </button>
-          <button class="btn" onclick="togglePreviewSize()" style="background: #9C27B0;">
-            📏 切換預覽大小
+          <button class="btn btn-secondary" onclick="togglePreviewSize()">
+            切換預覽大小
           </button>
-          <button class="btn" onclick="window.open(workspaceUrls.overlay, '_blank')" style="background: #4CAF50;">
-            🚀 在新分頁開啟
+          <button class="btn btn-accent" onclick="window.open(workspaceUrls.overlay, '_blank')">
+            在新分頁開啟
           </button>
         </div>
         <p style="color: #666; margin-top: 10px; font-size: 13px;">
@@ -1086,7 +1105,7 @@
       <div class="modal-content">
         <button class="modal-close" onclick="toggleSubscriptionModal()">×</button>
 
-        <h2 style="margin-bottom: 10px;">💎 訂閱方案管理</h2>
+        <h2 style="margin-bottom: 10px;">訂閱方案管理</h2>
         <div id="subscriptionManagement">
           <!-- Subscription management content will be loaded here -->
         </div>
@@ -1098,15 +1117,14 @@
       <div class="modal-content">
         <button class="modal-close" onclick="toggleFeedbackModal()">×</button>
 
-        <h2 style="margin-bottom: 10px;">💬 意見回饋</h2>
+        <h2 style="margin-bottom: 10px;">意見回饋</h2>
         <p style="color: #a0a0a0; margin-bottom: 20px;">
           有任何建議或問題嗎？我們很樂意聽取您的意見！
         </p>
         <form id="feedbackForm">
           <div class="form-group">
             <label for="feedbackType">回饋類型</label>
-            <select id="feedbackType"
-              style="width: 100%; padding: 12px 15px; border-radius: 8px; border: 2px solid #2a2f36; background: #0f1216; color: #ffffff; font-size: 14px;">
+            <select id="feedbackType">
               <option value="bug">🐛 Bug 回報</option>
               <option value="feature">✨ 功能建議</option>
               <option value="improvement">🚀 改善建議</option>
@@ -1121,7 +1139,7 @@
           </div>
 
           <button type="submit" class="btn btn-primary" id="feedbackSubmitBtn">
-            📤 提交回饋
+            提交回饋
           </button>
           <div class="form-feedback" id="feedbackFeedback"></div>
         </form>
@@ -1133,46 +1151,46 @@
       <div class="modal-content">
         <button class="modal-close" onclick="toggleDonationMethodsModal()">×</button>
 
-        <h2 style="margin-bottom: 10px;">💰 接受捐款的方式</h2>
+        <h2 style="margin-bottom: 10px;">接受捐款的方式</h2>
         <p style="color: #a0a0a0; margin-bottom: 20px;">
           您可以選擇以下兩種方式來接受觀眾的捐款：
         </p>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px;">
           <!-- Method 1: Donate Page -->
-          <div style="background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 12px; border: 2px solid #2a2f36;">
+          <div style="background: var(--surface-2); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
             <h3 style="color: #46e65a; margin-bottom: 15px;">📄 方法一：使用捐款頁面</h3>
             <p style="color: #e0e0e0; margin-bottom: 15px; line-height: 1.6;">
               透過我們的捐款頁面，觀眾可以直接輸入金額和留言，系統會自動導向 ECPay 付款頁面。付款完成後會自動更新進度條。
             </p>
             <div
-              style="background: #0f1216; padding: 12px; border-radius: 8px; border: 1px solid #2a2f36; margin-bottom: 15px;">
+              style="background: var(--bg); padding: 12px; border-radius: 10px; border: 1px solid var(--border-strong); margin-bottom: 15px;">
               <div style="color: #808080; font-size: 12px; margin-bottom: 5px;">捐款頁面網址：</div>
               <code id="donatePageUrl" style="color: #46e65a; word-break: break-all; font-size: 13px;"></code>
             </div>
             <button class="btn btn-secondary"
               onclick="copyToClipboard(document.getElementById('donatePageUrl').textContent, '捐款頁面網址已複製')">
-              📋 複製網址
+              複製網址
             </button>
-            <a href="/donate" class="btn" target="_blank" style="background: #3498db; margin-left: 10px;">
-              👁️ 查看頁面
+            <a href="/donate" class="btn btn-info" target="_blank" style="margin-left: 10px;">
+              查看頁面
             </a>
           </div>
 
           <!-- Method 2: Webhook -->
-          <div style="background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 12px; border: 2px solid #2a2f36;">
+          <div style="background: var(--surface-2); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
             <h3 style="color: #46e65a; margin-bottom: 15px;">🔗 方法二：ECPay Webhook</h3>
             <p style="color: #e0e0e0; margin-bottom: 15px; line-height: 1.6;">
               如果您已經有自己的商店或捐款方式，可以在 ECPay 商店後台設定 Webhook，讓系統自動接收付款通知並更新進度條。
             </p>
             <div
-              style="background: #0f1216; padding: 12px; border-radius: 8px; border: 1px solid #2a2f36; margin-bottom: 15px;">
+              style="background: var(--bg); padding: 12px; border-radius: 10px; border: 1px solid var(--border-strong); margin-bottom: 15px;">
               <div style="color: #808080; font-size: 12px; margin-bottom: 5px;">Webhook 網址：</div>
               <code id="webhookUrl" style="color: #46e65a; word-break: break-all; font-size: 13px;"></code>
             </div>
             <button class="btn btn-secondary"
               onclick="copyToClipboard(document.getElementById('webhookUrl').textContent, 'Webhook 網址已複製')">
-              📋 複製網址
+              複製網址
             </button>
             <div
               style="margin-top: 15px; padding: 12px; background: rgba(52, 152, 219, 0.1); border: 1px solid rgba(52, 152, 219, 0.3); border-radius: 8px;">
