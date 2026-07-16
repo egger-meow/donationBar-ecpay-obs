@@ -460,6 +460,14 @@
     .form-feedback.success { color: var(--accent); }
     .form-feedback.error { color: var(--danger); }
 
+    .step-hint {
+      font-size: 12.5px;
+      color: var(--text-dim);
+      margin: 3px 0 0 24px;
+      line-height: 1.5;
+    }
+    .step-hint:empty { display: none; }
+
     @keyframes slideInDown {
       from { opacity: 0; transform: translateY(-16px); }
       to { opacity: 1; transform: translateY(0); }
@@ -820,10 +828,22 @@
     <div class="card" id="activationCard" style="margin-bottom: 30px; display: none;">
       <h2>開始使用檢查清單</h2>
       <ul id="activationChecklist" style="list-style: none; padding: 0; margin: 15px 0 0;">
-        <li id="activationStepEcpay" style="padding: 8px 0;">⬜ 設定 ECPay 收款方式</li>
-        <li id="activationStepObs" style="padding: 8px 0;">⬜ 在 OBS 加入斗內條 Browser Source</li>
-        <li id="activationStepDonation" style="padding: 8px 0;">⬜ 完成第一筆付款（測試提示不會計入）</li>
-        <li id="activationStepAlert" style="padding: 8px 0;">⬜ 確認直播畫面有跳出即時提示</li>
+        <li style="padding: 8px 0;">
+          <div id="activationStepEcpay">⬜ 設定 ECPay 收款方式</div>
+          <div class="step-hint" id="activationHintEcpay"></div>
+        </li>
+        <li style="padding: 8px 0;">
+          <div id="activationStepObs">⬜ 在 OBS 加入斗內條 Browser Source</div>
+          <div class="step-hint" id="activationHintObs"></div>
+        </li>
+        <li style="padding: 8px 0;">
+          <div id="activationStepDonation">⬜ 完成第一筆付款（測試提示不會計入）</div>
+          <div class="step-hint" id="activationHintDonation"></div>
+        </li>
+        <li style="padding: 8px 0;">
+          <div id="activationStepAlert">⬜ 確認直播畫面有跳出即時提示</div>
+          <div class="step-hint" id="activationHintAlert"></div>
+        </li>
       </ul>
     </div>
 
@@ -2368,6 +2388,19 @@
         (steps.firstDonation.done ? '✅' : '⬜') + ' 完成第一筆付款（測試提示不會計入）';
       document.getElementById('activationStepAlert').textContent =
         (steps.liveAlertDelivered.done ? '✅' : '⬜') + ' 確認直播畫面有跳出即時提示';
+
+      // Actionable next-step text for every incomplete step, so nothing sits as a
+      // silent stuck state (ROADMAP.md P1 "Actionable failure diagnostics").
+      document.getElementById('activationHintEcpay').textContent = steps.ecpayConfigured.done
+        ? '' : '尚未設定 → 到下方「ECPay 金流設定」填入商店代號、HashKey、HashIV';
+      document.getElementById('activationHintObs').textContent = steps.obsConnected.done
+        ? '' : '尚未偵測到連線 → 複製下方 OBS URL，貼到 OBS 的 Browser Source，儲存後應立即看到畫面';
+      document.getElementById('activationHintDonation').textContent = !steps.ecpayConfigured.done
+        ? '' : steps.firstDonation.done
+          ? '' : '尚未收到真實付款 → 用小額（例如 NT$1）親自完成一次付款測試';
+      document.getElementById('activationHintAlert').textContent = !steps.firstDonation.done
+        ? '' : steps.liveAlertDelivered.done
+          ? '' : '已收到付款，但尚未確認畫面跳出提示 → 開啟 OBS 檢查來源是否可見、瀏覽器來源是否已重新整理過';
 
       // Hide the checklist once every step is complete, so returning users aren't
       // nagged after they're fully activated.

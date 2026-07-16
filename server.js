@@ -1021,7 +1021,8 @@ app.post('/webhook/:slug', async (req, res) => {
       logWarn('payment_webhook_invalid_merchant', { request_id: req.requestId });
       sendAlert('payment_webhook_invalid_merchant', { requestId: req.requestId, route: '/webhook/:slug', statusCode: 400 });
       broadcastAdminNotification(workspace.id, 'error', 'Webhook: Merchant ID 不符', {
-        reason: 'invalid_merchant'
+        reason: 'invalid_merchant',
+        hint: '請確認登入 ECPay 商店後台的帳號，與下方「ECPay 金流設定」填寫的商店代號 (MerchantID) 為同一個特店'
       });
       return res.status(400).send('0|Invalid merchant');
     }
@@ -1715,15 +1716,19 @@ app.post('/admin/ecpay', requireAdmin, requireSameOrigin, async (req, res) => {
     const { merchantId, hashKey, hashIV } = req.body;
 
     if (!merchantId && !hashKey && !hashIV) {
-      return res.status(400).json({ error: 'At least one ECPay credential is required' });
+      return res.status(400).json({ error: '請至少填寫商店代號、HashKey 或 HashIV 其中一項' });
     }
     const normalizedMerchantId = merchantId ? String(merchantId).trim() : '';
     const normalizedHashKey = hashKey ? String(hashKey).trim() : '';
     const normalizedHashIV = hashIV ? String(hashIV).trim() : '';
-    if ((normalizedMerchantId && !/^[A-Za-z0-9]{1,20}$/.test(normalizedMerchantId)) ||
-      (normalizedHashKey && !/^[A-Za-z0-9]{8,128}$/.test(normalizedHashKey)) ||
-      (normalizedHashIV && !/^[A-Za-z0-9]{8,128}$/.test(normalizedHashIV))) {
-      return res.status(400).json({ error: 'Invalid ECPay credential format' });
+    if (normalizedMerchantId && !/^[A-Za-z0-9]{1,20}$/.test(normalizedMerchantId)) {
+      return res.status(400).json({ error: '商店代號 (MerchantID) 格式不符：應為 1-20 碼英數字，請確認貼上時沒有多餘空格' });
+    }
+    if (normalizedHashKey && !/^[A-Za-z0-9]{8,128}$/.test(normalizedHashKey)) {
+      return res.status(400).json({ error: 'HashKey 格式不符：應為 8-128 碼英數字，請確認沒有貼錯欄位或多餘空格' });
+    }
+    if (normalizedHashIV && !/^[A-Za-z0-9]{8,128}$/.test(normalizedHashIV)) {
+      return res.status(400).json({ error: 'HashIV 格式不符：應為 8-128 碼英數字，請確認沒有貼錯欄位或多餘空格' });
     }
 
     const workspace = await getUserWorkspaceFromSession(req);

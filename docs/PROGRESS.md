@@ -4,6 +4,7 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-07-16 — Actionable activation-checklist diagnostics, first slice (P1 diagnostics)
 - 2026-07-16 — Premium dark UI overhaul across all creator/viewer pages (P1 conversion)
 - 2026-07-16 — Competitive reset: Nekolive Network analysis and roadmap revision
 - 2026-07-12 — Align recruitment draft with one-streamer gate (P1 beta)
@@ -56,6 +57,42 @@ delete a past entry — if something it describes later changes or turns out wro
 in a new entry instead. This file records *what happened*; it is not a priority list.
 For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edited in
 place as work completes or priorities shift.
+
+---
+
+## 2026-07-16 - Actionable activation-checklist diagnostics, first slice (P1 diagnostics)
+
+First real slice of ROADMAP.md's "P1 Actionable failure diagnostics" — the claimed
+differentiator vs. Nekolive's opaque failure handling. Scoped this narrowly rather than
+building new tracking infrastructure: an audit of the existing activation/webhook code
+found provider-connect and callback-verify diagnostics partially in place already
+(`broadcastAdminNotification` already pushes real-time webhook failure toasts with a
+`hint` field for three of four failure types), so this slice closes the specific gaps
+found rather than re-architecting.
+
+- `server.js` `/admin/ecpay` POST: credential-format validation errors were generic
+  English strings ("Invalid ECPay credential format"). Now three separate, Traditional
+  Chinese, field-specific messages naming which field is wrong, the expected format, and
+  the most common real cause (extra whitespace from copy-paste).
+- `server.js` webhook merchant-ID-mismatch notification: the three other webhook failure
+  notifications (invalid signature, decryption failure) already had actionable framing;
+  this one was missing a `hint`. Added one naming the most common real cause (ECPay
+  login account differs from the configured MerchantID).
+- `public/admin.html` guided activation checklist: each of the four steps
+  (ECPay configured, OBS connected, first donation, live alert delivered) now shows a
+  dimmed next-step hint line when incomplete, computed client-side from the same
+  `/admin/activation` response already being fetched — no new schema or tracking added.
+  Completed steps show no hint (CSS `:empty` collapse). This is the piece that most
+  directly targets "no failure surfaces as a silent stuck state": previously an
+  incomplete OBS-connection step, for example, gave no indication of what to actually
+  do next.
+
+Verification: `npm test` passes (95/95, no test changes needed — assertions target
+existing IDs and copy that were preserved). Hint rendering and CSS collapse verified via
+a static copy of `admin.html` with simulated activation-step states (done steps produce
+an empty, hidden hint node; incomplete steps show visible dimmed text at 12.5px). The
+real `/admin/activation`-backed authenticated flow and the webhook-notification hint
+rendering still need one live pass with a workspace mid-activation.
 
 ---
 
