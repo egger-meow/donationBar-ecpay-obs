@@ -1,6 +1,16 @@
 # DonationBar Taiwan-First Roadmap
 
-Status: execution baseline, 2026-07-11. This is authoritative for priorities; code and tests are authoritative for shipped behavior.
+Status: execution baseline, 2026-07-16 (competitive reset). This is authoritative for priorities; code and tests are authoritative for shipped behavior.
+
+**2026-07-16 competitive reset:** a direct, operating competitor — Nekolive Network —
+was identified. It already provides Taiwan-local payment aggregation (six providers),
+OBS donation alerts, progress bars, alert replay, donation cards, leaderboards, media
+requests, Discord notifications, Twitch bot integrations, and an overtime timer. This
+invalidates "Taiwan-local payment connected to OBS" as a standalone differentiator. See
+[docs/competitive/NEKOLIVE_ANALYSIS.md](docs/competitive/NEKOLIVE_ANALYSIS.md) for the
+full comparison. The project is not abandoned and is not pivoting to out-feature
+Nekolive; broad feature expansion is paused in favor of proving a narrower,
+evidence-backed differentiation (section 2–5 and section 6 below reflect this reset).
 
 ## 1. Current repository assessment
 
@@ -26,12 +36,32 @@ Not proven in real staging or production: all of the above against a real hosted
 
 ## 2–5. Market, customer, gap, positioning
 
-- **Market:** Taiwan creators need familiar local payments, Traditional Chinese onboarding/support, and direct payment-to-OBS interactions.
-- **Initial customer:** Twitch/YouTube creators with about 20–500 concurrent viewers, existing monetization, no engineer, and willingness to configure ECPay.
-- **Gap:** global alert tools under-serve local payment workflows; gateways do not provide the complete creator/OBS experience.
-- **Position:** “The reliable Taiwan payment-to-OBS layer.” DonationBar does not custody viewer funds.
+- **Market:** Taiwan creators need familiar local payments, Traditional Chinese onboarding/support, and direct payment-to-OBS interactions. This market already has an operating incumbent (Nekolive Network), so the opportunity is not an empty category — it is a specific incumbent weakness (manual approval gating, revenue-share pricing, unverified reliability/diagnostics) validated through interviews, not assumed.
+- **Initial customer (revised):** Twitch/YouTube creators who **already monetize seriously** — real, recurring donation volume, not beginners — who value reliability, activation speed, actionable diagnostics, and predictable pricing over a maximal feature list. This replaces the prior "beginner creator" framing; a beginner with no volume has little reason to care about fixed-vs-revenue-share pricing or diagnostic depth.
+- **Gap:** Nekolive gates onboarding behind manual Discord/human approval with no published SLA, charges a revenue-share fee (3% above NT$10,000/month, capped at NT$1,500), and publishes no reliability signals (no status page, no SLA, no public incident history). None of these are proven weaknesses yet — they are the specific claims the required interviews (section 13) must confirm or reject.
+- **Position (revised):** "The fastest, most reliable, fully self-service payment-to-OBS product for serious Taiwanese streamers" — not a feature-parity alternative to Nekolive. Differentiation is speed-to-first-alert, zero manual approval, diagnosability of failures, and fixed pricing, not overlay/bot feature breadth. DonationBar does not custody viewer funds.
 
 ## 6. Build now
+
+**Measurable competitive targets** (added 2026-07-16, replaces vague "build more
+features" framing as the next milestone — see section 17):
+
+| Target | Threshold | Why this number |
+|---|---|---|
+| Signup to test alert | Under 15 minutes, median | Nekolive requires manual Discord/form approval with no published SLA; a bounded, no-human-in-the-loop time is a structural advantage only if actually measured and met |
+| Developer intervention | Zero, for the gating first-streamer test | Matches existing Product DoD; Nekolive's onboarding is inherently human-mediated, so "no developer intervention" only differentiates if literally true, not aspirational |
+| Real payment rendered in OBS | At least one real ECPay payment, unmocked, visually observed in a real OBS Browser Source | Mocked/sandbox success does not count as competitive proof; Nekolive's users already have this working today, so parity here is the floor, not the win |
+| Diagnostic state coverage | Every failed step in the activation funnel (provider connect, callback verify, OBS delivery) has a specific, actionable creator-facing message | No evidence Nekolive exposes this beyond a manual resend button; this is the highest-leverage, lowest-cost plausible differentiator (see NEKOLIVE_ANALYSIS.md) |
+| Pricing presented | Fixed founder price shown and explained against the revenue-share crossover, not a bare number | Flat pricing is only a real advantage above roughly NT$6,600–13,300/month net donation revenue (see NEKOLIVE_ANALYSIS.md); presenting it without that context oversells it |
+
+**Do not build now** (formalized from the 2026-07-16 competitive reset; see
+[NEKOLIVE_ANALYSIS.md](docs/competitive/NEKOLIVE_ANALYSIS.md#roadmap-items-that-would-merely-reproduce-nekolive-features)
+for the audit — none of these were already on this roadmap, this exclusion list exists
+to keep it that way): Twitch chat bot feature parity, media request feature parity,
+overtime timer, loyalty points, VIP automation, check-in systems, viewer queues, a large
+surface of overlay configuration pages, and additional production payment providers
+before interview-backed demand evidence. A future proposal matching one of these needs
+an explicit evidence-backed override, not silent inclusion.
 
 | Priority / deliverable | Why and impact | Difficulty | Dependency | Definition of done |
 |---|---|---|---|---|
@@ -39,6 +69,7 @@ Not proven in real staging or production: all of the above against a real hosted
 | P0 Observable operations | Detects and shortens incidents | Medium | Monitoring vendor | Request IDs and safe structured errors exist; readiness, callback and 5xx alerts are exercised |
 | P0 Legal/data baseline | Required before real users and money | Medium | Taiwan legal/accounting review | Terms/privacy, retention, subprocessors, support, tax/e-invoice and incident ownership are approved |
 | P1 Guided activation | Raises first-alert completion | Medium | Stable staging | Checklist covers provider, test payment, OBS and live alert; funnel and activation time are measured |
+| P1 Actionable failure diagnostics | Primary claimed differentiator vs. Nekolive's opaque failure handling | Medium | Guided activation, Observable operations | Provider-connect, callback-verify, and OBS-delivery failures each show a specific, non-generic creator-facing message and next step; no failure surfaces as a silent stuck state |
 | P1 Beta operations | Converts feedback into evidence | Low | 10–20 recruits | Support SLA, interview cadence, weekly metrics review and exit process operate four weeks |
 | P1 Paid conversion | Tests willingness to pay and creates MRR | Medium | Stable billing and plan policy | Pricing/limits visible; trial, renewal failure, upgrade/cancel and access states pass tests and staging |
 | P2 Core retention slice | Improves repeat use after evidence | Medium | Activation baseline | Selected goal/top/latest/replay/TTS slice has tests, OBS verification and usage tracking |
@@ -119,6 +150,15 @@ reasons, and keep the current NT$70 configuration explicitly as a sandbox/beta
 validation price—not a public-launch promise. Agency pricing remains deferred until
 the founder experiment and retained-user evidence justify it.
 
+**Fixed vs. revenue-share (2026-07-16):** Nekolive charges 0% below NT$10,000/month net
+donation revenue, then 3% up to a NT$1,500/month cap (reached at NT$50,000/month net
+revenue) — see [NEKOLIVE_ANALYSIS.md](docs/competitive/NEKOLIVE_ANALYSIS.md#fixed-vs-revenue-share-pricing-crossover).
+A flat NT$199–399/month price beats that only above roughly NT$6,600–13,300/month net
+donation revenue; below that, Nekolive is cheaper because it charges nothing. This
+sharpens the target customer to streamers already past that volume, and means the
+founder pricing pitch must state the crossover explicitly rather than claim flat
+pricing is a universal win.
+
 ECPay periodic billing requires eligible merchant arrangements and fixed TWD periodic charges; contracted fees must be confirmed before publishing margins ([recurring documentation](https://developers.ecpay.com.tw/2868/), [eligibility guidance](https://support.ecpay.com.tw/25120/)).
 
 Illustrative, not forecast: 10 Pro users = NT$2,990 MRR; 34 = NT$10,166. With assumed NT$8,000 monthly fixed cost and 85% contribution after fees/variable support, break-even is about 32 Pro users. Replace assumptions with invoices, contract fees, hosting measurements and support hours.
@@ -134,6 +174,22 @@ self-service path and produce a real OBS alert. Only after that pass should the 
 expand to five and then 10–20; the later cohort target remains 7 streaming and 5 weekly
 active in week four, with no unresolved critical payment/data incident and recorded
 pricing objections.
+
+### Market validation (added 2026-07-16)
+
+Before expanding the general beta cohort, run interviews across five segments to test
+the competitive hypotheses in
+[NEKOLIVE_ANALYSIS.md](docs/competitive/NEKOLIVE_ANALYSIS.md): current Nekolive users,
+former Nekolive users, streamers who applied to Nekolive but didn't complete
+onboarding, monetized creators using ECPay directly with no aggregator, and creators
+using another donation platform. Full question set and per-segment follow-ups are in
+[STREAMER_INTERVIEW_GUIDE.md](docs/beta/STREAMER_INTERVIEW_GUIDE.md). Core questions:
+why they chose or rejected Nekolive, how long setup actually took, what fails during
+real streams, how often they need human support, whether they'd prefer flat monthly
+pricing, what would make them switch, which features are essential versus decorative,
+and whether they'd trust a new platform with payment-to-alert delivery. Treat any
+feature repeatedly called "essential" by interviewees as a signal to revisit the
+do-not-build list in section 6 — not as authorization to add it unilaterally.
 
 ## 14. Metrics
 
@@ -154,10 +210,19 @@ pricing objections.
 | Low willingness to pay | Invalid economics | Medium | Real price conversations | Qualified retained users see offer; responses recorded |
 | Support-heavy setup | Prevents scale | Medium | Funnel data | Setup time/support targets set after first five and then met |
 | Legal/tax gaps | Can block charging | High | Professional advice | Written entity, tax/e-invoice, privacy, retention and restriction decisions stored |
+| Undifferentiated vs. incumbent | Nekolive already serves this market; feature-parity competition is unwinnable for a single-provider product | High | Interview evidence | Section 13 market validation confirms at least one real gap (speed, diagnostics, or pricing) that a monetized streamer states as a switching reason |
 
 ## 17. Immediate next 10 actions
 
 Each action inherits the rationale, impact, difficulty, dependency and DoD of its referenced row.
+
+**Next milestone (revised 2026-07-16 — replaces "build more creator features"):**
+Prove that one external monetized streamer can onboard faster than Nekolive's
+manual-approval flow, understand any failure clearly through actionable diagnostics,
+complete a real ECPay-to-OBS payment reliably, and consider paying a fixed monthly fee
+instead of Nekolive's revenue share. This is a proof milestone, not a feature-count
+milestone — it is satisfied by evidence from one real external streamer, not by shipping
+more of the roadmap's build-now table.
 
 1. Provision staging Postgres, HTTPS domain, secrets, and encrypted backups.
 2. Run migrations; rehearse documented rollback and full restore.
@@ -166,6 +231,7 @@ Each action inherits the rationale, impact, difficulty, dependency and DoD of it
 5. Exercise recurring initial payment, renewal, failed renewal, and cancellation.
 6. Install monitoring and test readiness/callback/5xx alerts.
 7. Obtain Taiwan legal/accounting review for terms, privacy, retention, tax/e-invoice, and merchant eligibility.
-8. Use the sandbox-only OBS test-alert path to verify the real Browser Source, then finish the thin normalized payment event, ECPay adapter, and Chinese onboarding evidence.
-9. Recruit exactly one unfamiliar streamer and observe the complete no-database-edit, no-remote-operation journey.
-10. Hold the production gate, then the first-streamer gate, before expanding the cohort or showing Founder pricing.
+8. Use the sandbox-only OBS test-alert path to verify the real Browser Source, then finish the thin normalized payment event, ECPay adapter, actionable failure diagnostics, and Chinese onboarding evidence.
+9. Run market-validation interviews (section 13) across current/former Nekolive users, rejected applicants, direct-ECPay creators, and other-platform creators, in parallel with the above — this does not block the production/first-streamer gates but must inform the founder pricing pitch and any post-gate feature decision.
+10. Recruit exactly one unfamiliar, already-monetized streamer and observe the complete no-database-edit, no-remote-operation journey, measuring signup-to-test-alert time against the sub-15-minute target.
+11. Hold the production gate, then the first-streamer gate, before expanding the cohort or showing Founder pricing. Do not resume broad feature expansion (see section 6 do-not-build-now list) until this milestone is proven with real evidence.
