@@ -1,103 +1,100 @@
-# Go-Live Checklist — Free-First, Highest CP值
+# 上線檢查清單 —— 免費優先、最高 CP 值
 
-Goal: get DonationBar from local sandbox to a publicly reachable deployment that one
-external streamer can use, **spending NT$0 on infrastructure** until the first paying
-streamer proves the product (per [ROADMAP.md](../../ROADMAP.md) section 17). Every
-service below has a real free tier as of 2026-07; the only unavoidable cost is ECPay's
-per-transaction processing fee on real payments, which is not an infrastructure cost.
+目標：讓 DonationBar 從本機沙盒走到一個可公開連線的部署環境，讓一位外部實況主能夠使用，
+且在第一位付費實況主證明產品價值之前**基礎設施花費為新台幣 0 元**（依照
+[ROADMAP.md](../../ROADMAP.md) 第 17 節）。以下每項服務截至 2026-07 都有可實際使用的免費方案；
+唯一無可避免的成本是 ECPay 對真實付款收取的單筆交易手續費，這不屬於基礎設施成本。
 
-## Stage 0 — Local sandbox (no accounts needed)
+## 階段 0 —— 本機沙盒（不需要任何帳號）
 
-Works fully offline against `db.json`:
+完全離線運作，對著 `db.json`：
 
 ```bash
-cp .env.example .env    # keep ENVIRONMENT=sandbox
+cp .env.example .env    # 保持 ENVIRONMENT=sandbox
 npm install
 npm run dev             # http://localhost:3000
 ```
 
-Overlay demo without any payment setup: `http://localhost:3000/overlay?test=1`.
+不需任何金流設定即可看到疊加層示範：`http://localhost:3000/overlay?test=1`。
 
-## Stage 1 — Accounts to register (all free)
+## 階段 1 —— 需要註冊的帳號（全部免費）
 
-| # | Service | What for | Free tier reality check |
+| # | 服務 | 用途 | 免費方案實際狀況 |
 |---|---------|----------|------------------------|
-| 1 | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) | OAuth 2.0 login (the only auth method) | Free, no card required for OAuth credentials |
-| 2 | [Neon](https://neon.tech) | Production PostgreSQL | Free: ~3 GiB storage, persistent (no expiry). Pick region **Singapore (ap-southeast-1)** — lowest latency to Taiwan |
-| 3 | [Render](https://render.com) | Node web service hosting | Free: 750 h/month, HTTPS `*.onrender.com` subdomain included. Spins down after 15 min idle (see keep-warm note). Alternative: [Koyeb](https://koyeb.com) (1 free service, 512 MB) |
-| 4 | [ECPay 綠界](https://www.ecpay.com.tw) | Payment processing | **Stage testing:** free — use ECPay's published stage test credentials, no application needed (`ECPAY_ENVIRONMENT=stage`). **Production:** registering a 特店 merchant account is free; ECPay takes a per-transaction fee (~2–3% credit card) on real money. Requires Taiwan ID/company + bank account |
-| 5 | [UptimeRobot](https://uptimerobot.com) | Monitor `/health/ready` + keep Render warm | Free: 50 monitors, 5-min interval |
-| 6 | (later, optional) [Brevo](https://brevo.com) | SMTP for welcome emails | Free: 300 emails/day. App runs fine with SMTP unset |
-| 7 | (later, optional) custom domain | Branding | ~US$10/yr — the only paid item, and entirely optional; `*.onrender.com` HTTPS works for OAuth and ECPay callbacks |
+| 1 | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) | OAuth 2.0 登入（唯一的登入方式） | 免費，申請 OAuth 憑證不需信用卡 |
+| 2 | [Neon](https://neon.tech) | 正式環境用 PostgreSQL | 免費方案：約 3 GiB 儲存空間，永久保留（不會過期）。地區請選 **Singapore (ap-southeast-1)** —— 對台灣延遲最低 |
+| 3 | [Render](https://render.com) | Node 網頁服務代管 | 免費方案：每月 750 小時，內含 HTTPS 的 `*.onrender.com` 子網域。閒置 15 分鐘會自動休眠（見下方保持喚醒說明）。替代方案：[Koyeb](https://koyeb.com)（1 個免費服務，512 MB） |
+| 4 | [ECPay 綠界](https://www.ecpay.com.tw) | 金流處理 | **測試環境（stage）**：免費 —— 使用 ECPay 公開發布的測試特店金鑰即可，不需申請（`ECPAY_ENVIRONMENT=stage`）。**正式環境**：申請特店帳號本身免費；ECPay 會對真實金流收取單筆手續費（信用卡約 2–3%）。需要台灣身分證／公司登記與銀行帳戶 |
+| 5 | [UptimeRobot](https://uptimerobot.com) | 監控 `/health/ready` 並讓 Render 保持喚醒 | 免費方案：50 個監控項目，5 分鐘檢查間隔 |
+| 6 | （之後，選用）[Brevo](https://brevo.com) | 用於發送歡迎信的 SMTP 服務 | 免費方案：每日 300 封信。不設定 SMTP 應用程式也能正常運作 |
+| 7 | （之後，選用）自訂網域 | 品牌形象 | 每年約 US$10 —— 唯一需付費的項目，且完全選用；`*.onrender.com` 的 HTTPS 本身就足以支援 OAuth 與 ECPay callback |
 
-Notes:
+備註：
 
-- **Why Neon and not Render's free Postgres:** Render's free database expires after 90
-  days; Neon's does not. Don't put payment data on a database with a countdown timer.
-- **Keep-warm:** Render free spins down after 15 min idle and takes 30–50 s to wake —
-  that would break the OBS overlay's SSE during a live stream. A 5-minute UptimeRobot
-  ping on `/health/live` keeps it warm (750 h/month ≈ one always-on service).
-  **Before a real streamer goes live on a real stream, upgrade to Render Starter
-  (~US$7/mo)** — that expense is gated on the roadmap's first-streamer proof, not paid
-  up front.
-- **Two ECPay roles:** the platform's own merchant account collects DonationBar
-  *subscription* fees (`BILLING_ECPAY_*`); each streamer connects **their own** ECPay
-  merchant in the admin page so donations settle directly to them. For a closed beta
-  with stage credentials, one test merchant can play both roles.
+- **為何用 Neon 而非 Render 的免費 Postgres**：Render 的免費資料庫 90 天後會過期；
+  Neon 不會。付款資料不該放在有倒數計時的資料庫上。
+- **保持喚醒**：Render 免費方案閒置 15 分鐘後會休眠，喚醒需要 30–50 秒 ——
+  這會在直播進行中打斷 OBS 疊加層的 SSE 連線。用 UptimeRobot 每 5 分鐘 ping 一次
+  `/health/live` 即可保持喚醒（每月 750 小時大約等於一個全天候運作的服務）。
+  **在有真實實況主要正式開台前，請升級到 Render Starter（約每月 US$7）**——
+  這筆花費要等到 roadmap 中「第一位實況主驗證」通過後才需要投入，不需提前付費。
+- **兩種 ECPay 角色**：平台自己的特店帳號用於收取 DonationBar 的*訂閱*費用
+  （`BILLING_ECPAY_*`）；每位實況主則在管理後台連結**自己的** ECPay 特店，讓捐款
+  直接入帳給他們。若是使用測試金鑰的封閉測試（closed beta），一組測試特店即可同時
+  扮演這兩種角色。
 
-## Stage 2 — Environment variables for production
+## 階段 2 —— 正式環境的環境變數
 
-`validateProductionConfig()` in [config.js](../../config.js) hard-fails startup if any
-of these is missing or weak. Generate secrets locally, paste into Render's Environment
-tab (never commit them):
+[lib/config.js](../../lib/config.js) 中的 `validateProductionConfig()` 只要缺少或偵測到
+弱值就會直接讓啟動失敗。在本機產生金鑰後，貼到 Render 的 Environment 分頁（絕不要提交到
+版本控制）：
 
 ```bash
-# generate once each:
+# 各執行一次即可：
 node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"   # SESSION_SECRET
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"   # CREDENTIAL_ENCRYPTION_KEY
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"   # BACKUP_ENCRYPTION_KEY
 ```
 
-| Variable | Value | Source |
+| 變數 | 值 | 來源 |
 |----------|-------|--------|
 | `ENVIRONMENT` | `production` | — |
 | `NODE_ENV` | `production` | — |
-| `BASE_URL` | `https://<app>.onrender.com` | Render (must be HTTPS) |
-| `DATABASE_URL` | `postgres://…` | Neon dashboard → connection string |
-| `SESSION_SECRET` | 32+ random chars | generated above |
-| `CREDENTIAL_ENCRYPTION_KEY` | base64 32-byte key | generated above |
-| `BACKUP_ENCRYPTION_KEY` | base64 32-byte key | generated above (for `npm run backup`) |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth client | Google Cloud Console |
-| `GOOGLE_CALLBACK_URL` | `https://<app>.onrender.com/api/auth/google/callback` | must match the redirect URI registered in Google Console |
-| `PLATFORM_ADMIN_EMAILS` | your Gmail address | comma-separated |
-| `ECPAY_ENVIRONMENT` | `stage` until the real merchant is approved, then `production` | — |
-| `BILLING_ECPAY_MERCHANT_ID` / `BILLING_ECPAY_HASH_KEY` / `BILLING_ECPAY_HASH_IV` | stage test credentials first; real 特店 credentials later | ECPay |
-| `SUBSCRIPTION_TRIAL_DAYS` / `SUBSCRIPTION_MONTHLY_PRICE` | optional; defaults 30 / 70 | — |
-| `ALERT_WEBHOOK_URL` | optional; leave empty to disable | see [MONITORING_AND_INCIDENT_RESPONSE.md](../operations/MONITORING_AND_INCIDENT_RESPONSE.md) |
-| `ADMIN_EMAIL` / `ADMIN_USERNAME` / `ADMIN_DISPLAY_NAME` | used only by `npm run migrate` to seed the initial admin | — |
+| `BASE_URL` | `https://<app>.onrender.com` | Render（必須為 HTTPS） |
+| `DATABASE_URL` | `postgres://…` | Neon 控制台 → connection string |
+| `SESSION_SECRET` | 32 字元以上隨機字串 | 上方指令產生 |
+| `CREDENTIAL_ENCRYPTION_KEY` | base64 32 位元組金鑰 | 上方指令產生 |
+| `BACKUP_ENCRYPTION_KEY` | base64 32 位元組金鑰 | 上方指令產生（供 `npm run backup` 使用） |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth 用戶端 | Google Cloud Console |
+| `GOOGLE_CALLBACK_URL` | `https://<app>.onrender.com/api/auth/google/callback` | 必須與 Google Console 中登記的 redirect URI 一致 |
+| `PLATFORM_ADMIN_EMAILS` | 你的 Gmail 帳號 | 逗號分隔 |
+| `ECPAY_ENVIRONMENT` | 在真實特店核准前用 `stage`，核准後改為 `production` | — |
+| `BILLING_ECPAY_MERCHANT_ID` / `BILLING_ECPAY_HASH_KEY` / `BILLING_ECPAY_HASH_IV` | 先用測試金鑰，之後換成真實特店金鑰 | ECPay |
+| `SUBSCRIPTION_TRIAL_DAYS` / `SUBSCRIPTION_MONTHLY_PRICE` | 選填；預設 30 / 70 | — |
+| `ALERT_WEBHOOK_URL` | 選填；留空即停用 | 參見 [MONITORING_AND_INCIDENT_RESPONSE.md](../operations/MONITORING_AND_INCIDENT_RESPONSE.md) |
+| `ADMIN_EMAIL` / `ADMIN_USERNAME` / `ADMIN_DISPLAY_NAME` | 僅供 `npm run migrate` 用於初始化管理員 | — |
 
-Deploy sequence on Render: build `npm ci`, pre-deploy `npm run migrate`, start
-`npm start`. Health checks: `/health/live` (liveness), `/health/ready` (DB-backed).
-After deploy, run `npm run preflight:staging -- --base-url https://<app>.onrender.com`
-from your machine (see [STAGING_PREFLIGHT.md](../operations/STAGING_PREFLIGHT.md)).
+Render 上的部署流程：build 階段 `npm ci`，pre-deploy 階段 `npm run migrate`，start 階段
+`npm start`。健康檢查端點：`/health/live`（liveness）、`/health/ready`（DB 連線檢查）。
+部署完成後，從你自己的機器執行
+`npm run preflight:staging -- --base-url https://<app>.onrender.com`
+（參見 [STAGING_PREFLIGHT.md](../operations/STAGING_PREFLIGHT.md)）。
 
-## Stage 3 — When to start paying (CP值-ordered)
+## 階段 3 —— 何時開始花錢（依 CP 值排序）
 
-1. **NT$0 / month** — everything above; fine for staging, interviews, and OBS testing.
-2. **~US$7 / month (Render Starter)** — the moment a real streamer schedules a real
-   stream; removes cold starts that would break overlay SSE mid-broadcast.
-3. **~US$10 / year (domain)** — only when branding starts to matter for conversion.
-4. Everything else (Neon paid, email volume, monitoring) has no trigger until well past
-   the first paying cohort.
+1. **每月新台幣 0 元** —— 以上全部，足以應付預備環境、訪談與 OBS 測試。
+2. **約每月 US$7（Render Starter）** —— 當有真實實況主排定要正式開台時就該升級；
+   移除冷啟動問題，避免疊加層 SSE 在直播中被打斷。
+3. **約每年 US$10（網域）** —— 只有在品牌形象開始影響轉換率時才需要。
+4. 其餘項目（Neon 付費方案、email 量、監控服務）在第一批付費使用者出現之前，
+   都沒有需要升級的觸發點。
 
-## Order of operations
+## 執行順序
 
-1. Stage 0 locally → confirm `?test=1` overlay in OBS on your own machine.
-2. Register accounts 1–3 and 5 → deploy with `ECPAY_ENVIRONMENT=stage` + ECPay stage
-   test credentials → run staging preflight → complete a full stage-money
-   payment-to-OBS loop on the deployed URL.
-3. Apply for the real ECPay 特店 (the only step with external review time — start it
-   early, in parallel with everything else).
-4. Swap `ECPAY_ENVIRONMENT=production` + real billing credentials → one real NT$
-   payment as activation evidence (per ROADMAP.md's production gate) → recruit the
-   first external streamer.
+1. 先在本機完成階段 0 → 在自己的機器上以 OBS 確認 `?test=1` 疊加層可運作。
+2. 註冊第 1–3、5 項帳號 → 以 `ECPAY_ENVIRONMENT=stage` 與 ECPay 測試金鑰部署 →
+   執行 staging preflight → 在已部署的網址上完整跑一次測試金流的付款到 OBS 流程。
+3. 申請真正的 ECPay 特店（唯一需要等待外部審核的步驟 —— 及早開始申請，
+   與其他步驟並行進行）。
+4. 換成 `ECPAY_ENVIRONMENT=production` 與真實帳務金鑰 → 完成一筆真實新台幣付款
+   作為啟用證據（依 ROADMAP.md 的正式環境驗證關卡）→ 招募第一位外部實況主。

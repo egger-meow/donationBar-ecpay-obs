@@ -1,18 +1,20 @@
-# Production deployment
+# 正式環境部署
 
-DonationBar ships as a Node.js service and a production container. PostgreSQL and HTTPS are mandatory in production. The process fails startup when required configuration or PostgreSQL is unavailable; it never falls back to `db.json`.
+DonationBar 以 Node.js 服務與正式環境容器的形式部署。正式環境中 PostgreSQL 與 HTTPS
+為必要條件。若必要設定或 PostgreSQL 無法使用，啟動流程會直接失敗；絕不會回退使用
+`db.json`。
 
-## Required infrastructure
+## 所需基礎設施
 
-- A container or Node.js 20 runtime
-- PostgreSQL with automated backups and point-in-time recovery where available
-- An HTTPS reverse proxy that forwards `X-Forwarded-Proto`
-- A public, stable domain for OAuth and ECPay callbacks
-- Centralized application logs and an uptime monitor
+- 容器環境或 Node.js 20 執行環境
+- 具備自動備份與可用時支援時間點還原（point-in-time recovery）的 PostgreSQL
+- 會轉發 `X-Forwarded-Proto` 的 HTTPS 反向代理
+- 供 OAuth 與 ECPay callback 使用的公開穩定網域
+- 集中化的應用程式日誌與正常運行監控（uptime monitor）
 
-## Required configuration
+## 必要設定
 
-Start from `.env.example`. Production requires at least:
+以 `.env.example` 為起點。正式環境至少需要：
 
 ```dotenv
 NODE_ENV=production
@@ -31,27 +33,36 @@ BILLING_ECPAY_HASH_KEY=...
 BILLING_ECPAY_HASH_IV=...
 ```
 
-Streamer donation merchant credentials are entered per workspace. Never put streamer credentials in the platform billing variables. `npm run migrate` encrypts existing PostgreSQL provider credentials with `CREDENTIAL_ENCRYPTION_KEY`; store that key in a managed secret vault and preserve it in backups, because losing it prevents decryption.
+實況主的收款金鑰是逐工作區輸入的。切勿把實況主的金鑰放進平台帳務的環境變數。
+`npm run migrate` 會用 `CREDENTIAL_ENCRYPTION_KEY` 加密既有 PostgreSQL 中的金鑰；
+請將該金鑰保存在受管理的密鑰保管庫，並在備份中一併保留 —— 遺失這把金鑰會導致
+無法解密。
 
-## Encrypted backup and restore
+## 加密備份與還原
 
-Install PostgreSQL client tools (`pg_dump` and `pg_restore`) on the operations runner. Store a random 32-byte `BACKUP_ENCRYPTION_KEY` in the secret vault, separately from the backup files. Create a backup without overwriting an existing file:
+在維運用的執行環境上安裝 PostgreSQL 客戶端工具（`pg_dump` 與 `pg_restore`）。
+在密鑰保管庫中保存一組隨機 32 位元組的 `BACKUP_ENCRYPTION_KEY`，並與備份檔分開存放。
+在不覆蓋既有檔案的情況下建立備份：
 
 ```bash
 npm run backup -- backups/donationbar-2026-07-11.dump.enc
 ```
 
-Restore only into an explicitly selected database. The restore uses `--clean --if-exists` and is destructive, so it requires a deliberate confirmation variable:
+還原時只能指向明確選定的資料庫。還原動作使用 `--clean --if-exists`，具破壞性，
+因此需要明確的確認變數：
 
 ```bash
 ALLOW_DATABASE_RESTORE=yes npm run restore -- backups/donationbar-2026-07-11.dump.enc
 ```
 
-The restore authenticates the complete encrypted backup before invoking `pg_restore`, uses a private temporary dump, and removes it afterward. A wrong key or modified backup therefore fails before database changes begin.
+還原流程會先驗證整份加密備份，再呼叫 `pg_restore`，過程中使用私有的暫存 dump 檔，
+完成後即刪除。因此錯誤的金鑰或被竄改的備份檔，會在資料庫真正被變更之前就先失敗。
 
-Rehearse restoration on an isolated staging database after every schema release. Verify `/health/ready`, workspace/user counts, and one redacted donation and subscription record. Record duration and evidence, then delete the temporary database. A backup is not proven until this restore drill succeeds.
+每次 schema 發版後，都要在獨立的預備資料庫上演練還原流程。驗證
+`/health/ready`、工作區／使用者數量，以及至少一筆去識別化的捐款紀錄與訂閱紀錄。
+記錄耗時與證據，之後刪除該暫存資料庫。備份在通過這道還原演練之前都不算真正可靠。
 
-## Build and release
+## 建置與發版
 
 ```bash
 docker build -t donationbar:release .
@@ -59,43 +70,52 @@ docker run --rm --env-file .env donationbar:release npm run migrate
 docker run --env-file .env -p 3000:3000 donationbar:release
 ```
 
-Run `npm run migrate` as a release job before switching traffic to the new application version. Do not run multiple migration jobs concurrently.
+在切換流量到新版本之前，先以發版作業（release job）的形式執行 `npm run migrate`。
+不要同時併行執行多個 migration 作業。
 
-Configure probes:
+設定探測（probes）：
 
-- Liveness: `GET /health/live`
-- Readiness: `GET /health/ready`
+- Liveness：`GET /health/live`
+- Readiness：`GET /health/ready`
 
-Only readiness checks query PostgreSQL. Remove an instance from traffic whenever readiness returns HTTP 503.
+只有 readiness 檢查會查詢 PostgreSQL。只要 readiness 回傳 HTTP 503，就應將該實例移出
+流量。
 
-## Provider setup
+## 金流服務商設定
 
-Register these HTTPS endpoints with the platform billing merchant:
+向平台帳務用特店登記以下 HTTPS 端點：
 
-- Initial payment notification: `https://your-domain.example/ecpay/return`
-- Recurring payment notification: `https://your-domain.example/ecpay/period/callback`
+- 首次付款通知：`https://your-domain.example/ecpay/return`
+- 週期性付款通知：`https://your-domain.example/ecpay/period/callback`
 
-Set the Google OAuth callback to the exact `GOOGLE_CALLBACK_URL`. Perform the first release with ECPay stage credentials and `ECPAY_ENVIRONMENT=stage`; switch that variable to `production` only after signed callback, duplicate callback, simulated payment, cancellation, and failed-payment tests succeed.
+將 Google OAuth 的 callback 設為與 `GOOGLE_CALLBACK_URL` 完全一致的網址。
+第一次發版請使用 ECPay 測試金鑰並設定 `ECPAY_ENVIRONMENT=stage`；只有在完成
+簽章驗證、重複 callback、模擬付款、取消付款、付款失敗等測試都通過後，才將該變數
+切換為 `production`。
 
-## Backup and rollback
+## 備份與回退（Rollback）
 
-Before every database migration:
+每次資料庫 migration 之前：
 
-1. Create and verify a PostgreSQL snapshot.
-2. Record the application image tag and migration commit.
-3. Run the migration release job.
-4. Verify readiness, login, trial access, subscription checkout, donation checkout, and OBS overlay reconnect.
+1. 建立並驗證一份 PostgreSQL 快照。
+2. 記錄應用程式映像檔標籤（image tag）與 migration 的 commit。
+3. 執行 migration 發版作業。
+4. 驗證 readiness、登入、試用權限、訂閱結帳、捐款結帳、OBS 疊加層重新連線。
 
-The current migrations are additive and forward-compatible. Application rollback means redeploying the previous image while leaving the additive schema in place. If a migration causes data corruption, stop writes and restore the pre-migration PostgreSQL snapshot; do not attempt an ad-hoc down migration on live payment data.
+目前的 migration 皆為附加式（additive）且向前相容。應用程式回退指的是重新部署
+前一個映像檔，同時保留已附加的 schema 不變。若某次 migration 造成資料損毀，
+應立即停止寫入並還原 migration 前的 PostgreSQL 快照；不要對正式付款資料嘗試
+臨時拼湊的反向 migration。
 
-## Launch verification
+## 上線前驗證
 
-- `npm test` passes and `npm audit --omit=dev` reports no vulnerabilities.
-- Production startup fails when PostgreSQL or required secrets are missing.
-- Sessions survive application restarts and multiple instances.
-- ECPay stage payment activates exactly once; replaying the callback creates no second payment.
-- Cancellation succeeds at ECPay before local status changes.
-- Trial, paid, cancelled-through-period, and expired access rules are exercised.
-- OBS browser source loads with transparency, reconnects after interruption, and handles long localized text.
-- Desktop and mobile donation/admin pages are manually checked.
-- Alerts exist for readiness failures and recurring callback errors.
+- `npm test` 通過，且 `npm audit --omit=dev` 未回報漏洞。
+- 缺少 PostgreSQL 或必要金鑰時，正式環境啟動會直接失敗。
+- Session 在應用程式重啟與多實例情況下都能維持。
+- ECPay 測試付款只會啟用一次；重放（replay）同一筆 callback 不會建立第二筆付款。
+- 取消動作會先在 ECPay 端成功，才會更新本地狀態。
+- 試用、已付費、於週期中取消、已過期等各種存取狀態皆已驗證。
+- OBS 瀏覽器來源（Browser Source）能以透明背景載入，能在中斷後重新連線，並能處理
+  較長的在地化文字。
+- 桌面版與行動版的捐款／管理頁面皆已人工檢查。
+- Readiness 失敗與週期性 callback 錯誤都設有告警。
