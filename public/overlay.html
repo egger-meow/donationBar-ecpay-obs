@@ -360,11 +360,17 @@
       max-height: calc(100vh - 20px);
       box-sizing: border-box;
       overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
       text-align: center;
       visibility: hidden;
       margin: 0;
       will-change: transform, opacity;
     }
+
+    .donation-alert::-webkit-scrollbar { width: 6px; }
+    .donation-alert::-webkit-scrollbar-track { background: transparent; }
+    .donation-alert::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.25); border-radius: 3px; }
 
     .donation-alert.show {
       transform: translateX(-50%) translateY(0) scale(1);
@@ -419,10 +425,16 @@
       max-width: 100%;
       max-height: 30vh;
       overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
       word-wrap: break-word;
       overflow-wrap: anywhere;
       word-break: break-word;
     }
+
+    .alert-user-message::-webkit-scrollbar { width: 4px; }
+    .alert-user-message::-webkit-scrollbar-track { background: transparent; }
+    .alert-user-message::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.25); border-radius: 2px; }
 
     .alert-message {
       font-size: 13px;
