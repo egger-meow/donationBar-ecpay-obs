@@ -26,13 +26,22 @@ npm install
 npm run dev              # http://localhost:3000
 ```
 
-先看不需金流設定的示範疊加層：`http://localhost:3000/overlay?test=1`。
-
 要走完整的登入流程（本機也需要一組 Google OAuth 用戶端），照
 [COMPLETE_SETUP_GUIDE.md](COMPLETE_SETUP_GUIDE.md) 的「路徑 A」逐步做，包含
 `npm run migrate` 建立初始工作區，以及登入後在 `/admin/ecpay` 設定 ECPay 測試金鑰。
 
-✅ 完成判準：本機能登入、能看到 admin 後台、`?test=1` 疊加層正常顯示。
+**已知卡點：`npm run migrate` 建立的初始管理員帳號，訂閱方案是 `planType: 'free'`。
+`/overlay/:slug`、`/donate/:slug` 等路由由 `requireActiveSubscription`
+（[server.js](../../server.js)）在伺服器端把關，其允許清單是
+`['trial', 'free_pass', 'basic', 'pro', 'enterprise']` —— `'free'`
+不在清單內，所以剛跑完 migrate 的帳號會直接被導向「需要訂閱」畫面，連
+`/overlay?test=1` 都一樣，因為這個檢查發生在你的 `?test=1` 參數被讀到之前。**
+本機測試最快的解法：依 [EASTER_EGG.md](../features/EASTER_EGG.md) 描述的內建機制，
+在 admin 後台的「回饋建議」輸入指定字串，會把訂閱升級成 `planType: 'free_pass'`
+（無到期日、無需付款），之後所有付費牆路由就能正常存取。
+
+✅ 完成判準：本機能登入、能看到 admin 後台、訂閱方案不是 `free`、`?test=1`
+疊加層正常顯示。
 
 ---
 
