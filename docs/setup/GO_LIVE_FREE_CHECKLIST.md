@@ -74,8 +74,13 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"   # 
 | `ALERT_WEBHOOK_URL` | 選填；留空即停用 | 參見 [MONITORING_AND_INCIDENT_RESPONSE.md](../operations/MONITORING_AND_INCIDENT_RESPONSE.md) |
 | `ADMIN_EMAIL` / `ADMIN_USERNAME` / `ADMIN_DISPLAY_NAME` | 僅供 `npm run migrate` 用於初始化管理員 | — |
 
-Render 上的部署流程：build 階段 `npm ci`，pre-deploy 階段 `npm run migrate`，start 階段
-`npm start`。健康檢查端點：`/health/live`（liveness）、`/health/ready`（DB 連線檢查）。
+Render 的 Pre-Deploy Command 欄位只有付費方案的 instance type 才有——免費方案的
+Web Service 建立畫面根本不會出現這個欄位。免費方案請把 migration 併進 Build
+Command：**Build Command** 設為 `npm ci && npm run migrate`，**Start Command** 設為
+`npm start`。這樣做是安全的，因為 `npm run migrate` 的每個步驟都設計成附加式
+（additive）、可以重複執行；Render 的 Environment 分頁變數（包含 `DATABASE_URL`）
+在 build 階段就讀得到。健康檢查端點：`/health/live`（liveness）、`/health/ready`
+（DB 連線檢查）。
 部署完成後，從你自己的機器執行
 `npm run preflight:staging -- --base-url https://<app>.onrender.com`
 （參見 [STAGING_PREFLIGHT.md](../operations/STAGING_PREFLIGHT.md)）。

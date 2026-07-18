@@ -81,8 +81,11 @@ Render 的 Environment 分頁。此階段 `ECPAY_ENVIRONMENT` 設為 `stage`，
 
 ## 第 3 步：部署到 Render，跑一次完整的測試金流 🤝
 
-Render 部署流程：build `npm ci` → pre-deploy `npm run migrate` → start `npm start`。
-細節見 [DEPLOYMENT.md](DEPLOYMENT.md)「建置與發版」與「金流服務商設定」兩節（記得把
+Render 免費方案沒有 Pre-Deploy Command 欄位（那是付費 instance type 才有的功能）。
+**Build Command** 設為 `npm ci && npm run migrate`，**Start Command** 設為
+`npm start`——把 migration 併進 build 階段即可，細節見
+[GO_LIVE_FREE_CHECKLIST.md](GO_LIVE_FREE_CHECKLIST.md)。其他部署細節見
+[DEPLOYMENT.md](DEPLOYMENT.md)「建置與發版」與「金流服務商設定」兩節（記得把
 `https://<app>.onrender.com/ecpay/return` 與 `.../ecpay/period/callback` 這類回呼網址
 概念對應到你的 Render 網域）。
 
