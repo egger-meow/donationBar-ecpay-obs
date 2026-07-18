@@ -4,6 +4,7 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-07-19 — Fix bootstrap-workspace overlay/donate/webhook URL fields missing from fresh `npm run migrate`
 - 2026-07-16 — Move non-route modules into lib/, drop dead legacy backup files
 - 2026-07-16 — Actionable activation-checklist diagnostics, first slice (P1 diagnostics)
 - 2026-07-16 — Premium dark UI overhaul across all creator/viewer pages (P1 conversion)
@@ -58,6 +59,52 @@ delete a past entry — if something it describes later changes or turns out wro
 in a new entry instead. This file records *what happened*; it is not a priority list.
 For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edited in
 place as work completes or priorities shift.
+
+---
+
+## 2026-07-19 - Fix bootstrap-workspace overlay/donate/webhook URL fields missing from fresh `npm run migrate`
+
+Real bug, found while walking a fresh local setup end-to-end against the new
+[ZERO_TO_LAUNCH.md](setup/ZERO_TO_LAUNCH.md) guide. Two separate, stacked problems
+both surfaced as a blank white admin-panel overlay preview iframe:
+
+- `migrations/migrate.js`'s "no existing `db.json`, create fresh multi-user structure"
+  branch (the path a brand-new install actually takes) creates the workspace object
+  with `id`/`userId`/`workspaceName`/`slug`/`isActive`/`createdAt` only — it never sets
+  `donationUrl`/`overlayUrl`/`webhookUrl`. The sibling "migrate legacy single-user data"
+  branch a few lines above it does set those three fields, and the normal signup path
+  (`lib/database.js` `createWorkspace()`) also sets them — only this one fresh-install
+  branch was missing them. `GET /api/workspace/urls` in `server.js` does
+  `` `${baseUrl}${workspace.overlayUrl}` `` with no fallback, so a fresh install's
+  admin overlay-preview iframe `src` ends up literally
+  `http://localhost:3000undefined`, which fails to load and renders as a blank white
+  box — indistinguishable at a glance from a subscription/auth failure.
+- Separately (and this part is intentional, not a bug): the bootstrap admin's
+  subscription is `planType: 'free'`, which is not in `requireActiveSubscription`'s
+  allow-list (`['trial','free_pass','basic','pro','enterprise']`), so every route it
+  gates (`/overlay/:slug`, `/donate/:slug`, `/events`, `/progress`) redirects to
+  `/subscription-required.html` until the operator manually upgrades the plan (e.g. via
+  the existing `free_pass` mechanic in
+  [EASTER_EGG.md](features/EASTER_EGG.md)). This was already true before today; it just
+  compounded with the URL-field bug to make the blank iframe harder to diagnose since
+  both failure modes look the same in a browser.
+
+Fixed the workspace-object fields in `migrations/migrate.js` to match the other two
+creation paths, and backfilled the missing fields directly on the already-migrated
+local `db.json` this was found against (gitignored, local-only file — no migration
+needed for existing installs beyond re-running `npm run migrate` or adding the three
+fields by hand). Also corrected
+[ZERO_TO_LAUNCH.md](setup/ZERO_TO_LAUNCH.md) step 0, which had incorrectly claimed
+`/overlay?test=1` needs no financial/subscription setup.
+
+Verification: `npm test` passes (95/95, no test previously covered this field, none
+needed updating). Loaded `/overlay/default?test=1` in a real browser against the fixed
+code and confirmed the demo goal (37%, NT$18,500/NT$50,000) and demo donation alerts
+render — this route needs no login, so it exercises the `requireActiveSubscription`
+allow-list path but not the fixed `/api/workspace/urls` field directly; the field fix
+itself was verified by direct data inspection (`workspace.overlayUrl` was `undefined`
+before, present after) rather than a login-gated browser reproduction, since that route
+requires a real Google OAuth session.
 
 ---
 

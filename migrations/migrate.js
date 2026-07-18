@@ -744,6 +744,9 @@ async function migrateSandbox() {
           userId: adminUserId,
           workspaceName: 'Default Workspace',
           slug: 'default',
+          donationUrl: '/donate/default',
+          overlayUrl: '/overlay/default',
+          webhookUrl: '/webhook/default',
           isActive: true,
           createdAt: new Date().toISOString()
         }],
