@@ -10,6 +10,7 @@ test('CSP confines browser resources while allowing existing inline pages and EC
   assert.ok(directives.formAction.includes('https://payment.ecpay.com.tw'));
   assert.ok(directives.formAction.includes('https://payment-stage.ecpay.com.tw'));
   assert.ok(directives.scriptSrc.includes("'unsafe-inline'"), 'legacy inline scripts require this until nonce migration');
+  assert.deepEqual(directives.scriptSrcAttr, ["'unsafe-inline'"], "helmet defaults to script-src-attr 'none', which silently disables every inline onclick handler");
   assert.deepEqual(directives.upgradeInsecureRequests, []);
 });
 

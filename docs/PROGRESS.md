@@ -4,6 +4,7 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-07-19 — Fix CSP `script-src-attr 'none'` silently disabling every admin-panel button
 - 2026-07-19 — Fix bootstrap-workspace overlay/donate/webhook URL fields missing from fresh `npm run migrate`
 - 2026-07-16 — Move non-route modules into lib/, drop dead legacy backup files
 - 2026-07-16 — Actionable activation-checklist diagnostics, first slice (P1 diagnostics)
@@ -61,6 +62,34 @@ For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edit
 place as work completes or priorities shift.
 
 ---
+
+## 2026-07-19 - Fix CSP `script-src-attr 'none'` silently disabling every admin-panel button
+
+Real user-facing bug, reported as "捐款方式 / 訂閱方案 / 意見回饋 click no reaction" on
+the admin panel. Root cause: `lib/security-headers.js` sets
+`scriptSrc: ["'self'", "'unsafe-inline'"]` (so the page's inline `<script>` block runs
+and the panel initializes normally), but never sets `scriptSrcAttr`. Helmet merges
+custom directives with its defaults (`useDefaults: true`), and helmet's default is
+`script-src-attr 'none'` — which blocks inline event-handler *attributes* specifically.
+`admin.html` is the only page still using inline `onclick=` (25 occurrences: the three
+modal buttons, 重新整理, 登出, modal close buttons, etc.), so every one of those buttons
+rendered normally but did nothing when clicked, on every environment served by
+`server.js` since CSP was enabled on 2026-07-11. The other pages (donate/login/overlay)
+use `addEventListener`, which is why only the admin panel was affected.
+
+Fix: add `scriptSrcAttr: ["'unsafe-inline'"]` to `getHelmetOptions()` (consistent with
+the file's already-documented inline-script compromise, to be replaced together when the
+pages migrate off inline handlers), plus a regression assertion in
+`test/security-headers.test.js`.
+
+Verification: reproduced causally in a real browser — served the identical `admin.html`
+once with the old header (`script-src-attr 'none'`: real mouse click on 捐款方式 does
+nothing, modal never activates) and once without the restriction (same click opens the
+modal, `display:flex`, opacity animates to 1). Confirmed the running dev server now
+sends `script-src-attr 'unsafe-inline'` via curl. `npm test` passes (95/95 including the
+new assertion). Also styled the modal's scrollbar (`.modal-content`) with the same
+thin-scrollbar treatment given to overlay alerts earlier, replacing the boxy native
+Windows scrollbar visible in the opened modal.
 
 ## 2026-07-19 - Fix bootstrap-workspace overlay/donate/webhook URL fields missing from fresh `npm run migrate`
 
