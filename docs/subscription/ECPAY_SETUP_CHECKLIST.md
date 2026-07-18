@@ -51,13 +51,17 @@ BASE_URL=https://your-production-domain.com
 
 ### Step 3: ECPay 後台設定
 
-在 ECPay 商家後台設定：
+`ReturnURL` 與 `PeriodReturnURL` **不是**要在 ECPay 商家後台手動填寫的欄位——這兩個
+值是每次呼叫 ECPay API 時，由 `server.js` 自動帶入請求參數（依 `.env` 的
+`BASE_URL` 動態組成，見 `ReturnURL: \`${process.env.BASE_URL}/ecpay/return\`` 與
+`PeriodReturnURL: \`${process.env.BASE_URL}/ecpay/period/callback\``），只要
+`BASE_URL` 設定正確就會自動生效，不需要在 ECPay 後台另外設定。
 
-| 設定項目 | 值 |
-|----------|-----|
-| ReturnURL | `https://your-domain.com/ecpay/return` |
-| PeriodReturnURL | `https://your-domain.com/ecpay/period/callback` |
-| 信用卡定期定額 | ✅ 啟用 |
+唯一需要在 ECPay 商家後台實際處理的項目：
+
+| 設定項目 | 值 | 說明 |
+|----------|-----|-----|
+| 信用卡定期定額 | ✅ 啟用 | 這是帳號層級的功能開通，需向 ECPay 申請／等待審核，不是單純填一個網址欄位。僅平台自身的訂閱扣款（`BILLING_ECPAY_*`）需要這個功能；個別工作區的一般捐款流程不需要。 |
 
 ### Step 4: 切換到正式環境
 
