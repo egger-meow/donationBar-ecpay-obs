@@ -7,6 +7,7 @@ when; use it (and `git log`) as the source of truth over any single feature doc.
 
 ## Authoritative direction
 
+- [Zero to launch](setup/ZERO_TO_LAUNCH.md) — single linear checklist from local sandbox to first paying streamer, in Traditional Chinese; every other setup doc is reference material for one step of this path.
 - [Taiwan-first roadmap](../ROADMAP.md) — priorities, what's shipped vs. proven, next actions.
 - [Next direction](next-direction.md) — short framing of the current focus.
 - [Progress log](PROGRESS.md) — running, append-only record of what has shipped.
@@ -28,6 +29,7 @@ when; use it (and `git log`) as the source of truth over any single feature doc.
 ### 🔧 Setup & Configuration
 Location: `docs/setup/`
 
+- **[Zero to Launch](setup/ZERO_TO_LAUNCH.md)** - The one linear path from local sandbox to first paying streamer (中文)
 - **[Complete Setup Guide](setup/COMPLETE_SETUP_GUIDE.md)** - End-to-end setup
 - **[Go-Live Free Checklist](setup/GO_LIVE_FREE_CHECKLIST.md)** - Accounts to register, production env vars, and the NT$0-first path to deployment
 - **[Google OAuth Setup](setup/GOOGLE_OAUTH_SETUP.md)** - Google OAuth 2.0 config (the only supported login method)
@@ -95,7 +97,7 @@ Location: `docs/beta/`
 
 ### New to the project?
 1. [Main README](../README.md)
-2. [Complete Setup Guide](setup/COMPLETE_SETUP_GUIDE.md)
+2. [Zero to Launch](setup/ZERO_TO_LAUNCH.md) - follow this step by step
 3. [Database Schema](database/SCHEMA_MULTIUSER.md)
 
 ### Setting up subscriptions?
