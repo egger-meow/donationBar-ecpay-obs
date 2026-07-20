@@ -24,6 +24,7 @@ import { getHelmetOptions } from './lib/security-headers.js';
 import { createDonationTradeNo, createSubscriptionTradeNo } from './lib/trade-number.js';
 import { formatECPayDate } from './lib/ecpay-date.js';
 import { createTestDonationEvent } from './lib/donation-event.js';
+import { maybeActivateFreePass } from './lib/easter-egg.js';
 import { normalizeEcpayPaidDonation, normalizeEcpayReturn } from './providers/ecpay-donation-adapter.js';
 
 const app = express();
@@ -1331,8 +1332,22 @@ app.post('/api/feedback', requireAdmin, requireSameOrigin, async (req, res) => {
 
     logInfo('feedback_submitted', { type: feedback.type, messageLength: message.length });
 
-    // Easter egg: Secret free pass activation 🎁
-    const easterEggActivated = false;
+    // Easter egg: secret free-pass activation 🎁 (docs/features/EASTER_EGG.md).
+    // An upgrade failure must not fail the feedback submission itself.
+    let easterEggActivated = false;
+    try {
+      easterEggActivated = await maybeActivateFreePass({
+        database,
+        userId,
+        message,
+        feedbackId: feedback.id
+      });
+      if (easterEggActivated) {
+        logInfo('free_pass_granted', { source: 'easter_egg', request_id: req.requestId });
+      }
+    } catch (upgradeError) {
+      logError('easter_egg_upgrade_failed', { request_id: req.requestId });
+    }
 
     // Add regular audit log
     await database.addAuditLog({

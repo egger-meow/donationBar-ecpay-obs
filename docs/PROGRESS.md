@@ -4,6 +4,7 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-07-20 — Reinstate the free-pass feedback easter egg as a sanctioned, audited mechanic
 - 2026-07-19 — Fix CSP `script-src-attr 'none'` silently disabling every admin-panel button
 - 2026-07-19 — Fix bootstrap-workspace overlay/donate/webhook URL fields missing from fresh `npm run migrate`
 - 2026-07-16 — Move non-route modules into lib/, drop dead legacy backup files
@@ -62,6 +63,34 @@ For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edit
 place as work completes or priorities shift.
 
 ---
+
+## 2026-07-20 - Reinstate the free-pass feedback easter egg as a sanctioned, audited mechanic
+
+[EASTER_EGG.md](features/EASTER_EGG.md) described a secret feedback phrase that upgrades
+the submitting user to a permanent `free_pass` subscription, but the live code had the
+trigger hardcoded to `false`: the 2026-07-12 security pass removed it as a suspected
+backdoor and `test/subscription-security.test.js` asserted the phrase and grant action
+stayed out of `server.js`. The owner explicitly requested the mechanic be made real, so
+it was reinstated deliberately rather than by reverting:
+
+- Logic lives in a new `lib/easter-egg.js` (`maybeActivateFreePass`), not inline in the
+  route: exact case-sensitive match after trim, at most once per user (already-
+  `free_pass` users just submit feedback normally), no grant without a subscription
+  record, and every grant writes a `subscription.free_pass_granted` audit event with
+  `source: 'easter_egg'`. `POST /api/feedback` calls it in a try/catch so an upgrade
+  failure can never fail the feedback submission itself.
+- `test/subscription-security.test.js` was rewritten, not deleted: the invariant is now
+  "free-pass grants only happen through the audited easter-egg module" (no inline
+  phrase, grant action, or `planType: 'free_pass'` writes in `server.js`). New
+  `test/easter-egg.test.js` covers the grant, near-miss phrases, once-per-user,
+  missing-subscription, and database-failure paths against a fake database.
+- Caveat recorded in the feature doc: the repository is public, so the phrase is
+  effectively a rotatable promo code, not a secret or a security boundary.
+
+Verification: `npm test` passes (100/100, 5 new). Server boots with the new module and
+anonymous `POST /api/feedback` still 302s to `/login`; the full logged-in grant path is
+exercised by the unit tests (a browser end-to-end pass needs a real Google login, which
+automated verification here cannot perform).
 
 ## 2026-07-19 - Fix CSP `script-src-attr 'none'` silently disabling every admin-panel button
 

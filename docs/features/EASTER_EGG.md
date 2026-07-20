@@ -1,5 +1,13 @@
 # 🎁 Easter Egg: Free Pass Activation
 
+> **Status (2026-07-20): live.** Implemented in [lib/easter-egg.js](../../lib/easter-egg.js)
+> (`maybeActivateFreePass`), called from `POST /api/feedback` in `server.js`, covered by
+> `test/easter-egg.test.js`. The 2026-07-12 security pass had removed this as a suspected
+> backdoor; it was deliberately reinstated at the owner's request as a sanctioned,
+> audited mechanic. ⚠️ This repository is **public**, so the phrase below is not actually
+> secret — treat it as a rotatable promo code (change the constant in
+> `lib/easter-egg.js` to rotate it), never as a security boundary.
+
 ## Secret Mechanic
 
 A hidden Easter egg has been implemented that grants users a **permanent Free Pass** subscription.
