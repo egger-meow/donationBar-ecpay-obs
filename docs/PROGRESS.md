@@ -4,6 +4,7 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-07-21 — Tabbed admin dashboard IA for faster new-user onboarding
 - 2026-07-21 — Donation page banner image + custom donation-alert image/sound/voice
 - 2026-07-20 — Warn when a workspace's ECPay MerchantID is shared with another workspace
 - 2026-07-20 — Fix workspace ECPay credentials never being decrypted after read (P0 payment correctness)
@@ -66,6 +67,44 @@ For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edit
 place as work completes or priorities shift.
 
 ---
+
+## 2026-07-21 - Tabbed admin dashboard IA for faster new-user onboarding
+
+`/ui-ux-pro-max` request: admin.html had grown to ~12 cards (progress, goals, ECPay,
+overlay appearance, alert media, OBS setup, danger-zone reset, live preview, etc.) all
+dumped into one flat CSS grid with equal visual weight and no order — a brand-new
+streamer landed on a wall of unrelated forms with no indication of what to do first.
+Consulted the ui-ux-pro-max skill (`--domain ux "dashboard onboarding progressive
+disclosure information hierarchy"`, `--domain product "admin dashboard saas"`) for
+IA guidance; kept the existing dark theme/color tokens as-is (already coherent) and
+focused entirely on information architecture.
+
+Grouped the existing cards into 4 tabs — 總覽 (progress, goal, recent donations,
+activation checklist), 收款設定 (ECPay + donation banner), 斗內條與提醒 (overlay
+appearance, alert image/sound/voice, OBS setup, live preview), 帳號 (danger zone: reset
+progress, split out of the old combined "Admin Actions" card per the
+`destructive-nav-separation` guideline) — using a `data-tab` attribute per card plus a
+`switchTab()` toggler, rather than physically reordering ~1000 lines of existing HTML.
+This kept the change low-risk: every card's internal markup, IDs, and JS untouched, only
+an attribute added to its wrapping `<div>`.
+
+Two independent things can hide a `[data-tab]` element (inactive tab; the activation
+checklist's own "hide once complete" state) — resolved through one `applyTabVisibility()`
+function reading a `dataset.forceHidden` flag, instead of two pieces of code fighting over
+`style.display` directly. Checklist steps are now clickable buttons
+(`goToStep(tab, cardId)`) that jump to the right tab, scroll to the exact card, and pulse
+it — turning "go find the ECPay section yourself" into one click. Tabs with unresolved
+setup show a small badge dot (payment/overlay) so the gap is visible from any tab, not
+just when the checklist happens to be in view. Active tab persists in the URL hash for
+deep-linking/reload.
+
+Verification: `npm test` passes (113/113, including the existing inline-script-parses
+check). Manually exercised in the browser pane against a stubbed admin API (mixed
+completion state: ECPay done, OBS not connected) — confirmed each tab shows only its own
+cards via computed `display` values, the overlay-tab badge appears and the payment-tab
+badge doesn't, the OBS checklist step correctly jumps to and pulses `#obsSetupCard`, and
+the tab bar collapses to icon-only (with `aria-label`s for screen readers) at 375px width
+while staying ≥44px touch targets.
 
 ## 2026-07-21 - Donation page banner image + custom donation-alert image/sound/voice
 

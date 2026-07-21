@@ -381,6 +381,107 @@
 
     .quick-links .btn-danger { margin-left: auto; }
 
+    /* ===== Tab navigation ===== */
+    .tab-bar {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 24px;
+      background: var(--surface);
+      border-radius: 14px;
+      padding: 6px;
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--border);
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1 1 auto;
+      justify-content: center;
+      white-space: nowrap;
+      padding: 12px 18px;
+      min-height: 44px;
+      border: none;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 14.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.18s ease, color 0.18s ease;
+    }
+
+    .tab-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+    .tab-btn:hover {
+      background: var(--surface-2);
+      color: var(--text);
+    }
+
+    .tab-btn.active {
+      background: var(--accent-dim);
+      color: var(--accent);
+    }
+
+    .tab-btn .tab-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 999px;
+      background: var(--warning);
+      color: #1a1300;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    @media (max-width: 720px) {
+      .tab-btn { font-size: 13px; padding: 10px 12px; }
+      .tab-btn span.tab-label-full { display: none; }
+    }
+
+    .step-clickable {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 12px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14.5px;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.16s ease, border-color 0.16s ease;
+    }
+
+    .step-clickable:hover {
+      background: var(--surface-2);
+      border-color: var(--border);
+    }
+
+    .step-clickable .step-arrow {
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .step-clickable.step-done {
+      color: var(--text-muted);
+      cursor: default;
+    }
+
+    .step-clickable.step-done:hover { background: transparent; border-color: transparent; }
+    .step-clickable.step-done .step-arrow { display: none; }
+
     .alert {
       padding: 14px 18px;
       border-radius: 12px;
@@ -828,33 +929,71 @@
       <button class="btn btn-danger" onclick="logout()">登出</button>
     </div>
 
+    <!-- Section navigation: groups a long single-scroll page into 4 focused steps so a
+         brand-new streamer sees only what's relevant to the task at hand. -->
+    <nav class="tab-bar" id="tabBar" role="tablist" aria-label="管理後台區塊">
+      <button type="button" class="tab-btn" role="tab" data-tab-target="overview" aria-label="總覽" onclick="switchTab('overview')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-4"/></svg>
+        <span class="tab-label-full">總覽</span>
+      </button>
+      <button type="button" class="tab-btn" role="tab" data-tab-target="payment" aria-label="收款設定" onclick="switchTab('payment')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+        <span class="tab-label-full">收款設定</span>
+        <span class="tab-badge" id="tabBadgePayment" style="display:none;">!</span>
+      </button>
+      <button type="button" class="tab-btn" role="tab" data-tab-target="overlay" aria-label="斗內條與提醒" onclick="switchTab('overlay')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        <span class="tab-label-full">斗內條與提醒</span>
+        <span class="tab-badge" id="tabBadgeOverlay" style="display:none;">!</span>
+      </button>
+      <button type="button" class="tab-btn" role="tab" data-tab-target="account" aria-label="帳號" onclick="switchTab('account')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+        <span class="tab-label-full">帳號</span>
+      </button>
+    </nav>
+
     <div id="alertContainer"></div>
 
     <!-- Guided Activation Checklist -->
-    <div class="card" id="activationCard" style="margin-bottom: 30px; display: none;">
+    <div class="card" id="activationCard" data-tab="overview" data-force-hidden="1" style="margin-bottom: 30px;">
       <h2>開始使用檢查清單</h2>
-      <ul id="activationChecklist" style="list-style: none; padding: 0; margin: 15px 0 0;">
-        <li style="padding: 8px 0;">
-          <div id="activationStepEcpay">⬜ 設定 ECPay 收款方式</div>
+      <p style="color: var(--text-muted); font-size: 13.5px; margin-bottom: 4px;">
+        依序完成以下 4 步驟即可開始收款。點一下任一步驟會直接帶你到該去的地方。
+      </p>
+      <ul id="activationChecklist" style="list-style: none; padding: 0; margin: 8px 0 0;">
+        <li>
+          <button type="button" class="step-clickable" id="activationBtnEcpay" onclick="goToStep('payment', 'ecpayCard')">
+            <span id="activationStepEcpay">⬜ 設定 ECPay 收款方式</span>
+            <svg class="step-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
           <div class="step-hint" id="activationHintEcpay"></div>
         </li>
-        <li style="padding: 8px 0;">
-          <div id="activationStepObs">⬜ 在 OBS 加入斗內條 Browser Source</div>
+        <li>
+          <button type="button" class="step-clickable" id="activationBtnObs" onclick="goToStep('overlay', 'obsSetupCard')">
+            <span id="activationStepObs">⬜ 在 OBS 加入斗內條 Browser Source</span>
+            <svg class="step-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
           <div class="step-hint" id="activationHintObs"></div>
         </li>
-        <li style="padding: 8px 0;">
-          <div id="activationStepDonation">⬜ 完成第一筆付款（測試提示不會計入）</div>
+        <li>
+          <button type="button" class="step-clickable" id="activationBtnDonation" onclick="goToStep('payment', 'ecpayCard')">
+            <span id="activationStepDonation">⬜ 完成第一筆付款（測試提示不會計入）</span>
+            <svg class="step-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
           <div class="step-hint" id="activationHintDonation"></div>
         </li>
-        <li style="padding: 8px 0;">
-          <div id="activationStepAlert">⬜ 確認直播畫面有跳出即時提示</div>
+        <li>
+          <button type="button" class="step-clickable" id="activationBtnAlert" onclick="goToStep('overlay', 'overlayPreviewCard')">
+            <span id="activationStepAlert">⬜ 確認直播畫面有跳出即時提示</span>
+            <svg class="step-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
           <div class="step-hint" id="activationHintAlert"></div>
         </li>
       </ul>
     </div>
 
     <!-- User Info & Subscription Status -->
-    <div class="card" style="margin-bottom: 30px;">
+    <div class="card" data-tab="overview" style="margin-bottom: 30px;">
       <div class="user-info" id="userInfo">
         <div class="user-avatar" id="userAvatar">A</div>
         <div class="user-details">
@@ -873,7 +1012,7 @@
 
     <div class="dashboard">
       <!-- Current Progress -->
-      <div class="card">
+      <div class="card" data-tab="overview">
         <h2>當前進度</h2>
         <div class="stats-grid">
           <div class="stat-item">
@@ -902,7 +1041,7 @@
       </div>
 
       <!-- Goal Settings -->
-      <div class="card">
+      <div class="card" data-tab="overview">
         <h2>目標設定</h2>
         <form id="goalForm">
           <div class="form-group">
@@ -930,7 +1069,7 @@
       </div>
 
       <!-- Donation Page Banner -->
-      <div class="card">
+      <div class="card" data-tab="payment">
         <h2>捐款頁面形象橫幅</h2>
         <div class="form-group">
           <label for="bannerImageInput">收款網址形象橫幅</label>
@@ -949,7 +1088,7 @@
       </div>
 
       <!-- Recent Donations -->
-      <div class="card">
+      <div class="card" data-tab="overview">
         <h2>最近捐款</h2>
         <div class="donations-list" id="donationsList">
           <div style="text-align: center; color: #a0a0a0; padding: 20px;">
@@ -959,7 +1098,7 @@
       </div>
 
       <!-- ECPay Configuration -->
-      <div class="card">
+      <div class="card" id="ecpayCard" data-tab="payment">
         <h2>ECPay 金流設定</h2>
         <div class="alert alert-info"
           style="margin-bottom: 20px;">
@@ -997,7 +1136,7 @@
 
 
       <!-- Overlay Settings -->
-      <div class="card">
+      <div class="card" data-tab="overlay">
         <h2>斗內條外觀設定</h2>
         <form id="overlaySettingsForm">
           <div class="form-group">
@@ -1112,7 +1251,7 @@
       </div>
 
       <!-- Donation Alert Media -->
-      <div class="card">
+      <div class="card" data-tab="overlay">
         <h2>捐款動畫與音效</h2>
 
         <div class="form-group">
@@ -1141,36 +1280,38 @@
         </div>
       </div>
 
-      <!-- Admin Actions -->
-      <div class="card">
-        <h2>管理操作</h2>
-        <div style="display: flex; flex-direction: column; gap: 15px;">
-          <button class="btn btn-danger" onclick="resetProgress()">
-            重置進度（清空所有捐款記錄）
-          </button>
-
-          <div style="margin-top: 20px;">
-            <h3 style="margin-bottom: 15px; color: #e0e0e0;">OBS 設定</h3>
-            <p style="color: #a0a0a0; margin-bottom: 10px;">
-              在 OBS 中添加 Browser Source，使用以下 URL：
-            </p>
-            <div style="background: var(--bg); padding: 15px; border-radius: 10px; border: 1px solid var(--border-strong);">
-              <code id="obsUrl" style="color: var(--accent); word-break: break-all;"></code>
-            </div>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px;">
-              <button class="btn btn-secondary" type="button" onclick="copyObsUrl()">複製 OBS URL</button>
-              <button class="btn btn-info" type="button" onclick="openObsTest()">開啟測試提示</button>
-              <button class="btn btn-accent" type="button" onclick="sendObsTestAlert()">發送到 OBS</button>
-            </div>
-            <p style="color: #a0a0a0; margin-top: 10px; font-size: 14px;">
-              建議尺寸：900 x 150 pixels，啟用透明背景。先貼入 OBS，再按「發送到 OBS」；15 分鐘內確認畫面可看到測試斗內，再進行真實付款。
-            </p>
-          </div>
+      <!-- OBS Setup -->
+      <div class="card" id="obsSetupCard" data-tab="overlay">
+        <h2>OBS 設定</h2>
+        <p style="color: #a0a0a0; margin-bottom: 10px;">
+          在 OBS 中添加 Browser Source，使用以下 URL：
+        </p>
+        <div style="background: var(--bg); padding: 15px; border-radius: 10px; border: 1px solid var(--border-strong);">
+          <code id="obsUrl" style="color: var(--accent); word-break: break-all;"></code>
         </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px;">
+          <button class="btn btn-secondary" type="button" onclick="copyObsUrl()">複製 OBS URL</button>
+          <button class="btn btn-info" type="button" onclick="openObsTest()">開啟測試提示</button>
+          <button class="btn btn-accent" type="button" onclick="sendObsTestAlert()">發送到 OBS</button>
+        </div>
+        <p style="color: #a0a0a0; margin-top: 10px; font-size: 14px;">
+          建議尺寸：900 x 150 pixels，啟用透明背景。先貼入 OBS，再按「發送到 OBS」；15 分鐘內確認畫面可看到測試斗內，再進行真實付款。
+        </p>
+      </div>
+
+      <!-- Danger Zone: destructive actions kept out of the main setup flow -->
+      <div class="card" data-tab="account">
+        <h2>危險操作</h2>
+        <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 13.5px;">
+          此操作無法復原，請謹慎使用。
+        </p>
+        <button class="btn btn-danger" onclick="resetProgress()">
+          重置進度（清空所有捐款記錄）
+        </button>
       </div>
 
       <!-- Overlay Preview -->
-      <div class="card full-width">
+      <div class="card full-width" id="overlayPreviewCard" data-tab="overlay">
         <h2>斗內條即時預覽</h2>
         <p style="color: #a0a0a0; margin-bottom: 15px;">
           以下是您的斗內條即時預覽。調整設定後會自動反映在此預覽中。
@@ -1335,6 +1476,56 @@
   </div>
 
   <script>
+    // ===== Section tabs =====
+    // Groups the long single-scroll page into 4 focused steps (overview / payment /
+    // overlay / account) so a brand-new user only sees what's relevant to the task at
+    // hand. Visibility for a [data-tab] element depends on two independent things: does
+    // its tab match the active one, AND is it separately force-hidden (only used by the
+    // activation checklist, which must stay hidden once complete regardless of tab).
+    // Both are resolved through this one function so they can never fight each other.
+    let currentTab = 'overview';
+    const VALID_TABS = ['overview', 'payment', 'overlay', 'account'];
+
+    function applyTabVisibility() {
+      document.querySelectorAll('[data-tab]').forEach(el => {
+        const matchesTab = el.dataset.tab === currentTab;
+        const forceHidden = el.dataset.forceHidden === '1';
+        el.style.display = (matchesTab && !forceHidden) ? '' : 'none';
+      });
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        const active = btn.dataset.tabTarget === currentTab;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+    }
+
+    function switchTab(tab, options = {}) {
+      if (!VALID_TABS.includes(tab)) tab = 'overview';
+      currentTab = tab;
+      applyTabVisibility();
+      if (history.replaceState) history.replaceState(null, '', `#${tab}`);
+      if (options.focusId) {
+        const target = document.getElementById(options.focusId);
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          pulseCard(target, 'success');
+        }
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+
+    // Jump straight to the relevant tab + card from an activation-checklist step.
+    function goToStep(tab, focusId) {
+      switchTab(tab, { focusId });
+    }
+
+    (function initialTab() {
+      const hashTab = window.location.hash.replace('#', '');
+      currentTab = VALID_TABS.includes(hashTab) ? hashTab : 'overview';
+      applyTabVisibility();
+    })();
+
     // Elements
     const alertContainer = document.getElementById('alertContainer');
     const goalForm = document.getElementById('goalForm');
@@ -2671,9 +2862,23 @@
         ? '' : steps.liveAlertDelivered.done
           ? '' : '已收到付款，但尚未確認畫面跳出提示 → 開啟 OBS 檢查來源是否可見、瀏覽器來源是否已重新整理過';
 
+      // Completed steps are no longer actionable, so stop inviting clicks on them.
+      document.getElementById('activationBtnEcpay').classList.toggle('step-done', steps.ecpayConfigured.done);
+      document.getElementById('activationBtnObs').classList.toggle('step-done', steps.obsConnected.done);
+      document.getElementById('activationBtnDonation').classList.toggle('step-done', steps.firstDonation.done);
+      document.getElementById('activationBtnAlert').classList.toggle('step-done', steps.liveAlertDelivered.done);
+
+      // Surface unfinished setup directly on the tab bar so it's visible from any tab,
+      // not just when the checklist itself happens to be in view.
+      document.getElementById('tabBadgePayment').style.display = steps.ecpayConfigured.done ? 'none' : '';
+      document.getElementById('tabBadgeOverlay').style.display = steps.obsConnected.done ? 'none' : '';
+
       // Hide the checklist once every step is complete, so returning users aren't
-      // nagged after they're fully activated.
-      document.getElementById('activationCard').style.display = allDone ? 'none' : '';
+      // nagged after they're fully activated. Goes through the shared tab-visibility
+      // resolver (dataset.forceHidden) instead of touching style.display directly, so
+      // this never fights with switchTab() over who owns the element's visibility.
+      document.getElementById('activationCard').dataset.forceHidden = allDone ? '1' : '0';
+      applyTabVisibility();
     }
 
     function withTimeout(promise, ms, name) {
