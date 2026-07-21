@@ -1075,10 +1075,10 @@
           <label for="bannerImageInput">收款網址形象橫幅</label>
           <input type="file" id="bannerImageInput" accept="image/jpeg,image/png,image/gif">
           <div style="font-size: 12px; color: #a0a0a0; margin-top: 8px;">
-            請上傳 920×130px 圖片，檔案格式限 JPG、GIF、PNG，大小不得超過 5MB，以確保顯示品質。此圖片會顯示在捐款頁面最上方。
+            建議上傳寬幅圖片（例如 920×130px 或相近比例），檔案格式限 JPG、GIF、PNG，大小不得超過 5MB。此圖片會顯示在捐款頁面最上方，非此比例的圖片會自動裁切置中以符合橫幅版面。
           </div>
           <img id="bannerImagePreview" alt="橫幅預覽"
-            style="display:none; margin-top: 12px; max-width: 100%; border-radius: 8px; border: 1px solid var(--border);">
+            style="display:none; margin-top: 12px; width: 100%; aspect-ratio: 920 / 130; object-fit: cover; object-position: center; border-radius: 8px; border: 1px solid var(--border); background: var(--bg);">
           <div style="display: flex; gap: 10px; margin-top: 12px;">
             <button type="button" class="btn btn-primary" id="bannerUploadBtn" onclick="uploadBannerImage()">上傳</button>
             <button type="button" class="btn btn-secondary" id="bannerResetBtn" onclick="resetBannerImage()">回復預設</button>
