@@ -4,6 +4,8 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-07-20 — Warn when a workspace's ECPay MerchantID is shared with another workspace
+- 2026-07-20 — Fix workspace ECPay credentials never being decrypted after read (P0 payment correctness)
 - 2026-07-20 — Reinstate the free-pass feedback easter egg as a sanctioned, audited mechanic
 - 2026-07-19 — Fix CSP `script-src-attr 'none'` silently disabling every admin-panel button
 - 2026-07-19 — Fix bootstrap-workspace overlay/donate/webhook URL fields missing from fresh `npm run migrate`
@@ -63,6 +65,72 @@ For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edit
 place as work completes or priorities shift.
 
 ---
+
+## 2026-07-20 - Warn when a workspace's ECPay MerchantID is shared with another workspace
+
+Follow-up to a user question about a group of streamers sharing one ECPay merchant
+account across separate DonationBar workspaces (separate Google logins). Our own
+`/donate/:slug` page is fine to share (every order it creates embeds the workspace slug
+server-side, so callbacks always land on the right workspace regardless of shared
+credentials). "Method 2" (方法二：ECPay Webhook, `admin.html`'s 捐款方式 modal) is not:
+that field is ECPay's `付款完成通知回傳網址`, configured **once per ECPay merchant
+account** in ECPay's own dashboard, not per order. If N workspaces share one merchant
+and each pastes their own `/webhook/<slug>` there, only the last one saved actually
+takes effect — every group member's Method-2 donations then get silently misattributed
+to whichever one slug is currently registered, since `/webhook/:slug` trusts the slug in
+the URL path with no way to know who the buyer actually paid.
+
+Added a warning, not a block (this is a legitimate use case for an actual group, just
+one with a real footgun): `GET /admin/ecpay` now returns `sharedMerchantId: true` when
+`database.isEcpayMerchantIdSharedWithOtherWorkspace(workspaceId, merchantId)` finds the
+same MerchantID configured on any other workspace. `admin.html` shows a persistent
+warning box under the ECPay credentials form when true, and a short caution note inside
+the Method 2 modal card, both explaining to use 方法一 (the hosted donation page) only
+when sharing an account.
+
+Verification: `npm test` passes (105/105). Manually exercised
+`isEcpayMerchantIdSharedWithOtherWorkspace` end-to-end against a throwaway sandbox
+db.json (isolated from the real repo db.json by running from a different working
+directory) with two workspaces on the same MerchantID — confirmed both are flagged
+`true` and an unrelated MerchantID is `false`.
+
+## 2026-07-20 - Fix workspace ECPay credentials never being decrypted after read (P0 payment correctness)
+
+Found while building the merchant-ID sharing check above, which needed to compare
+decrypted MerchantIDs across workspaces. `lib/database.js`'s `getPaymentProvider` — the
+only read path for a workspace's ECPay credentials, used to sign every donation order
+and verify every webhook — never called `decryptCredential`. In production Postgres,
+`payment_providers.merchant_id/hash_key/hash_iv` are always stored as `enc:v1:...`
+ciphertext (`upsertPaymentProvider` and `migrations/encrypt-provider-credentials.js`
+both always encrypt on write), so `getECPayCredentials()` in `server.js` was handing the
+raw ciphertext string to `generateCheckMacValueForCredentials` as if it were the real
+MerchantID/HashKey/HashIV. Any real donation through a production Postgres-backed
+workspace would send a garbage MerchantID to ECPay, and any real ECPay webhook would
+fail the `merchantIdOk` check (ECPay's real MerchantID compared against our ciphertext
+blob). Sandbox/JSON mode never hit this because `db.json` stores plaintext directly —
+this is why it went unnoticed through all the sandbox testing done in earlier sessions.
+
+Separately, `lib/database.js`'s `findUserByEmail` had a `decryptCredential` call on
+`provider.merchantId/hashKey/hashIV` — fields that don't exist on the `users` table
+schema at all (confirmed against `migrations/migrate.js`'s `CREATE TABLE users`).
+Harmless (decrypts `undefined` to `''`) but actively misleading dead code that looked
+like the real decrypt path; removed.
+
+Fix: added `decryptProviderCredentials()` (new `lib/payment-provider-credentials.js`,
+kept out of `database.js` so it and the sharing-check comparison logic can be unit
+tested without importing `database.js` and instantiating the live `Database()`
+singleton, which can attempt a real Postgres connection as an import-time side effect
+when `DATABASE_URL` is set) and call it from both `getPaymentProvider` and
+`upsertPaymentProvider`'s Postgres branches. Decrypt failures propagate (matching this
+file's existing intentional fail-loud design for unencrypted legacy data) rather than
+being swallowed, since this is the path that signs real money-moving requests.
+
+Verification: `npm test` passes (105/105 including 5 new tests covering the
+encrypt/decrypt round trip, empty/null fields, and tamper detection). Could not exercise
+the Postgres branch itself against a live database in this session; the fix was verified
+by unit-testing the exact row-transform function `getPaymentProvider` now calls, plus
+reading `camelCaseKeys` to confirm `merchant_id` → `merchantId` mapping lines up with
+what the decrypt function expects.
 
 ## 2026-07-20 - Reinstate the free-pass feedback easter egg as a sanctioned, audited mechanic
 

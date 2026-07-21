@@ -966,6 +966,14 @@
           <button type="submit" class="btn btn-primary" id="ecpaySubmitBtn">更新 ECPay 設定</button>
           <div class="form-feedback" id="ecpayFeedback"></div>
         </form>
+        <div id="ecpaySharedWarning"
+          style="display: none; background: var(--warning-dim); border: 1px solid rgba(251, 191, 36, 0.35); color: var(--warning); padding: 12px 14px; border-radius: 8px; margin-top: 14px; font-size: 13px; line-height: 1.6;">
+          ⚠️ <strong>共用 ECPay 商店代號：</strong>這個商店代號 (MerchantID) 已經被平台上另一個工作區使用。
+          ECPay 的「付款完成通知回傳網址」（意見回饋按鈕旁的「捐款方式」→ 方法二：ECPay Webhook）是<strong>商店帳號層級</strong>的單一設定，
+          同一個商店代號在 ECPay 後台只能填一組網址——如果你們其中多人都各自貼上自己的 Webhook 網址，只有最後儲存的那個會生效，
+          其他人的捐款通知會被送到那一個工作區，導致進度條/斗內提醒對錯人。
+          <strong>共用同一組 ECPay 憑證時，請所有人只使用「方法一：捐款頁面」，不要使用方法二。</strong>
+        </div>
       </div>
 
 
@@ -1208,6 +1216,10 @@
             <h3 style="color: #46e65a; margin-bottom: 15px;">🔗 方法二：ECPay Webhook</h3>
             <p style="color: #e0e0e0; margin-bottom: 15px; line-height: 1.6;">
               如果您已經有自己的商店或捐款方式，可以在 ECPay 商店後台設定 Webhook，讓系統自動接收付款通知並更新進度條。
+            </p>
+            <p style="color: var(--warning, #fbbf24); margin-bottom: 15px; font-size: 12px; line-height: 1.6;">
+              ⚠️ 若這個 ECPay 商店代號與其他人共用，請勿使用此方法——ECPay 後台的通知網址是帳號層級單一設定，
+              只有其中一人的網址會生效，其他人的捐款通知會送錯地方。詳見下方「ECPay 金流設定」的共用提醒。
             </p>
             <div
               style="background: var(--bg); padding: 12px; border-radius: 10px; border: 1px solid var(--border-strong); margin-bottom: 15px;">
@@ -1783,6 +1795,11 @@
         hashIVInput.placeholder = data.hashIV || '請輸入 ECPay HashIV';
         // Set value for merchantId to show current value
         merchantIdInput.value = data.merchantId || '';
+
+        const sharedWarning = document.getElementById('ecpaySharedWarning');
+        if (sharedWarning) {
+          sharedWarning.style.display = data.sharedMerchantId ? 'block' : 'none';
+        }
       } catch (error) {
         console.error('Failed to load ECPay credentials:', error);
       }

@@ -1715,10 +1715,14 @@ app.get('/admin/ecpay', requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Workspace not found' });
     }
     const credentials = await getECPayCredentials(workspace.id);
+    const sharedMerchantId = credentials.merchantId
+      ? await database.isEcpayMerchantIdSharedWithOtherWorkspace(workspace.id, credentials.merchantId)
+      : false;
     res.json({
       merchantId: credentials.merchantId || '',
       hashKey: credentials.hashKey ? '••••••••' : '',
-      hashIV: credentials.hashIV ? '••••••••' : ''
+      hashIV: credentials.hashIV ? '••••••••' : '',
+      sharedMerchantId
     });
   } catch (error) {
     logError('admin_ecpay_credentials_fetch_failed', { request_id: req.requestId });
