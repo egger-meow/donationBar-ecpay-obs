@@ -4,6 +4,7 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-07-21 — Donation page banner image + custom donation-alert image/sound/voice
 - 2026-07-20 — Warn when a workspace's ECPay MerchantID is shared with another workspace
 - 2026-07-20 — Fix workspace ECPay credentials never being decrypted after read (P0 payment correctness)
 - 2026-07-20 — Reinstate the free-pass feedback easter egg as a sanctioned, audited mechanic
@@ -65,6 +66,55 @@ For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edit
 place as work completes or priorities shift.
 
 ---
+
+## 2026-07-21 - Donation page banner image + custom donation-alert image/sound/voice
+
+`/goal` request: let users upload a photo for their donation page, and add an alert
+system similar to a competitor's (custom animation image, custom sound effect + volume,
+and a spoken voice readout of the sponsor message), based on two reference screenshots
+of that competitor's admin panel.
+
+No object storage (S3/Cloudinary/etc.) exists in this app, so uploads are validated then
+stored as `data:` URLs inside the workspace's existing `overlay_settings` JSONB column
+(already free-form JSON in both the Postgres and JSON-sandbox backends) rather than
+adding a new table/column — this keeps the change to route handlers and a small
+validation module, with zero schema migration. `lib/media-upload.js` is new and
+dependency-free (no `database.js` import, matching the pattern set by
+`payment-provider-credentials.js`): it validates that a value is a `data:` URL with an
+allowlisted image (jpeg/png/gif) or audio (mpeg/wav/ogg/webm) MIME type and base64
+payload, and rejects anything over 5MB.
+
+Three new admin-only routes read-modify-write the relevant `overlaySettings` key:
+`POST /admin/donation-banner` (`donationBannerImage`, rendered on `/donate/:slug`),
+`POST /admin/alert-image` (`alertImage`, shown in the OBS donation-alert popup), and
+`POST /admin/alert-sound` (`alertCustomSound`, played instead of the built-in beep).
+Each accepts `null` to reset back to default. `/admin/overlay` gained three more small
+fields: `alertSoundVolume`, `alertVoiceEnabled`, `alertVoiceVolume`.
+
+Base64 image/audio payloads don't fit Express's 100kb default JSON body limit, so a
+larger 8mb `bodyParser.json()` is scoped to just those three paths (via a path-checking
+middleware ahead of the global parser) instead of raising the global limit and widening
+the DoS surface for every other route.
+
+Voice readout uses the browser's built-in `speechSynthesis` (Web Speech API) on
+overlay.html — no external TTS service or paid API needed. `showDonationAlert()` now
+waits for the configured sound to finish (`audio.onended`) before speaking, matching the
+reference behavior ("after the animation sound finishes, read the message aloud").
+
+`donationBannerImage` is stripped from both `GET /overlay-settings` and the SSE
+`overlay-settings` broadcast (a new `forOverlayClient()` helper) — overlay.html has no
+use for the donate-page banner, and skipping it keeps that payload from ballooning with
+an unrelated multi-MB blob on every appearance-only settings change.
+
+Verification: `npm test` passes (113/113), including a new `test/media-upload.test.js`
+(format/size/reset validation, all pure-function, no `database.js` import). Manually
+exercised the full loop against a stubbed admin/overlay/progress server in the browser
+pane: uploaded a banner + alert image + alert sound via direct API calls, reloaded
+`admin.html` and confirmed all three previews and the voice/volume settings loaded back
+correctly; confirmed the banner renders on `donate.html`; confirmed `overlay.html`'s
+`?test=1` demo mode shows the custom alert image, sets the custom `<audio>` element's
+`src` to the uploaded sound, and — with a `speechSynthesis.speak` spy installed — calls
+it with the expected donor/amount/message text after the sound alert fires.
 
 ## 2026-07-20 - Warn when a workspace's ECPay MerchantID is shared with another workspace
 

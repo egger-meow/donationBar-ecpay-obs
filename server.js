@@ -25,6 +25,7 @@ import { createDonationTradeNo, createSubscriptionTradeNo } from './lib/trade-nu
 import { formatECPayDate } from './lib/ecpay-date.js';
 import { createTestDonationEvent } from './lib/donation-event.js';
 import { maybeActivateFreePass } from './lib/easter-egg.js';
+import { MAX_MEDIA_BYTES, validateAudioDataUrl, validateImageDataUrl } from './lib/media-upload.js';
 import { normalizeEcpayPaidDonation, normalizeEcpayReturn } from './providers/ecpay-donation-adapter.js';
 
 const app = express();
@@ -70,7 +71,16 @@ app.use(bodyParser.urlencoded({
     req.rawFormBody = Buffer.from(buffer);
   }
 }));
-app.use(bodyParser.json());
+// Media upload routes carry base64 image/audio data URLs (up to MAX_MEDIA_BYTES, which
+// is ~33% larger once base64-encoded), so they need a much higher body limit than every
+// other JSON route. Scope the larger limit to just those admin-only, authenticated paths
+// instead of raising the global default and widening the DoS surface for everything else.
+const MEDIA_UPLOAD_PATHS = ['/admin/donation-banner', '/admin/alert-image', '/admin/alert-sound'];
+app.use((req, res, next) => {
+  if (MEDIA_UPLOAD_PATHS.includes(req.path)) return next();
+  return bodyParser.json()(req, res, next);
+});
+app.use(MEDIA_UPLOAD_PATHS, bodyParser.json({ limit: '8mb' }));
 
 // Session middleware
 const PgSession = connectPgSimple(session);
@@ -429,6 +439,14 @@ async function broadcastProgress(workspaceId = null, transientDonationEvent = nu
   }
 }
 
+// donationBannerImage belongs to /donate, not the OBS overlay — drop it before sending
+// overlay settings to overlay.html so a multi-MB banner isn't pushed to every browser
+// source on unrelated appearance changes.
+function forOverlayClient(overlaySettings) {
+  const { donationBannerImage, ...rest } = overlaySettings || {};
+  return rest;
+}
+
 async function broadcastOverlaySettings(workspaceId = null) {
   try {
     if (!workspaceId) {
@@ -441,7 +459,7 @@ async function broadcastOverlaySettings(workspaceId = null) {
     }
 
     const settings = await database.getWorkspaceSettings(workspaceId);
-    const payload = `event: overlay-settings\ndata: ${JSON.stringify(settings?.overlaySettings || {})}\n\n`;
+    const payload = `event: overlay-settings\ndata: ${JSON.stringify(forOverlayClient(settings?.overlaySettings))}\n\n`;
 
     // Only broadcast to clients watching this specific workspace
     for (const [res, client] of sseClients.entries()) {
@@ -613,7 +631,8 @@ async function getProgress(workspaceId = null) {
     goal,
     percent,
     donations: displayDonations,
-    latestDonation: progress.donations[0] || null
+    latestDonation: progress.donations[0] || null,
+    bannerImage: progress.overlaySettings?.donationBannerImage || null
   };
 }
 
@@ -1849,6 +1868,15 @@ app.post('/admin/overlay', requireAdmin, requireSameOrigin, async (req, res) => 
     if (typeof settings.alertSound === 'boolean') {
       overlaySettings.alertSound = settings.alertSound;
     }
+    if (typeof settings.alertSoundVolume === 'number') {
+      overlaySettings.alertSoundVolume = Math.max(0, Math.min(100, settings.alertSoundVolume));
+    }
+    if (typeof settings.alertVoiceEnabled === 'boolean') {
+      overlaySettings.alertVoiceEnabled = settings.alertVoiceEnabled;
+    }
+    if (typeof settings.alertVoiceVolume === 'number') {
+      overlaySettings.alertVoiceVolume = Math.max(0, Math.min(100, settings.alertVoiceVolume));
+    }
     if (typeof settings.donationDisplayMode === 'string') {
       const validModes = ['top', 'latest', 'hidden'];
       if (validModes.includes(settings.donationDisplayMode)) {
@@ -1872,13 +1900,83 @@ app.post('/admin/overlay', requireAdmin, requireSameOrigin, async (req, res) => 
   }
 });
 
+// Shared handler for the 3 media-upload routes below: validates a base64 data URL (or
+// clears the field when dataUrl is empty/null, used by the admin UI's "revert to
+// default" buttons), then read-modify-writes it into the workspace's overlaySettings.
+async function handleMediaUpload(req, res, { bodyKey, settingsKey, validate, broadcast, failureEvent }) {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
+
+    let validated;
+    try {
+      validated = validate(req.body?.[bodyKey]);
+    } catch (validationError) {
+      return res.status(400).json({ success: false, error: validationError.message });
+    }
+
+    const currentSettings = await database.getWorkspaceSettings(workspace.id);
+    const overlaySettings = currentSettings?.overlaySettings || {};
+    if (validated) {
+      overlaySettings[settingsKey] = validated;
+    } else {
+      delete overlaySettings[settingsKey];
+    }
+    await database.updateWorkspaceSettings(workspace.id, { overlaySettings });
+
+    if (broadcast) {
+      await broadcastOverlaySettings(workspace.id);
+    }
+
+    res.json({ success: true, [settingsKey]: overlaySettings[settingsKey] || null });
+  } catch (error) {
+    logError(failureEvent, { request_id: req.requestId });
+    res.status(500).json({ success: false, error: 'internal_error' });
+  }
+}
+
+// Donation page banner image (rendered on /donate/:slug, not the OBS overlay).
+app.post('/admin/donation-banner', requireAdmin, requireSameOrigin, async (req, res) => {
+  await handleMediaUpload(req, res, {
+    bodyKey: 'imageDataUrl',
+    settingsKey: 'donationBannerImage',
+    validate: (value) => validateImageDataUrl(value, { maxBytes: MAX_MEDIA_BYTES }),
+    broadcast: false,
+    failureEvent: 'admin_donation_banner_update_failed'
+  });
+});
+
+// Custom image shown inside the OBS donation-alert popup.
+app.post('/admin/alert-image', requireAdmin, requireSameOrigin, async (req, res) => {
+  await handleMediaUpload(req, res, {
+    bodyKey: 'imageDataUrl',
+    settingsKey: 'alertImage',
+    validate: (value) => validateImageDataUrl(value, { maxBytes: MAX_MEDIA_BYTES }),
+    broadcast: true,
+    failureEvent: 'admin_alert_image_update_failed'
+  });
+});
+
+// Custom sound effect played when the OBS donation-alert popup shows.
+app.post('/admin/alert-sound', requireAdmin, requireSameOrigin, async (req, res) => {
+  await handleMediaUpload(req, res, {
+    bodyKey: 'audioDataUrl',
+    settingsKey: 'alertCustomSound',
+    validate: (value) => validateAudioDataUrl(value, { maxBytes: MAX_MEDIA_BYTES }),
+    broadcast: true,
+    failureEvent: 'admin_alert_sound_update_failed'
+  });
+});
+
 // Overlay settings endpoint for overlay.html - supports slug query parameter
 app.get('/overlay-settings', requireActiveSubscription, async (req, res) => {
   try {
     const { slug } = req.query;
     const workspace = await getWorkspaceFromSlug(slug);
     const settings = await database.getWorkspaceSettings(workspace?.id);
-    res.json(settings?.overlaySettings || {});
+    res.json(forOverlayClient(settings?.overlaySettings));
   } catch (error) {
     logError('overlay_settings_fetch_failed', { request_id: req.requestId });
     res.json({});

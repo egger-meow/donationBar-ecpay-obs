@@ -87,6 +87,14 @@
       font-size: 14.5px;
     }
 
+    .donation-banner {
+      display: none;
+      width: 100%;
+      border-radius: 16px;
+      margin-bottom: 26px;
+      border: 1px solid var(--border);
+    }
+
     /* ===== Progress hero ===== */
     .progress-preview {
       background: var(--surface);
@@ -371,6 +379,8 @@
       <span>付款過程中發生錯誤，請重試。若持續失敗，可換一張卡或稍後再試。</span>
     </div>
 
+    <img id="donationBanner" class="donation-banner" alt="">
+
     <section class="progress-preview" id="progressPreview" aria-live="polite">
       <div class="progress-title">
         <strong id="goalTitle">載入中…</strong>
@@ -438,6 +448,7 @@
     const workspaceSlug = getWorkspaceSlug();
 
     // Elements
+    const donationBanner = document.getElementById('donationBanner');
     const form = document.getElementById('donationForm');
     const amountInput = document.getElementById('amount');
     const amountButtons = document.querySelectorAll('.amount-btn');
@@ -478,6 +489,14 @@
       progressPercent.textContent = Number(data.percent) || 0;
       progressFill.style.width = `${percent}%`;
       progressTrack.setAttribute('aria-valuenow', String(percent));
+
+      if (data.bannerImage) {
+        donationBanner.src = data.bannerImage;
+        donationBanner.style.display = 'block';
+      } else {
+        donationBanner.removeAttribute('src');
+        donationBanner.style.display = 'none';
+      }
     }
 
     // Load current progress
