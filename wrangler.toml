@@ -1,6 +1,6 @@
 name = "donatio"
 main = "src/worker.js"
-compatibility_date = "2024-09-23"
+compatibility_date = "2026-08-22"
 compatibility_flags = ["nodejs_compat"]
 
 # Static Assets served directly by Cloudflare edge
@@ -11,32 +11,39 @@ binding = "ASSETS"
 # Default non-secret runtime configuration
 [vars]
 ENVIRONMENT = "staging"
-BASE_URL = "https://donatio.jjmowlab.com"
-GOOGLE_CALLBACK_URL = "https://donatio.jjmowlab.com/api/auth/google/callback"
+BASE_URL = "https://donatio-staging.jjmowlab.com"
+GOOGLE_CALLBACK_URL = "https://donatio-staging.jjmowlab.com/api/auth/google/callback"
 ECPAY_ENVIRONMENT = "stage"
 NODE_ENV = "production"
 
-# Hyperdrive binding for PostgreSQL connection acceleration and pooling
-# Run `npx wrangler hyperdrive create donatio-db --connection-string="<postgres-url>"` to obtain the ID
+# Top-level Hyperdrive binding for local/default development
 [[hyperdrive]]
 binding = "HYPERDRIVE"
 id = "HYPERDRIVE_CONFIG_ID"
 
-# Staging Environment
+# Staging Environment (Deploy first: npx wrangler deploy --env staging)
 [env.staging]
 name = "donatio-staging"
+routes = [
+  { pattern = "donatio-staging.jjmowlab.com", custom_domain = true }
+]
 [env.staging.vars]
 ENVIRONMENT = "staging"
-BASE_URL = "https://donatio.jjmowlab.com"
-GOOGLE_CALLBACK_URL = "https://donatio.jjmowlab.com/api/auth/google/callback"
+BASE_URL = "https://donatio-staging.jjmowlab.com"
+GOOGLE_CALLBACK_URL = "https://donatio-staging.jjmowlab.com/api/auth/google/callback"
 ECPAY_ENVIRONMENT = "stage"
 NODE_ENV = "production"
 
-# Production Environment
+# Hyperdrive bindings are non-inheritable across named environments
+[[env.staging.hyperdrive]]
+binding = "HYPERDRIVE"
+id = "HYPERDRIVE_STAGING_CONFIG_ID"
+
+# Production Environment (Deploy after staging verification passes: npx wrangler deploy --env production)
 [env.production]
 name = "donatio-production"
 routes = [
-  { pattern = "donatio.jjmowlab.com/*", custom_domain = true }
+  { pattern = "donatio.jjmowlab.com", custom_domain = true }
 ]
 [env.production.vars]
 ENVIRONMENT = "production"
@@ -44,3 +51,8 @@ BASE_URL = "https://donatio.jjmowlab.com"
 GOOGLE_CALLBACK_URL = "https://donatio.jjmowlab.com/api/auth/google/callback"
 ECPAY_ENVIRONMENT = "production"
 NODE_ENV = "production"
+
+# Hyperdrive bindings are non-inheritable across named environments
+[[env.production.hyperdrive]]
+binding = "HYPERDRIVE"
+id = "HYPERDRIVE_PRODUCTION_CONFIG_ID"

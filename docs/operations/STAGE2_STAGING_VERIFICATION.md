@@ -1,25 +1,27 @@
 # Stage 2: Cloudflare Staging Deployment & Verification Runbook
 
 **Product:** Donatio (斗內條)  
-**Target Domain:** `https://donatio.jjmowlab.com` (Production) / Cloudflare Staging Worker URL  
+**Staging Domain:** `https://donatio-staging.jjmowlab.com`  
+**Production Domain:** `https://donatio.jjmowlab.com`  
 **Date:** 2026-08-22  
-**Status:** Verification Runbook  
+**Status:** Staging-First Verification Runbook  
 
 ---
 
 ## 1. Prerequisites Checklist
 
 Before executing this verification checklist, ensure:
-- [ ] Cloudflare Worker `donatio` is deployed.
-- [ ] Hyperdrive binding `HYPERDRIVE` is configured and connected to PostgreSQL.
-- [ ] Production secrets (`SESSION_SECRET`, `CREDENTIAL_ENCRYPTION_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`) are provisioned via `wrangler secret put`.
+- [ ] Cloudflare Worker staging is deployed: `npx wrangler deploy --env staging`
+- [ ] Hyperdrive binding `HYPERDRIVE` is configured in `[env.staging.hyperdrive]` and connected to PostgreSQL.
+- [ ] Staging secrets (`SESSION_SECRET`, `CREDENTIAL_ENCRYPTION_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`) are provisioned via `npx wrangler secret put <KEY> --env staging`.
+- [ ] Staging custom domain `donatio-staging.jjmowlab.com` is attached in Cloudflare Worker settings.
 - [ ] Database migrations have run against the target PostgreSQL instance (`npm run migrate`).
 
 ---
 
 ## 2. Automated & HTTP Verification Steps
 
-Replace `<STAGING_URL>` with your staging worker domain (e.g. `https://donatio-staging.<account>.workers.dev` or `https://donatio.jjmowlab.com`).
+Use staging URL `https://donatio-staging.jjmowlab.com` (or your staging worker URL).
 
 ### Test 1: Health Live Check
 Verify that the Cloudflare Worker runtime is active.

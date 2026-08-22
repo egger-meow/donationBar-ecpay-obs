@@ -18,18 +18,25 @@ test('wrangler.toml is valid and contains required Cloudflare Workers configurat
   assert.match(config, /name\s*=\s*"donatio"/);
   assert.match(config, /main\s*=\s*"src\/worker\.js"/);
   assert.match(config, /compatibility_flags\s*=\s*\["nodejs_compat"\]/);
-  assert.match(config, /compatibility_date/);
+  assert.match(config, /compatibility_date\s*=\s*"2026-08-22"/);
   
   // Static assets binding
   assert.match(config, /\[assets\]/);
   assert.match(config, /directory\s*=\s*"\.\/public"/);
   
-  // Hyperdrive binding
+  // Explicit per-environment Hyperdrive bindings (non-inheritable)
   assert.match(config, /\[\[hyperdrive\]\]/);
-  assert.match(config, /binding\s*=\s*"HYPERDRIVE"/);
+  assert.match(config, /\[\[env\.staging\.hyperdrive\]\]/);
+  assert.match(config, /\[\[env\.production\.hyperdrive\]\]/);
   
-  // Production custom domain
-  assert.match(config, /donatio\.jjmowlab\.com/);
+  // Staging and production custom domains
+  assert.match(config, /pattern\s*=\s*"donatio-staging\.jjmowlab\.com"/);
+  assert.match(config, /pattern\s*=\s*"donatio\.jjmowlab\.com"/);
+  assert.doesNotMatch(config, /donatio\.jjmowlab\.com\/\*/, 'Custom domain must not include wildcard path');
+
+  // Staging URLs
+  assert.match(config, /BASE_URL\s*=\s*"https:\/\/donatio-staging\.jjmowlab\.com"/);
+  assert.match(config, /GOOGLE_CALLBACK_URL\s*=\s*"https:\/\/donatio-staging\.jjmowlab\.com\/api\/auth\/google\/callback"/);
 });
 
 test('canonical brand and domain constants are correctly exported in config', () => {
