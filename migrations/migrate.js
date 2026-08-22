@@ -12,8 +12,8 @@ const __dirname = path.resolve();
 
 console.log('🔄 Starting migration to multi-user schema...\n');
 
-const isSandbox = process.env.ENVIRONMENT === 'sandbox';
 const databaseUrl = process.env.DATABASE_URL;
+const isSandbox = process.env.ENVIRONMENT === 'sandbox' && !databaseUrl;
 
 if (!isSandbox && !databaseUrl) {
   console.log('⚠️  No DATABASE_URL found. For sandbox mode, set ENVIRONMENT=sandbox');

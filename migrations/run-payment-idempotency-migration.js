@@ -7,7 +7,7 @@ import { databaseSsl } from '../lib/database-ssl.js';
 const { Client } = pg;
 const databaseUrl = process.env.DATABASE_URL;
 
-if (process.env.ENVIRONMENT === 'sandbox') {
+if (process.env.ENVIRONMENT === 'sandbox' && !databaseUrl) {
   console.log('Payment idempotency migration is not needed for JSON sandbox storage.');
   process.exit(0);
 }

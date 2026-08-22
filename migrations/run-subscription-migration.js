@@ -15,8 +15,8 @@ const __dirname = path.resolve();
 
 console.log('🔄 Running Subscription System Migration\n');
 
-const isSandbox = process.env.ENVIRONMENT === 'sandbox';
 const databaseUrl = process.env.DATABASE_URL;
+const isSandbox = process.env.ENVIRONMENT === 'sandbox' && !databaseUrl;
 
 if (isSandbox) {
   console.log('✅ Sandbox mode detected');

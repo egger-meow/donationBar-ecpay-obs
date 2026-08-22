@@ -4,7 +4,7 @@ import { encryptCredential, isEncryptedCredential } from '../lib/credentials.js'
 import { databaseSsl } from '../lib/database-ssl.js';
 
 const { Client } = pg;
-if (process.env.ENVIRONMENT === 'sandbox') process.exit(0);
+if (process.env.ENVIRONMENT === 'sandbox' && !process.env.DATABASE_URL) process.exit(0);
 if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required to encrypt provider credentials');
 
 const client = new Client({
