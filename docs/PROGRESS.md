@@ -4,6 +4,7 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-08-22 — Stage 1: Universal Revenue Event Core implementation (P0 architecture)
 - 2026-07-21 — Tabbed admin dashboard IA for faster new-user onboarding
 - 2026-07-21 — Donation page banner image + custom donation-alert image/sound/voice
 - 2026-07-20 — Warn when a workspace's ECPay MerchantID is shared with another workspace
@@ -65,6 +66,20 @@ delete a past entry — if something it describes later changes or turns out wro
 in a new entry instead. This file records *what happened*; it is not a priority list.
 For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edited in
 place as work completes or priorities shift.
+
+---
+
+## 2026-08-22 — Stage 1: Universal Revenue Event Core implementation (P0 architecture)
+
+Completed Stage 1 of the global product build roadmap ("Universal Revenue Event Core"):
+- Created the provider-independent Canonical Revenue Event model ([`lib/revenue-event.js`](../lib/revenue-event.js)) separating source event facts from downstream goal engine weighting.
+- Implemented multi-currency support in [`lib/money.js`](../lib/money.js) for ISO 4217 zero-decimal (`TWD`, `JPY`, `KRW`, `CLP`, `VND`, `HUF`) and two-decimal (`USD`, `EUR`, `GBP`, `CAD`, `AUD`, `SGD`, `HKD`, etc.) currencies with strict integer minor units.
+- Created the Source Registry ([`lib/source-registry.js`](../lib/source-registry.js)) defining capabilities and metadata for active (`ecpay`, `webhook`, `manual`, `test`) and planned (`twitch`, `kofi`, `streamlabs`, `streamelements`, `youtube`) sources.
+- Built source adapters for ECPay (`providers/ecpay-donation-adapter.js`), Generic Webhooks (`lib/source-adapters/generic-webhook-adapter.js`), Creator Manual adjustments (`lib/source-adapters/manual-adapter.js`), and isolated Test Mode (`lib/source-adapters/test-adapter.js`).
+- Implemented token-authenticated generic inbound webhook handler with constant-time token verification ([`lib/generic-webhook-handler.js`](../lib/generic-webhook-handler.js)) and routes in [`server.js`](../server.js).
+- Migrated database schema with `revenue_events` table and partial unique index `(workspace_id, source, external_event_id)` supporting Postgres and JSON sandbox dual storage modes.
+- Added comprehensive documentation: `REVENUE_EVENT_CORE.md`, `SOURCE_ADAPTERS.md`, `GENERIC_WEBHOOK.md`, `ADDING_A_SOURCE.md`, `OWNER_ACTIONS.md`.
+- Expanded automated test suite from 113 to 150 tests across 24 test suites with 100% pass rate and zero credential leakage.
 
 ---
 

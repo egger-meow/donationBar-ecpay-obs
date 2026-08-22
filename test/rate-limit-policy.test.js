@@ -5,6 +5,7 @@ import { GENERAL_RATE_LIMIT, PROVIDER_CALLBACK_RATE_LIMIT, isProviderCallbackPat
 test('provider callback paths are isolated from the general rate-limit bucket', () => {
   assert.equal(isProviderCallbackPath('/webhook'), true);
   assert.equal(isProviderCallbackPath('/webhook/creator'), true);
+  assert.equal(isProviderCallbackPath('/api/webhook/generic/creator'), true);
   assert.equal(isProviderCallbackPath('/ecpay/period/callback'), true);
   assert.equal(isProviderCallbackPath('/create-order'), false);
   assert.equal(isProviderCallbackPath('/events'), false);

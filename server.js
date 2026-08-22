@@ -26,7 +26,12 @@ import { formatECPayDate } from './lib/ecpay-date.js';
 import { createTestDonationEvent } from './lib/donation-event.js';
 import { maybeActivateFreePass } from './lib/easter-egg.js';
 import { MAX_MEDIA_BYTES, validateAudioDataUrl, validateImageDataUrl } from './lib/media-upload.js';
-import { normalizeEcpayPaidDonation, normalizeEcpayReturn } from './providers/ecpay-donation-adapter.js';
+import { normalizeEcpayPaidDonation, normalizeEcpayPaidRevenueEvent, normalizeEcpayReturn, normalizeEcpayReturnRevenueEvent } from './providers/ecpay-donation-adapter.js';
+import { normalizeGenericWebhookPayload } from './lib/source-adapters/generic-webhook-adapter.js';
+import { extractWebhookToken, processGenericWebhook } from './lib/generic-webhook-handler.js';
+import { createManualRevenueEvent } from './lib/source-adapters/manual-adapter.js';
+import { createTestRevenueEvent } from './lib/source-adapters/test-adapter.js';
+import { getActiveSources, getSourceDefinition } from './lib/source-registry.js';
 
 const app = express();
 const __dirname = path.resolve();
@@ -52,6 +57,7 @@ const providerCallbackRateLimiter = rateLimit({
   legacyHeaders: false
 });
 app.use('/webhook', providerCallbackRateLimiter);
+app.use('/api/webhook/generic', providerCallbackRateLimiter);
 app.use('/ecpay/period/callback', providerCallbackRateLimiter);
 app.use(requestObservability);
 
@@ -999,6 +1005,13 @@ app.post('/success', async (req, res) => {
   if (ok) {
     // Safe fallback: add donation here too (idempotent via trade number)
     await addDonation(workspace.id, normalizeEcpayReturn(p, { providerRecordId: provider?.id }));
+    const returnRevenueEvent = normalizeEcpayReturnRevenueEvent(p, {
+      workspaceId: workspace.id,
+      providerRecordId: provider?.id
+    });
+    if (returnRevenueEvent) {
+      await database.addRevenueEvent(workspace.id, returnRevenueEvent);
+    }
     logInfo('success_post_donation_added');
 
     // Redirect to workspace-specific donate page
@@ -1114,6 +1127,16 @@ app.post('/webhook/:slug', async (req, res) => {
     });
     if (!donationEvent) return res.send('1|OK');
     const donationAdded = await addDonation(workspace.id, donationEvent);
+
+    const revenueEvent = normalizeEcpayPaidRevenueEvent({
+      workspaceId: workspace.id,
+      orderInfo,
+      decryptedData,
+      providerRecordId: provider?.id
+    });
+    if (revenueEvent) {
+      await database.addRevenueEvent(workspace.id, revenueEvent);
+    }
 
     if (donationAdded) {
       logInfo('payment_webhook_donation_processed', { request_id: req.requestId });
@@ -1280,12 +1303,169 @@ app.get('/api/workspace/urls', requireAdmin, async (req, res) => {
         overlay: `${baseUrl}${workspace.overlayUrl}`,
         donate: `${baseUrl}${workspace.donationUrl}`,
         webhook: `${baseUrl}${workspace.webhookUrl}`,
+        genericWebhook: `${baseUrl}/api/webhook/generic/${workspace.slug}`,
         slug: workspace.slug
       }
     });
   } catch (error) {
     logError('workspace_urls_fetch_failed', { request_id: req.requestId });
     res.status(500).json({ error: 'Failed to get workspace URLs' });
+  }
+});
+
+// =============================================
+// UNIVERSAL REVENUE EVENT CORE ROUTES
+// =============================================
+
+// Get active revenue sources and capabilities
+app.get('/api/sources', (req, res) => {
+  const sources = getActiveSources().map(s => ({
+    id: s.id,
+    name: s.name,
+    type: s.type,
+    description: s.description,
+    capabilities: s.capabilities
+  }));
+  res.json({ status: 'success', sources });
+});
+
+// Generic Inbound Webhook (Token-Authenticated)
+app.post('/api/webhook/generic/:slug', async (req, res) => {
+  logInfo('generic_webhook_received', { request_id: req.requestId, slug: req.params.slug });
+
+  try {
+    const { slug } = req.params;
+    const authToken = extractWebhookToken(req.headers);
+
+    const result = await processGenericWebhook({
+      slug,
+      authToken,
+      body: req.body,
+      requestId: req.requestId,
+      database
+    });
+
+    if (result.workspaceId && !result.wasDuplicate) {
+      await broadcastProgress(result.workspaceId);
+    }
+
+    return res.status(result.statusCode).json(result.body);
+  } catch (error) {
+    logError('generic_webhook_unexpected_error', { request_id: req.requestId });
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get current generic webhook token for workspace
+app.get('/api/workspace/webhook-token', requireAdmin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+    const token = await database.getGenericWebhookToken(workspace.id);
+    return res.json({ status: 'success', token });
+  } catch (error) {
+    logError('get_webhook_token_failed', { request_id: req.requestId });
+    return res.status(500).json({ error: 'Failed to retrieve webhook token' });
+  }
+});
+
+// Rotate generic webhook token for workspace
+app.post('/api/workspace/webhook-token/rotate', requireAdmin, requireSameOrigin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+    const token = await database.rotateGenericWebhookToken(workspace.id);
+    logInfo('webhook_token_rotated', { workspace_id: workspace.id });
+    return res.json({ status: 'success', token });
+  } catch (error) {
+    logError('rotate_webhook_token_failed', { request_id: req.requestId });
+    return res.status(500).json({ error: 'Failed to rotate webhook token' });
+  }
+});
+
+// Create manual revenue event (authenticated creator)
+app.post('/api/events/manual', requireAdmin, requireSameOrigin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+    const { amount, currency, quantity, type, supporter, message, metadata } = req.body || {};
+    const event = createManualRevenueEvent({
+      workspaceId: workspace.id,
+      amountMinor: amount,
+      currency,
+      quantity,
+      type,
+      supporter,
+      message,
+      metadata
+    });
+
+    const result = await database.addRevenueEvent(workspace.id, event);
+    await broadcastProgress(workspace.id);
+    return res.status(201).json({ status: 'success', event: result.event });
+  } catch (error) {
+    logWarn('create_manual_event_failed', { error: error.message });
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+// Create/trigger test revenue event (authenticated creator)
+app.post('/api/events/test', requireAdmin, requireSameOrigin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+    const { amount, currency, quantity, type, supporter, message, externalId, persist = false } = req.body || {};
+    const event = createTestRevenueEvent({
+      workspaceId: workspace.id,
+      amountMinor: amount !== undefined ? amount : 100,
+      currency: currency || 'TWD',
+      quantity,
+      type: type || 'test',
+      supporter: supporter || 'Tester',
+      message: message || 'Test contribution',
+      externalId: externalId || null
+    });
+
+    if (persist) {
+      await database.addRevenueEvent(workspace.id, event);
+      await broadcastProgress(workspace.id);
+    } else {
+      // Broadcast transient test event to OBS without corrupting totals
+      await broadcastProgress(workspace.id, {
+        externalId: event.id,
+        amount: event.amount?.valueMinor ?? 0,
+        payer: event.supporter?.displayName || 'Tester',
+        message: event.message || ''
+      });
+    }
+
+    return res.json({ status: 'success', event });
+  } catch (error) {
+    logWarn('create_test_event_failed', { error: error.message });
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+// Query revenue event history (authenticated creator)
+app.get('/api/events', requireAdmin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+    const { limit, offset, source, isSynthetic } = req.query;
+    const events = await database.getWorkspaceRevenueEvents(workspace.id, {
+      limit: limit ? parseInt(limit, 10) : 50,
+      offset: offset ? parseInt(offset, 10) : 0,
+      source: source || null,
+      isSynthetic: isSynthetic !== undefined ? (isSynthetic === 'true' || isSynthetic === '1') : null
+    });
+
+    return res.json({ status: 'success', events });
+  } catch (error) {
+    logError('get_events_history_failed', { request_id: req.requestId });
+    return res.status(500).json({ error: 'Failed to retrieve events history' });
   }
 });
 
@@ -1450,6 +1630,13 @@ app.post('/ecpay/return', async (req, res) => {
 
   if (validMac && success && mine) {
     await addDonation(workspace.id, normalizeEcpayReturn(p, { providerRecordId: provider?.id }));
+    const returnRevenueEvent = normalizeEcpayReturnRevenueEvent(p, {
+      workspaceId: workspace.id,
+      providerRecordId: provider?.id
+    });
+    if (returnRevenueEvent) {
+      await database.addRevenueEvent(workspace.id, returnRevenueEvent);
+    }
     logInfo('ecpay_return_donation_added');
     return res.send('1|OK');
   }

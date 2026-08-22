@@ -7,6 +7,7 @@ test('browser-initiated state-changing routes require same-origin protection', a
   const providerOrNavigationRoutes = new Set([
     '/success',
     '/webhook/:slug',
+    '/api/webhook/generic/:slug',
     '/subscription/success',
     '/ecpay/return',
     '/ecpay/period/callback'

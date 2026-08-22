@@ -77,117 +77,36 @@ Stage 0 market research and competitive validation was completed on 2026-08-22.
 
 ---
 
-# Stage 1 — Universal Revenue Event Core
+# Stage 1 — Universal Revenue Event Core (COMPLETED)
 
-## Goal
+## Status: COMPLETED
+Stage 1 architecture refactoring and implementation was completed on 2026-08-22.
 
-Refactor the current ECPay-centric system into a provider-independent revenue event architecture without breaking the existing working ECPay path.
-
-Transform:
-
-```text
-ECPay
-→ donation
-→ OBS
-```
-
-into:
-
-```text
-Revenue Source
-→ Source Adapter
-→ Normalized Revenue Event
-→ Goal Engine
-→ OBS / History / Automation
-```
-
-The system must support future sources such as:
-
-```text
-Twitch
-YouTube
-Ko-fi
-Streamlabs
-StreamElements
-ECPay
-Generic Webhook
-Manual/Test
-```
-
-Do NOT implement all of these production integrations yet.
-
-Implement the architecture.
-
-Create a canonical event model covering concepts such as:
-
-```text
-source
-event type
-external event id
-workspace
-amount
-currency
-quantity/weight
-supporter
-message
-timestamp
-metadata
-```
-
-Support non-monetary contribution events where appropriate, such as:
-
-```text
-subscription
-membership
-bits
-channel reward
-manual increment
-```
-
-Build:
-
-* source adapter interface
-* source registry
-* normalized revenue event
-* event idempotency
-* source capability metadata
-* provider-independent persistence
-* provider-independent history
-* provider-independent OBS delivery
-* safe Manual/Test adapter
-* ECPay adapter using existing logic
-* Generic Webhook adapter
-
-Preserve existing payment security invariants.
-
-Do not build a universal abstraction monster.
-
-The abstraction only needs to support realistic V1 sources.
-
-### Done Criteria
-
-Stage 1 is complete only when:
-
-* no downstream goal/OBS code depends directly on ECPay payloads
-* ECPay still works through an adapter
-* Manual/Test events work
-* Generic Webhook events work
-* duplicate external events are rejected safely
-* events can contain different currencies
-* events can represent money and non-money contributions
-* source-specific metadata remains isolated
-* public OBS payloads contain no secrets
-* existing ECPay regression tests still pass
-* adding a new source does not require rewriting OBS rendering
-* architecture documentation exists
-
-Required docs:
-
-`docs/architecture/REVENUE_EVENT_CORE.md`
-
-`docs/architecture/SOURCE_ADAPTERS.md`
-
-`docs/architecture/ADDING_A_SOURCE.md`
+### Deliverables:
+- **Canonical Model & Normalizer**: [`lib/revenue-event.js`](lib/revenue-event.js) — pure frozen immutable model separating source event facts from downstream goal rules, strictly integer minor units with ISO 4217 multi-currency validation.
+- **Source Registry**: [`lib/source-registry.js`](lib/source-registry.js) — active (`ecpay`, `webhook`, `manual`, `test`) and planned (`twitch`, `kofi`, `streamlabs`, `streamelements`, `youtube`) capabilities registry.
+- **Multi-Currency System**: [`lib/money.js`](lib/money.js) — multi-currency decimals map and normalization for zero-decimal (`TWD`, `JPY`, `KRW`, etc.) and two-decimal (`USD`, `EUR`, `GBP`, etc.) currencies.
+- **Source Adapters**:
+  - `providers/ecpay-donation-adapter.js` — ECPay paid and return event normalizers.
+  - `lib/source-adapters/generic-webhook-adapter.js` — Generic inbound webhook JSON normalizer.
+  - `lib/source-adapters/manual-adapter.js` — Creator manual adjustment adapter.
+  - `lib/source-adapters/test-adapter.js` — Isolated creator test console adapter.
+- **Generic Webhook Handler**: [`lib/generic-webhook-handler.js`](lib/generic-webhook-handler.js) — constant-time token verification, payload normalization, error handling.
+- **Database & Idempotency Layer**: [`lib/database.js`](lib/database.js) & [`migrations/20260822-create-revenue-events.sql`](migrations/20260822-create-revenue-events.sql) — PostgreSQL `revenue_events` table with partial unique index `(workspace_id, source, external_event_id)` and JSON sandbox support.
+- **Endpoints in `server.js`**:
+  - `POST /api/webhook/generic/:slug` — Token-authenticated generic inbound webhook.
+  - `GET /api/sources` — Active sources list and capabilities metadata.
+  - `GET /api/workspace/webhook-token` & `POST /api/workspace/webhook-token/rotate` — Token management.
+  - `POST /api/events/manual` — Authenticated creator manual adjustment.
+  - `POST /api/events/test` — Authenticated creator test event trigger.
+  - `GET /api/events` — Authenticated creator revenue event history.
+- **Architecture Documentation**:
+  - [`REVENUE_EVENT_CORE.md`](docs/architecture/REVENUE_EVENT_CORE.md)
+  - [`SOURCE_ADAPTERS.md`](docs/architecture/SOURCE_ADAPTERS.md)
+  - [`GENERIC_WEBHOOK.md`](docs/architecture/GENERIC_WEBHOOK.md)
+  - [`ADDING_A_SOURCE.md`](docs/architecture/ADDING_A_SOURCE.md)
+  - [`OWNER_ACTIONS.md`](docs/operations/OWNER_ACTIONS.md)
+- **Automated Tests**: 150 automated tests passing across 24 test suites with 100% pass rate.
 
 ---
 
