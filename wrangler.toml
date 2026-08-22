@@ -19,7 +19,7 @@ NODE_ENV = "production"
 # Top-level Hyperdrive binding for local/default development
 [[hyperdrive]]
 binding = "HYPERDRIVE"
-id = "HYPERDRIVE_CONFIG_ID"
+id = "58a070df7a8942d885af5c19c9902bb3"
 
 # Staging Environment (Deploy first: npx wrangler deploy --env staging)
 [env.staging]
@@ -37,7 +37,7 @@ NODE_ENV = "production"
 # Hyperdrive bindings are non-inheritable across named environments
 [[env.staging.hyperdrive]]
 binding = "HYPERDRIVE"
-id = "HYPERDRIVE_STAGING_CONFIG_ID"
+id = "58a070df7a8942d885af5c19c9902bb3"
 
 # Production Environment (Deploy after staging verification passes: npx wrangler deploy --env production)
 [env.production]
@@ -55,4 +55,4 @@ NODE_ENV = "production"
 # Hyperdrive bindings are non-inheritable across named environments
 [[env.production.hyperdrive]]
 binding = "HYPERDRIVE"
-id = "HYPERDRIVE_PRODUCTION_CONFIG_ID"
+id = "0aaf2f2f7cfb4dc99eec44545fa58651"
