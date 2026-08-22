@@ -19,7 +19,7 @@ import { logError, logInfo, logWarn, requestObservability, sendAlert } from './l
 import { processSubscriptionPaymentCallback as processSubscriptionPaymentCallbackCore } from './lib/subscription-callback.js';
 import { computeActivationSteps } from './lib/activation.js';
 import { buildAccountExport } from './lib/privacy-export.js';
-import { GENERAL_RATE_LIMIT, PROVIDER_CALLBACK_RATE_LIMIT, isProviderCallbackPath } from './lib/rate-limit-policy.js';
+import { GENERAL_RATE_LIMIT, PROVIDER_CALLBACK_RATE_LIMIT, isProviderCallbackPath, EdgeMemoryStore } from './lib/rate-limit-policy.js';
 import { getHelmetOptions } from './lib/security-headers.js';
 import { createDonationTradeNo, createSubscriptionTradeNo } from './lib/trade-number.js';
 import { formatECPayDate } from './lib/ecpay-date.js';
@@ -47,13 +47,15 @@ app.use(rateLimit({
   limit: GENERAL_RATE_LIMIT,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  store: new EdgeMemoryStore(),
   skip: req => isProviderCallbackPath(req.path)
 }));
 const providerCallbackRateLimiter = rateLimit({
   windowMs: 60_000,
   limit: PROVIDER_CALLBACK_RATE_LIMIT,
   standardHeaders: 'draft-7',
-  legacyHeaders: false
+  legacyHeaders: false,
+  store: new EdgeMemoryStore()
 });
 app.use('/webhook', providerCallbackRateLimiter);
 app.use('/api/webhook/generic', providerCallbackRateLimiter);
