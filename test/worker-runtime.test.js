@@ -92,3 +92,33 @@ test('handleFetchWithExpress returns 404 for unhandled routes', async () => {
   const response = await handleFetchWithExpress(app, request);
   assert.equal(response.status, 404);
 });
+
+test('handleFetchWithExpress supports res.sendFile and headersSent', async () => {
+  const app = express();
+  app.get('/page', (req, res) => {
+    assert.equal(res.headersSent, false);
+    res.sendFile('terms.html');
+  });
+
+  const mockEnv = {
+    ASSETS: {
+      async fetch(assetReq) {
+        return new Response('<h1>Terms of Service</h1>', {
+          status: 200,
+          headers: { 'Content-Type': 'text/html; charset=utf-8' }
+        });
+      }
+    }
+  };
+
+  const request = new Request('https://donatio.jjmowlab.com/page', {
+    method: 'GET'
+  });
+
+  const response = await handleFetchWithExpress(app, request, mockEnv);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-type'), 'text/html; charset=utf-8');
+  const html = await response.text();
+  assert.ok(html.includes('<h1>Terms of Service</h1>'));
+});
+

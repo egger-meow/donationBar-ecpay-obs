@@ -36,7 +36,8 @@ export default {
             }
 
             if (env && (env.HYPERDRIVE || env.DATABASE_URL || process.env.DATABASE_URL)) {
-              await database.initPostgreSQL({ env });
+              database.ready = database.initPostgreSQL({ env });
+              await database.ready;
             }
             initialized = true;
           } catch (err) {
