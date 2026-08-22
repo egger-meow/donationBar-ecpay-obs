@@ -32,6 +32,11 @@ import { extractWebhookToken, processGenericWebhook } from './lib/generic-webhoo
 import { createManualRevenueEvent } from './lib/source-adapters/manual-adapter.js';
 import { createTestRevenueEvent } from './lib/source-adapters/test-adapter.js';
 import { getActiveSources, getSourceDefinition } from './lib/source-registry.js';
+import { processRevenueEventForGoalEngine } from './lib/goal-engine/goal-engine.js';
+import { validateGoalRule, RULE_TYPES } from './lib/goal-engine/goal-rules.js';
+import { validateOutboundWebhookUrl } from './lib/goal-engine/outbound-webhook.js';
+import { minorToMajorUnits, majorToMinorUnits, parseMinorUnitAmount, normalizeRevenueCurrency } from './lib/money.js';
+import { normalizeRevenueEvent } from './lib/revenue-event.js';
 
 const app = express();
 const __dirname = path.resolve();
@@ -597,6 +602,59 @@ async function getProgress(workspaceId = null) {
     workspaceId = workspace.id;
   }
 
+  const activeGoal = await database.getActiveGoal(workspaceId);
+  const workspaceSettings = await database.getWorkspaceSettings(workspaceId);
+  const overlaySettings = workspaceSettings?.overlaySettings || {};
+
+  if (activeGoal) {
+    const currency = activeGoal.displayCurrency || 'TWD';
+    const targetMajor = minorToMajorUnits(activeGoal.targetMinor, currency);
+    const startingMajor = minorToMajorUnits(activeGoal.startingAmountMinor, currency);
+    const currentMajor = minorToMajorUnits(activeGoal.currentAmountMinor, currency);
+    const actualDonationsMajor = minorToMajorUnits(Math.max(0, activeGoal.currentAmountMinor - activeGoal.startingAmountMinor), currency);
+    const percent = Math.min(100, Math.floor((activeGoal.currentAmountMinor / activeGoal.targetMinor) * 100));
+
+    const contributions = await database.getGoalContributions(activeGoal.id, { limit: 20 });
+    const formattedDonations = contributions.map(c => ({
+      alertId: c.id,
+      amount: minorToMajorUnits(c.contributionMinor, currency),
+      payer: c.supporterName || '贊助者',
+      message: c.message || '',
+      at: c.createdAt
+    }));
+
+    const displayMode = overlaySettings?.donationDisplayMode || 'top';
+    const displayCount = overlaySettings?.donationDisplayCount || 3;
+    let displayDonations = [];
+
+    if (displayMode === 'hidden') {
+      displayDonations = [];
+    } else if (displayMode === 'latest') {
+      displayDonations = formattedDonations.slice(0, displayCount);
+    } else {
+      displayDonations = [...formattedDonations]
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, displayCount);
+    }
+
+    return {
+      title: activeGoal.title,
+      current: currentMajor,
+      actualDonations: actualDonationsMajor,
+      startFrom: startingMajor,
+      goal: targetMajor,
+      percent,
+      currency,
+      goalId: activeGoal.id,
+      epoch: activeGoal.epoch || 1,
+      status: activeGoal.status,
+      donations: displayDonations,
+      latestDonation: formattedDonations[0] || null,
+      bannerImage: overlaySettings?.donationBannerImage || null,
+      overlaySettings
+    };
+  }
+
   const progress = await database.getWorkspaceProgress(workspaceId);
   if (!progress) {
     return {
@@ -653,7 +711,39 @@ async function addDonation(workspaceId, donationEvent) {
     message: donationEvent.message,
     paymentProviderId: donationEvent.providerRecordId
   });
+
   if (success) {
+    try {
+      const currency = donationEvent.currency || 'TWD';
+      const revenueEvent = donationEvent.rawRevenueEvent || normalizeRevenueEvent({
+        workspaceId,
+        source: 'ecpay',
+        sourceEventType: 'donation',
+        externalEventId: donationEvent.externalId,
+        amount: {
+          valueMinor: majorToMinorUnits(donationEvent.amount, currency),
+          currency
+        },
+        supporter: {
+          displayName: donationEvent.payer || '匿名'
+        },
+        message: donationEvent.message || '',
+        isSynthetic: false,
+        metadata: {
+          paymentProviderId: donationEvent.providerRecordId || null
+        }
+      });
+
+      await database.addRevenueEvent(workspaceId, revenueEvent);
+      await processRevenueEventForGoalEngine({
+        database,
+        workspaceId,
+        revenueEvent
+      });
+    } catch (engineErr) {
+      logWarn('goal_engine_ecpay_ingest_failed', { error: engineErr.message });
+    }
+
     await broadcastProgress(workspaceId);
     database.markWorkspaceFirstDonation(workspaceId).catch(() => {});
   }
@@ -1347,7 +1437,12 @@ app.post('/api/webhook/generic/:slug', async (req, res) => {
       database
     });
 
-    if (result.workspaceId && !result.wasDuplicate) {
+    if (result.workspaceId && !result.wasDuplicate && result.event) {
+      await processRevenueEventForGoalEngine({
+        database,
+        workspaceId: result.workspaceId,
+        revenueEvent: result.event
+      }).catch(err => logWarn('goal_engine_webhook_ingest_failed', { error: err.message }));
       await broadcastProgress(result.workspaceId);
     }
 
@@ -1404,6 +1499,13 @@ app.post('/api/events/manual', requireAdmin, requireSameOrigin, async (req, res)
     });
 
     const result = await database.addRevenueEvent(workspace.id, event);
+    if (result.event) {
+      await processRevenueEventForGoalEngine({
+        database,
+        workspaceId: workspace.id,
+        revenueEvent: result.event
+      }).catch(err => logWarn('goal_engine_manual_ingest_failed', { error: err.message }));
+    }
     await broadcastProgress(workspace.id);
     return res.status(201).json({ status: 'success', event: result.event });
   } catch (error) {
@@ -1431,7 +1533,14 @@ app.post('/api/events/test', requireAdmin, requireSameOrigin, async (req, res) =
     });
 
     if (persist) {
-      await database.addRevenueEvent(workspace.id, event);
+      const result = await database.addRevenueEvent(workspace.id, event);
+      if (result.event) {
+        await processRevenueEventForGoalEngine({
+          database,
+          workspaceId: workspace.id,
+          revenueEvent: result.event
+        }).catch(err => logWarn('goal_engine_test_ingest_failed', { error: err.message }));
+      }
       await broadcastProgress(workspace.id);
     } else {
       // Broadcast transient test event to OBS without corrupting totals
@@ -1468,6 +1577,306 @@ app.get('/api/events', requireAdmin, async (req, res) => {
   } catch (error) {
     logError('get_events_history_failed', { request_id: req.requestId });
     return res.status(500).json({ error: 'Failed to retrieve events history' });
+  }
+});
+
+// =============================================
+// GOAL ENGINE REST API ENDPOINTS (Stage 3)
+// =============================================
+
+// List all goals for workspace
+app.get('/api/goals', requireAdmin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+    const goals = await database.getWorkspaceGoals(workspace.id);
+    return res.json({ status: 'success', goals });
+  } catch (error) {
+    logError('list_goals_failed', { error: error.message });
+    return res.status(500).json({ error: 'Failed to retrieve goals' });
+  }
+});
+
+// Create a new goal
+app.post('/api/goals', requireAdmin, requireSameOrigin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+    const { title, description, targetMinor, displayCurrency, startingAmountMinor, isActive, nextGoalId } = req.body || {};
+
+    const goal = await database.createGoal(workspace.id, {
+      title,
+      description,
+      targetMinor,
+      displayCurrency,
+      startingAmountMinor,
+      isActive: Boolean(isActive),
+      nextGoalId
+    });
+
+    if (goal.isActive) {
+      await broadcastProgress(workspace.id);
+    }
+
+    return res.status(201).json({ status: 'success', goal });
+  } catch (error) {
+    logWarn('create_goal_failed', { error: error.message });
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+// Get currently active goal with full details (rules, milestones, recent contributions)
+app.get('/api/goals/active', requireAdmin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+    const goal = await database.getActiveGoal(workspace.id);
+    if (!goal) {
+      return res.json({ status: 'success', goal: null, rules: [], milestones: [], contributions: [], triggers: [] });
+    }
+
+    const [rules, milestones, contributions, triggers] = await Promise.all([
+      database.getGoalRules(goal.id),
+      database.getGoalMilestones(goal.id),
+      database.getGoalContributions(goal.id, { limit: 20 }),
+      database.getGoalMilestoneTriggers(goal.id, goal.epoch || 1)
+    ]);
+
+    return res.json({
+      status: 'success',
+      goal,
+      rules,
+      milestones,
+      contributions,
+      triggers
+    });
+  } catch (error) {
+    logError('get_active_goal_failed', { error: error.message });
+    return res.status(500).json({ error: 'Failed to retrieve active goal' });
+  }
+});
+
+// Get goal by ID
+app.get('/api/goals/:goalId', requireAdmin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+    const { goalId } = req.params;
+    const goal = await database.getGoalById(workspace.id, goalId);
+    if (!goal) return res.status(404).json({ error: 'Goal not found' });
+
+    const [rules, milestones] = await Promise.all([
+      database.getGoalRules(goal.id),
+      database.getGoalMilestones(goal.id)
+    ]);
+
+    return res.json({ status: 'success', goal, rules, milestones });
+  } catch (error) {
+    logError('get_goal_failed', { error: error.message });
+    return res.status(500).json({ error: 'Failed to retrieve goal' });
+  }
+});
+
+// Update goal details
+app.patch('/api/goals/:goalId', requireAdmin, requireSameOrigin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+    const { goalId } = req.params;
+    const updated = await database.updateGoal(workspace.id, goalId, req.body);
+    if (!updated) return res.status(404).json({ error: 'Goal not found' });
+
+    if (updated.isActive) {
+      await broadcastProgress(workspace.id);
+    }
+
+    return res.json({ status: 'success', goal: updated });
+  } catch (error) {
+    logWarn('update_goal_failed', { error: error.message });
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+// Activate a goal
+app.post('/api/goals/:goalId/activate', requireAdmin, requireSameOrigin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+    const { goalId } = req.params;
+    const activated = await database.activateGoal(workspace.id, goalId);
+    if (!activated) return res.status(404).json({ error: 'Goal not found' });
+
+    await broadcastProgress(workspace.id);
+    return res.json({ status: 'success', goal: activated });
+  } catch (error) {
+    logError('activate_goal_failed', { error: error.message });
+    return res.status(500).json({ error: 'Failed to activate goal' });
+  }
+});
+
+// Deactivate a goal
+app.post('/api/goals/:goalId/deactivate', requireAdmin, requireSameOrigin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+    const { goalId } = req.params;
+    const deactivated = await database.deactivateGoal(workspace.id, goalId);
+    if (!deactivated) return res.status(404).json({ error: 'Goal not found' });
+
+    await broadcastProgress(workspace.id);
+    return res.json({ status: 'success', goal: deactivated });
+  } catch (error) {
+    logError('deactivate_goal_failed', { error: error.message });
+    return res.status(500).json({ error: 'Failed to deactivate goal' });
+  }
+});
+
+// Reset goal progress (epoch increment)
+app.post('/api/goals/:goalId/reset', requireAdmin, requireSameOrigin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+    const { goalId } = req.params;
+    const reset = await database.resetGoalProgress(workspace.id, goalId);
+    if (!reset) return res.status(404).json({ error: 'Goal not found' });
+
+    await broadcastProgress(workspace.id);
+    return res.json({ status: 'success', goal: reset });
+  } catch (error) {
+    logError('reset_goal_failed', { error: error.message });
+    return res.status(500).json({ error: 'Failed to reset goal' });
+  }
+});
+
+// Get source rules for a goal
+app.get('/api/goals/:goalId/rules', requireAdmin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+    const { goalId } = req.params;
+    const rules = await database.getGoalRules(goalId);
+    return res.json({ status: 'success', rules });
+  } catch (error) {
+    logError('get_goal_rules_failed', { error: error.message });
+    return res.status(500).json({ error: 'Failed to retrieve goal rules' });
+  }
+});
+
+// Upsert source rule for a goal
+app.put('/api/goals/:goalId/rules', requireAdmin, requireSameOrigin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+    const { goalId } = req.params;
+    const validatedRule = validateGoalRule(req.body);
+
+    const savedRule = await database.upsertGoalRule(workspace.id, goalId, validatedRule);
+    return res.json({ status: 'success', rule: savedRule });
+  } catch (error) {
+    logWarn('upsert_goal_rule_failed', { error: error.message });
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+// Get milestones for a goal
+app.get('/api/goals/:goalId/milestones', requireAdmin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+    const { goalId } = req.params;
+    const milestones = await database.getGoalMilestones(goalId);
+    return res.json({ status: 'success', milestones });
+  } catch (error) {
+    logError('get_goal_milestones_failed', { error: error.message });
+    return res.status(500).json({ error: 'Failed to retrieve milestones' });
+  }
+});
+
+// Upsert milestone for a goal
+app.put('/api/goals/:goalId/milestones', requireAdmin, requireSameOrigin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+    const { goalId } = req.params;
+    const { thresholdPercent, label, enabled, visualAction, soundAction, webhookActionUrl } = req.body || {};
+
+    if (webhookActionUrl) {
+      const ssrfCheck = validateOutboundWebhookUrl(webhookActionUrl);
+      if (!ssrfCheck.valid) {
+        return res.status(400).json({ error: `Invalid webhook action URL: ${ssrfCheck.reason}` });
+      }
+    }
+
+    const savedMilestone = await database.upsertGoalMilestone(workspace.id, goalId, {
+      thresholdPercent,
+      label,
+      enabled,
+      visualAction,
+      soundAction,
+      webhookActionUrl
+    });
+
+    return res.json({ status: 'success', milestone: savedMilestone });
+  } catch (error) {
+    logWarn('upsert_goal_milestone_failed', { error: error.message });
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+// Add manual adjustment to goal (positive or negative)
+app.post('/api/goals/:goalId/adjustments', requireAdmin, requireSameOrigin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+    const { goalId } = req.params;
+    const { amountMinor, reason, metadata } = req.body || {};
+
+    const result = await database.addGoalAdjustment(workspace.id, goalId, {
+      amountMinor,
+      reason,
+      metadata
+    });
+
+    await broadcastProgress(workspace.id);
+    return res.status(201).json({ status: 'success', ...result });
+  } catch (error) {
+    logWarn('goal_adjustment_failed', { error: error.message });
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+// Get paginated contributions for a goal
+app.get('/api/goals/:goalId/contributions', requireAdmin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+    const { goalId } = req.params;
+    const { limit, offset, epoch } = req.query;
+
+    const contributions = await database.getGoalContributions(goalId, {
+      limit: limit ? parseInt(limit, 10) : 50,
+      offset: offset ? parseInt(offset, 10) : 0,
+      epoch: epoch !== undefined ? parseInt(epoch, 10) : null
+    });
+
+    return res.json({ status: 'success', contributions });
+  } catch (error) {
+    logError('get_goal_contributions_failed', { error: error.message });
+    return res.status(500).json({ error: 'Failed to retrieve goal contributions' });
   }
 });
 
