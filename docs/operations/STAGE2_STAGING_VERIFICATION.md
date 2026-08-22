@@ -60,8 +60,9 @@ curl -i -s "<STAGING_URL>/api/pricing"
 ### Test 4: Static Assets & Security Headers
 Verify that public assets serve correctly and protected pages remain guarded.
 ```bash
-# Public CSS / JS should succeed
-curl -i -s "<STAGING_URL>/style.css" | head -n 10
+# Public pages should succeed (200 OK)
+curl -i -s "<STAGING_URL>/privacy.html" | head -n 10
+curl -i -s -o /dev/null -w "%{http_code}\n" "<STAGING_URL>/terms.html"
 
 # Direct access to protected html pages MUST return 404
 curl -i -s -o /dev/null -w "%{http_code}\n" "<STAGING_URL>/admin.html"
