@@ -440,6 +440,87 @@
       font-weight: 800;
     }
 
+    /* Goal Engine Styles */
+    .goal-meta-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--surface-2);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    .goal-meta-badge.active {
+      background: var(--accent-dim);
+      color: var(--accent);
+      border-color: rgba(52, 211, 153, 0.3);
+    }
+    .source-rule-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 14px;
+      transition: border-color 0.2s ease;
+    }
+    .source-rule-card:hover {
+      border-color: var(--border-strong);
+    }
+    .source-rule-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .source-rule-title {
+      font-weight: 700;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .milestone-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 10px;
+      gap: 12px;
+    }
+    .milestone-badge {
+      font-weight: 800;
+      font-size: 14px;
+      color: var(--accent);
+      min-width: 48px;
+    }
+    .contribution-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .contribution-table th, .contribution-table td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .contribution-table th {
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .provenance-pill {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.06);
+      color: var(--text-dim);
+    }
+
     @media (max-width: 720px) {
       .tab-btn { font-size: 13px; padding: 10px 12px; }
       .tab-btn span.tab-label-full { display: none; }
@@ -936,6 +1017,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-4"/></svg>
         <span class="tab-label-full">總覽</span>
       </button>
+      <button type="button" class="tab-btn" role="tab" data-tab-target="goals" aria-label="目標引擎" onclick="switchTab('goals')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        <span class="tab-label-full">目標引擎</span>
+      </button>
       <button type="button" class="tab-btn" role="tab" data-tab-target="payment" aria-label="收款設定" onclick="switchTab('payment')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
         <span class="tab-label-full">收款設定</span>
@@ -1338,11 +1423,263 @@
             在新分頁開啟
           </button>
         </div>
-        <p style="color: #666; margin-top: 10px; font-size: 13px;">
-          💡 提示：預覽會即時顯示斗內進度和外觀變化。調整斗內條設定後會自動更新。
-        </p>
+      <!-- Goal Engine Cards (data-tab="goals") -->
+      <div class="card full-width" data-tab="goals">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h2 style="margin: 0; border: none; padding: 0;">🎯 目標引擎 (The Programmable Goal Engine)</h2>
+            <p style="color: var(--text-muted); font-size: 13.5px; margin: 4px 0 0;">
+              統一匯流所有支援管道，跨幣別換算與自動化目標推進
+            </p>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-primary" onclick="openCreateGoalModal()">➕ 建立新目標</button>
+            <button type="button" class="btn btn-secondary" onclick="openAdjustmentModal()">⚖️ 手動增減調整</button>
+            <button type="button" class="btn btn-secondary" onclick="openResetGoalModal()">🔄 安全重設進度</button>
+          </div>
+        </div>
+
+        <!-- Active Goal Banner / Selector -->
+        <div style="background: var(--surface-2); border-radius: 12px; padding: 20px; border: 1px solid var(--border-strong); margin-bottom: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
+                <span class="goal-meta-badge active" id="goalStatusBadge">● 進行中</span>
+                <span class="goal-meta-badge" id="goalEpochBadge">第 1 輪</span>
+                <span class="goal-meta-badge" id="goalCurrencyBadge">TWD</span>
+              </div>
+              <h3 id="activeGoalTitleDisplay" style="font-size: 22px; font-weight: 700; margin: 0; color: var(--text);">目標載入中...</h3>
+              <p id="activeGoalDescDisplay" style="color: var(--text-dim); font-size: 13.5px; margin: 6px 0 0;"></p>
+            </div>
+            <div style="min-width: 240px;">
+              <label for="workspaceGoalSelect" style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 6px;">切換當前活躍目標：</label>
+              <select id="workspaceGoalSelect" onchange="onGoalSelectChange(this.value)">
+                <option value="">載入目標清單...</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="margin-top: 18px;">
+            <div style="display: flex; justify-content: space-between; font-size: 14.5px; margin-bottom: 8px;">
+              <span><strong id="activeGoalCurrentDisplay">NT$ 0</strong> (<span id="activeGoalPercentDisplay" style="color: var(--accent); font-weight: bold;">0%</span>)</span>
+              <span>目標金額：<strong id="activeGoalTargetDisplay">NT$ 0</strong></span>
+            </div>
+            <div class="progress-bar" style="height: 18px; margin: 0;">
+              <div class="progress-fill" id="activeGoalProgressFill" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
+      <!-- Goal Engine: Source Rules Builder -->
+      <div class="card" data-tab="goals">
+        <h2>🎛️ 來源規則設定 (Source Rules)</h2>
+        <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 16px;">
+          設定各個贊助或訂閱管道計入目標的方式與權重公式。
+        </p>
+
+        <div id="sourceRulesContainer">
+          <!-- Rendered dynamically -->
+        </div>
+
+        <div style="padding: 12px 16px; background: rgba(255,255,255,0.03); border: 1px dashed var(--border); border-radius: 10px; margin-top: 16px;">
+          <div style="font-size: 13px; font-weight: 600; color: var(--text-dim); display: flex; align-items: center; gap: 6px;">
+            <span>🔒 Stage 5 規劃來源 (Twitch, YouTube, Ko-fi)</span>
+            <span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.08);">即將推出</span>
+          </div>
+          <p style="font-size: 12px; color: var(--text-dim); margin: 4px 0 0;">
+            目前已支援 ECPay 金流、Generic Webhook (Streamer.bot/自訂)、手動贊助與測試事件。
+          </p>
+        </div>
+      </div>
+
+      <!-- Goal Engine: Milestone Automations -->
+      <div class="card" data-tab="goals">
+        <h2>🏆 里程碑自動化 (Milestone Automations)</h2>
+        <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 16px;">
+          達成指定進度門檻時，自動觸發 OBS 動畫、音效及外部 Webhook 廣播。
+        </p>
+
+        <div id="milestonesContainer">
+          <!-- Rendered dynamically -->
+        </div>
+
+        <div style="margin-top: 16px;">
+          <button type="button" class="btn btn-secondary" onclick="openAddMilestoneModal()" style="width: 100%;">➕ 新增自訂里程碑門檻</button>
+        </div>
+      </div>
+
+      <!-- Goal Engine: Contribution History -->
+      <div class="card full-width" data-tab="goals">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+          <h2 style="margin: 0; border: none; padding: 0;">📜 即時目標貢獻與換算稽核紀錄</h2>
+          <button type="button" class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px;" onclick="loadGoalEngineData()">🔄 重新整理</button>
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="contribution-table" id="contributionsTable">
+            <thead>
+              <tr>
+                <th>贊助者</th>
+                <th>來源</th>
+                <th>原始金額 / 數量</th>
+                <th>匯率與換算</th>
+                <th>計入目標金額</th>
+                <th>備註 / 理由</th>
+                <th>時間</th>
+              </tr>
+            </thead>
+            <tbody id="contributionsTableBody">
+              <tr>
+                <td colspan="7" style="text-align: center; color: var(--text-dim); padding: 24px;">載入貢獻紀錄中...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Create / Edit Goal Modal -->
+    <div id="createGoalModal" class="modal-overlay">
+      <div class="modal-content">
+        <button class="modal-close" onclick="closeCreateGoalModal()">×</button>
+        <h2 style="margin-bottom: 10px;">建立新目標</h2>
+        <p style="color: #a0a0a0; margin-bottom: 20px; font-size: 13.5px;">
+          設定目標標題、目標金額與顯示幣別。支援多幣別換算與連鎖目標。
+        </p>
+        <form id="createGoalForm" onsubmit="handleCreateGoalSubmit(event)">
+          <div class="form-group">
+            <label for="newGoalTitle">目標標題 *</label>
+            <input type="text" id="newGoalTitle" placeholder="例：新顯卡與麥克風升級" required>
+          </div>
+          <div class="form-group">
+            <label for="newGoalDescription">目標說明 (選填)</label>
+            <textarea id="newGoalDescription" placeholder="例：感謝大家支持！達成後將開箱直播" rows="2"></textarea>
+          </div>
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label for="newGoalTarget">目標金額 *</label>
+              <input type="number" id="newGoalTarget" min="1" step="any" placeholder="10000" required>
+            </div>
+            <div class="form-group">
+              <label for="newGoalCurrency">顯示幣別</label>
+              <select id="newGoalCurrency">
+                <option value="TWD" selected>TWD (新台幣)</option>
+                <option value="USD">USD (美元)</option>
+                <option value="EUR">EUR (歐元)</option>
+                <option value="GBP">GBP (英鎊)</option>
+                <option value="JPY">JPY (日圓)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="newGoalStartingAmount">起始進度金額 (選填)</label>
+            <input type="number" id="newGoalStartingAmount" min="0" step="any" value="0" placeholder="0">
+          </div>
+          <div class="form-group">
+            <label for="newGoalNextChain">達成 100% 後自動切換下一個目標 (連鎖目標)</label>
+            <select id="newGoalNextChain">
+              <option value="">無 (不自動切換)</option>
+            </select>
+          </div>
+          <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="newGoalIsActive" checked>
+            <label for="newGoalIsActive" style="margin: 0; cursor: pointer;">立即啟用此目標（將自動停用其他進行中目標）</label>
+          </div>
+          <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button type="submit" class="btn btn-primary" id="createGoalSubmitBtn" style="flex: 1;">建立目標</button>
+            <button type="button" class="btn btn-secondary" onclick="closeCreateGoalModal()">取消</button>
+          </div>
+          <div class="form-feedback" id="createGoalFeedback"></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Manual Adjustment Modal -->
+    <div id="goalAdjustmentModal" class="modal-overlay">
+      <div class="modal-content">
+        <button class="modal-close" onclick="closeAdjustmentModal()">×</button>
+        <h2 style="margin-bottom: 10px;">手動增減目標進度</h2>
+        <p style="color: #a0a0a0; margin-bottom: 20px; font-size: 13.5px;">
+          手動補登線下贊助、Superchat 或扣除退款。每筆調整均會完整寫入稽核歷史。
+        </p>
+        <form id="adjustmentForm" onsubmit="handleAdjustmentSubmit(event)">
+          <div class="form-group">
+            <label for="adjAmount">調整金額 (可輸入正數增加或負數扣除) *</label>
+            <input type="number" id="adjAmount" step="any" placeholder="例：500 或 -100" required>
+            <div style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">
+              單位為當前活躍目標之顯示幣別。
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="adjReason">調整理由 / 備註 *</label>
+            <input type="text" id="adjReason" placeholder="例：線下現金贊助、退款調整" required>
+          </div>
+          <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button type="submit" class="btn btn-primary" id="adjSubmitBtn" style="flex: 1;">確定調整</button>
+            <button type="button" class="btn btn-secondary" onclick="closeAdjustmentModal()">取消</button>
+          </div>
+          <div class="form-feedback" id="adjFeedback"></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Goal Reset Confirmation Modal -->
+    <div id="goalResetModal" class="modal-overlay">
+      <div class="modal-content">
+        <button class="modal-close" onclick="closeResetGoalModal()">×</button>
+        <h2 style="margin-bottom: 10px; color: var(--warning);">🔄 安全重設目標進度 (Safe Reset)</h2>
+        <div style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 10px; padding: 16px; margin-bottom: 16px;">
+          <p style="color: var(--warning); font-size: 14px; margin: 0; line-height: 1.6;">
+            <strong>安全保證：</strong>重設會將目標輪數 (Epoch) 自動 +1，並將金額歸回起始值。所有先前的贊助歷史與稽核紀錄均會<strong>完整保留</strong>，里程碑在新的輪次亦可再次正常觸發。
+          </p>
+        </div>
+        <p style="color: var(--text-muted); font-size: 13.5px; margin-bottom: 20px;">
+          確定要重設當前目標進度嗎？
+        </p>
+        <div style="display: flex; gap: 10px;">
+          <button type="button" class="btn btn-danger" id="confirmResetGoalBtn" onclick="handleConfirmGoalReset()" style="flex: 1;">確定重設進度</button>
+          <button type="button" class="btn btn-secondary" onclick="closeResetGoalModal()">取消</button>
+        </div>
+        <div class="form-feedback" id="resetGoalFeedback"></div>
+      </div>
+    </div>
+
+    <!-- Add / Edit Milestone Modal -->
+    <div id="milestoneModal" class="modal-overlay">
+      <div class="modal-content">
+        <button class="modal-close" onclick="closeMilestoneModal()">×</button>
+        <h2 style="margin-bottom: 10px;">設定里程碑門檻</h2>
+        <form id="milestoneForm" onsubmit="handleMilestoneSubmit(event)">
+          <div class="form-group">
+            <label for="msPercent">達成百分比門檻 (1 - 100) *</label>
+            <input type="number" id="msPercent" min="1" max="100" placeholder="50" required>
+          </div>
+          <div class="form-group">
+            <label for="msLabel">里程碑標籤名稱 *</label>
+            <input type="text" id="msLabel" placeholder="例：50% 半程達成！" required>
+          </div>
+          <div class="form-group">
+            <label for="msWebhookUrl">外部 Webhook 觸發網址 (選填，如 Streamer.bot / Discord)</label>
+            <input type="url" id="msWebhookUrl" placeholder="https://api.streamerbot.com/webhook/xxx">
+          </div>
+          <div style="display: flex; gap: 16px; margin: 16px 0;">
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+              <input type="checkbox" id="msVisualAction" checked>
+              <span>OBS 畫面特效動畫</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+              <input type="checkbox" id="msSoundAction" checked>
+              <span>播放慶祝音效</span>
+            </label>
+          </div>
+          <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button type="submit" class="btn btn-primary" id="msSubmitBtn" style="flex: 1;">儲存里程碑</button>
+            <button type="button" class="btn btn-secondary" onclick="closeMilestoneModal()">取消</button>
+          </div>
+          <div class="form-feedback" id="msFeedback"></div>
+        </form>
+      </div>
     </div>
 
     <!-- Subscription Management Modal -->
@@ -1484,7 +1821,7 @@
     // activation checklist, which must stay hidden once complete regardless of tab).
     // Both are resolved through this one function so they can never fight each other.
     let currentTab = 'overview';
-    const VALID_TABS = ['overview', 'payment', 'overlay', 'account'];
+    const VALID_TABS = ['overview', 'goals', 'payment', 'overlay', 'account'];
 
     function applyTabVisibility() {
       document.querySelectorAll('[data-tab]').forEach(el => {
@@ -1767,22 +2104,48 @@
       }
     });
 
+    document.getElementById('createGoalModal')?.addEventListener('click', function (e) {
+      if (e.target === this) {
+        closeCreateGoalModal();
+      }
+    });
+
+    document.getElementById('goalAdjustmentModal')?.addEventListener('click', function (e) {
+      if (e.target === this) {
+        closeAdjustmentModal();
+      }
+    });
+
+    document.getElementById('goalResetModal')?.addEventListener('click', function (e) {
+      if (e.target === this) {
+        closeResetGoalModal();
+      }
+    });
+
+    document.getElementById('milestoneModal')?.addEventListener('click', function (e) {
+      if (e.target === this) {
+        closeMilestoneModal();
+      }
+    });
+
     // Close modal with ESC key
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         const donationModal = document.getElementById('donationMethodsModal');
         const subscriptionModal = document.getElementById('subscriptionModal');
         const feedbackModal = document.getElementById('feedbackModal');
+        const createGoalModal = document.getElementById('createGoalModal');
+        const goalAdjustmentModal = document.getElementById('goalAdjustmentModal');
+        const goalResetModal = document.getElementById('goalResetModal');
+        const milestoneModal = document.getElementById('milestoneModal');
 
-        if (donationModal?.classList.contains('active')) {
-          toggleDonationMethodsModal();
-        }
-        if (subscriptionModal?.classList.contains('active')) {
-          toggleSubscriptionModal();
-        }
-        if (feedbackModal?.classList.contains('active')) {
-          toggleFeedbackModal();
-        }
+        if (donationModal?.classList.contains('active')) toggleDonationMethodsModal();
+        if (subscriptionModal?.classList.contains('active')) toggleSubscriptionModal();
+        if (feedbackModal?.classList.contains('active')) toggleFeedbackModal();
+        if (createGoalModal?.classList.contains('active')) closeCreateGoalModal();
+        if (goalAdjustmentModal?.classList.contains('active')) closeAdjustmentModal();
+        if (goalResetModal?.classList.contains('active')) closeResetGoalModal();
+        if (milestoneModal?.classList.contains('active')) closeMilestoneModal();
       }
     });
 
@@ -2881,6 +3244,647 @@
       applyTabVisibility();
     }
 
+    // =============================================
+    // Goal Engine (Stage 3) State & Handlers
+    // =============================================
+    let allWorkspaceGoals = [];
+    let activeGoalEngineGoal = null;
+    let activeGoalRules = [];
+    let activeGoalMilestones = [];
+    let activeGoalTriggers = [];
+    let activeGoalContributions = [];
+
+    const SOURCE_DEFINITIONS = [
+      { id: 'ecpay', name: 'ECPay 綠界金流', icon: '💳', desc: '信用卡、ATM、超商代碼等法定貨幣捐款' },
+      { id: 'webhook', name: 'Generic Inbound Webhook', icon: '🔗', desc: '第三方機器人 (Streamer.bot/Discord) 與自訂 API 事件' },
+      { id: 'manual', name: '手動增減與線下贊助', icon: '✍️', desc: '直播主手動補登或調整之款項' },
+      { id: 'test', name: '測試事件', icon: '🧪', desc: '後台測試與連線驗證事件' }
+    ];
+
+    const RULE_TYPE_OPTIONS = [
+      { value: 'monetary_passthrough', label: '100% 原始金額直通 (Monetary Passthrough)' },
+      { value: 'percentage_weighting', label: '百分比權重換算 (Percentage Weighting)' },
+      { value: 'unit_conversion', label: '單位數量換算 (Unit Conversion)' },
+      { value: 'fixed_amount', label: '每筆固定金額 (Fixed Amount)' },
+      { value: 'tier_rules', label: '訂閱層級規則 (Tier Rules)' }
+    ];
+
+    async function loadGoalEngineData() {
+      try {
+        const goalsRes = await fetch('/api/goals');
+        if (!goalsRes.ok) return;
+        const goalsData = await goalsRes.json();
+        allWorkspaceGoals = goalsData.goals || [];
+
+        const activeRes = await fetch('/api/goals/active');
+        if (activeRes.ok) {
+          const activeData = await activeRes.json();
+          activeGoalEngineGoal = activeData.goal || (allWorkspaceGoals.length > 0 ? allWorkspaceGoals[0] : null);
+        } else if (allWorkspaceGoals.length > 0) {
+          activeGoalEngineGoal = allWorkspaceGoals[0];
+        } else {
+          activeGoalEngineGoal = null;
+        }
+
+        if (activeGoalEngineGoal && activeGoalEngineGoal.id) {
+          const goalId = activeGoalEngineGoal.id;
+          const [rulesRes, milestonesRes, contribRes] = await Promise.all([
+            fetch(`/api/goals/${goalId}/rules`).catch(() => null),
+            fetch(`/api/goals/${goalId}/milestones`).catch(() => null),
+            fetch(`/api/goals/${goalId}/contributions`).catch(() => null)
+          ]);
+
+          if (rulesRes && rulesRes.ok) {
+            const rData = await rulesRes.json();
+            activeGoalRules = rData.rules || [];
+          }
+          if (milestonesRes && milestonesRes.ok) {
+            const mData = await milestonesRes.json();
+            activeGoalMilestones = mData.milestones || [];
+            activeGoalTriggers = mData.triggers || [];
+          }
+          if (contribRes && contribRes.ok) {
+            const cData = await contribRes.json();
+            activeGoalContributions = cData.contributions || [];
+          }
+        }
+
+        renderActiveGoal();
+        renderGoalRules();
+        renderGoalMilestones();
+        renderGoalContributions();
+      } catch (err) {
+        console.error('Failed to load Goal Engine data:', err);
+      }
+    }
+
+    function renderActiveGoal() {
+      const titleEl = document.getElementById('activeGoalTitleDisplay');
+      const descEl = document.getElementById('activeGoalDescDisplay');
+      const statusBadge = document.getElementById('goalStatusBadge');
+      const epochBadge = document.getElementById('goalEpochBadge');
+      const currencyBadge = document.getElementById('goalCurrencyBadge');
+      const currentEl = document.getElementById('activeGoalCurrentDisplay');
+      const percentEl = document.getElementById('activeGoalPercentDisplay');
+      const targetEl = document.getElementById('activeGoalTargetDisplay');
+      const fillEl = document.getElementById('activeGoalProgressFill');
+      const selectEl = document.getElementById('workspaceGoalSelect');
+      const nextChainSelect = document.getElementById('newGoalNextChain');
+
+      if (!activeGoalEngineGoal) {
+        if (titleEl) titleEl.textContent = '尚未建立目標';
+        if (descEl) descEl.textContent = '請點擊上方「➕ 建立新目標」開始使用目標引擎。';
+        return;
+      }
+
+      const g = activeGoalEngineGoal;
+      const currency = g.currency || 'TWD';
+      const targetMajor = (g.target_amount_minor || 0) / 100;
+      const currentMajor = (g.current_amount_minor || 0) / 100;
+      const pct = targetMajor > 0 ? Math.min(100, Math.round((currentMajor / targetMajor) * 100)) : 0;
+
+      if (titleEl) titleEl.textContent = g.title || '未命名目標';
+      if (descEl) descEl.textContent = g.description || '';
+      if (statusBadge) {
+        statusBadge.textContent = g.is_active ? '● 進行中' : '○ 停用';
+        statusBadge.className = `goal-meta-badge ${g.is_active ? 'active' : ''}`;
+      }
+      if (epochBadge) epochBadge.textContent = `第 ${g.epoch || 1} 輪`;
+      if (currencyBadge) currencyBadge.textContent = currency;
+
+      if (currentEl) currentEl.textContent = `${currency} ${formatNumber(currentMajor)}`;
+      if (percentEl) percentEl.textContent = `${pct}%`;
+      if (targetEl) targetEl.textContent = `${currency} ${formatNumber(targetMajor)}`;
+      if (fillEl) fillEl.style.width = `${pct}%`;
+
+      if (selectEl) {
+        selectEl.innerHTML = allWorkspaceGoals.map(goal => `
+          <option value="${escapeHtml(goal.id)}" ${goal.id === g.id ? 'selected' : ''}>
+            ${escapeHtml(goal.title)} (${goal.currency || 'TWD'} ${formatNumber((goal.target_amount_minor || 0)/100)}) ${goal.is_active ? '★ 進行中' : ''}
+          </option>
+        `).join('');
+      }
+
+      if (nextChainSelect) {
+        nextChainSelect.innerHTML = '<option value="">無 (不自動切換)</option>' +
+          allWorkspaceGoals
+            .filter(goal => goal.id !== g.id)
+            .map(goal => `<option value="${escapeHtml(goal.id)}">${escapeHtml(goal.title)}</option>`)
+            .join('');
+      }
+    }
+
+    async function onGoalSelectChange(goalId) {
+      if (!goalId) return;
+      try {
+        const res = await fetch(`/api/goals/${goalId}/activate`, { method: 'POST' });
+        if (res.ok) {
+          showAlert('✅ 已切換當前活躍目標', 'success');
+          await loadGoalEngineData();
+          await loadData();
+        } else {
+          showAlert('❌ 切換目標失敗', 'error');
+        }
+      } catch (err) {
+        showAlert('❌ 網路連線錯誤', 'error');
+      }
+    }
+
+    function renderGoalRules() {
+      const container = document.getElementById('sourceRulesContainer');
+      if (!container) return;
+
+      if (!activeGoalEngineGoal) {
+        container.innerHTML = '<div style="color: var(--text-dim); padding: 12px;">請先建立或啟用目標以設定來源規則。</div>';
+        return;
+      }
+
+      container.innerHTML = SOURCE_DEFINITIONS.map(src => {
+        const existingRule = activeGoalRules.find(r => r.source === src.id);
+        const isEnabled = existingRule ? existingRule.is_enabled !== false : true;
+        const ruleType = existingRule ? existingRule.rule_type : 'monetary_passthrough';
+        const config = existingRule ? existingRule.config || {} : {};
+
+        return `
+          <div class="source-rule-card" id="ruleCard_${src.id}">
+            <div class="source-rule-header">
+              <div class="source-rule-title">
+                <span>${src.icon}</span>
+                <span>${escapeHtml(src.name)}</span>
+              </div>
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px;">
+                <input type="checkbox" id="ruleEnabled_${src.id}" ${isEnabled ? 'checked' : ''}>
+                <span>啟用此來源</span>
+              </label>
+            </div>
+            <p style="font-size: 12.5px; color: var(--text-dim); margin-bottom: 12px;">${src.desc}</p>
+            
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label style="font-size: 12.5px;">換算規則類型</label>
+              <select id="ruleType_${src.id}" onchange="onRuleTypeChange('${src.id}')">
+                ${RULE_TYPE_OPTIONS.map(opt => `
+                  <option value="${opt.value}" ${opt.value === ruleType ? 'selected' : ''}>${opt.label}</option>
+                `).join('')}
+              </select>
+            </div>
+
+            <div id="ruleConfigContainer_${src.id}">
+              ${renderRuleConfigInputs(src.id, ruleType, config)}
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; margin-top: 12px;">
+              <button type="button" class="btn btn-secondary" style="font-size: 12.5px; padding: 6px 14px;" onclick="saveSourceRule('${src.id}')">
+                💾 儲存規則設定
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderRuleConfigInputs(source, ruleType, config) {
+      if (ruleType === 'percentage_weighting') {
+        const pct = config.percentage || 100;
+        return `
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 12px;">計入百分比權重 (%)</label>
+            <input type="number" id="ruleConfig_pct_${source}" value="${pct}" min="1" max="1000" placeholder="100">
+            <div style="font-size: 11.5px; color: var(--text-dim); margin-top: 4px;">例如：50 表示贊助 100 元計入 50 元進度；200 表示雙倍計入。</div>
+          </div>
+        `;
+      } else if (ruleType === 'fixed_amount') {
+        const fixed = (config.amount_minor || 0) / 100;
+        return `
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 12px;">每筆固定計入金額 (${activeGoalEngineGoal ? activeGoalEngineGoal.currency : 'TWD'})</label>
+            <input type="number" id="ruleConfig_fixed_${source}" value="${fixed}" min="0" step="any" placeholder="100">
+            <div style="font-size: 11.5px; color: var(--text-dim); margin-top: 4px;">不論贊助金額多少，每筆事件皆計入此固定進度。</div>
+          </div>
+        `;
+      } else if (ruleType === 'unit_conversion') {
+        const rate = config.rate || 1;
+        const unitName = config.unit_name || '點數';
+        return `
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 0;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 12px;">單位名稱</label>
+              <input type="text" id="ruleConfig_unit_${source}" value="${escapeHtml(unitName)}" placeholder="Bits / 點數">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 12px;">每單位換算價值</label>
+              <input type="number" id="ruleConfig_rate_${source}" value="${rate}" min="0.001" step="any" placeholder="1.0">
+            </div>
+          </div>
+        `;
+      } else if (ruleType === 'tier_rules') {
+        const tiers = config.tiers || { '1': 10000, '2': 20000, '3': 50000 };
+        return `
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 0;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 11px;">Tier 1 金額</label>
+              <input type="number" id="ruleConfig_tier1_${source}" value="${(tiers['1']||10000)/100}" step="any">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 11px;">Tier 2 金額</label>
+              <input type="number" id="ruleConfig_tier2_${source}" value="${(tiers['2']||20000)/100}" step="any">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 11px;">Tier 3 金額</label>
+              <input type="number" id="ruleConfig_tier3_${source}" value="${(tiers['3']||50000)/100}" step="any">
+            </div>
+          </div>
+        `;
+      }
+      return '<div style="font-size: 12px; color: var(--text-dim);">此規則依據贊助金額 100% 透過匯率直接計入目標。</div>';
+    }
+
+    function onRuleTypeChange(source) {
+      const select = document.getElementById(`ruleType_${source}`);
+      const container = document.getElementById(`ruleConfigContainer_${source}`);
+      if (select && container) {
+        container.innerHTML = renderRuleConfigInputs(source, select.value, {});
+      }
+    }
+
+    async function saveSourceRule(source) {
+      if (!activeGoalEngineGoal) return;
+      const isEnabled = document.getElementById(`ruleEnabled_${source}`)?.checked ?? true;
+      const ruleType = document.getElementById(`ruleType_${source}`)?.value || 'monetary_passthrough';
+
+      let config = {};
+      if (ruleType === 'percentage_weighting') {
+        const pct = parseInt(document.getElementById(`ruleConfig_pct_${source}`)?.value || '100');
+        config.percentage = pct;
+      } else if (ruleType === 'fixed_amount') {
+        const fixed = parseFloat(document.getElementById(`ruleConfig_fixed_${source}`)?.value || '0');
+        config.amount_minor = Math.round(fixed * 100);
+      } else if (ruleType === 'unit_conversion') {
+        const unitName = document.getElementById(`ruleConfig_unit_${source}`)?.value || '點數';
+        const rate = parseFloat(document.getElementById(`ruleConfig_rate_${source}`)?.value || '1');
+        config.unit_name = unitName;
+        config.rate = rate;
+      } else if (ruleType === 'tier_rules') {
+        const t1 = parseFloat(document.getElementById(`ruleConfig_tier1_${source}`)?.value || '100');
+        const t2 = parseFloat(document.getElementById(`ruleConfig_tier2_${source}`)?.value || '200');
+        const t3 = parseFloat(document.getElementById(`ruleConfig_tier3_${source}`)?.value || '500');
+        config.tiers = {
+          '1': Math.round(t1 * 100),
+          '2': Math.round(t2 * 100),
+          '3': Math.round(t3 * 100)
+        };
+      }
+
+      const otherRules = activeGoalRules.filter(r => r.source !== source);
+      const updatedRules = [
+        ...otherRules,
+        {
+          source,
+          is_enabled: isEnabled,
+          rule_type: ruleType,
+          config
+        }
+      ];
+
+      try {
+        const res = await fetch(`/api/goals/${activeGoalEngineGoal.id}/rules`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rules: updatedRules })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showAlert('✅ 來源規則已儲存！', 'success');
+          await loadGoalEngineData();
+        } else {
+          showAlert(`❌ ${data.error || '儲存規則失敗'}`, 'error');
+        }
+      } catch (err) {
+        showAlert('❌ 網路連線錯誤', 'error');
+      }
+    }
+
+    function renderGoalMilestones() {
+      const container = document.getElementById('milestonesContainer');
+      if (!container) return;
+
+      if (!activeGoalEngineGoal) {
+        container.innerHTML = '<div style="color: var(--text-dim); padding: 12px;">請先建立或啟用目標以設定里程碑。</div>';
+        return;
+      }
+
+      if (activeGoalMilestones.length === 0) {
+        container.innerHTML = '<div style="color: var(--text-dim); padding: 12px; text-align: center;">尚未設定任何里程碑門檻。</div>';
+        return;
+      }
+
+      const currentEpoch = activeGoalEngineGoal.epoch || 1;
+
+      container.innerHTML = activeGoalMilestones.map(ms => {
+        const isTriggered = activeGoalTriggers.some(t => t.threshold_percent === ms.threshold_percent && t.epoch === currentEpoch);
+        const actions = ms.actions || {};
+
+        return `
+          <div class="milestone-item">
+            <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+              <span class="milestone-badge">${ms.threshold_percent}%</span>
+              <div>
+                <div style="font-weight: 600; font-size: 14px;">${escapeHtml(ms.label || '')}</div>
+                <div style="font-size: 12px; color: var(--text-dim); display: flex; gap: 8px; margin-top: 2px;">
+                  ${actions.visual ? '<span>🎬 OBS動畫</span>' : ''}
+                  ${actions.sound ? '<span>🔊 音效</span>' : ''}
+                  ${actions.webhook_url ? `<span>📡 Webhook: ${escapeHtml(actions.webhook_url.substring(0, 24))}...</span>` : ''}
+                </div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 12px; padding: 3px 8px; border-radius: 4px; ${isTriggered ? 'background: var(--accent-dim); color: var(--accent);' : 'background: var(--surface); color: var(--text-dim);'}">
+                ${isTriggered ? '✅ 本輪已觸發' : '⏳ 待達成'}
+              </span>
+              <button type="button" class="btn btn-secondary" style="font-size: 11px; padding: 4px 8px;" onclick="deleteMilestone(${ms.threshold_percent})">✕</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function deleteMilestone(thresholdPercent) {
+      if (!activeGoalEngineGoal) return;
+      const updated = activeGoalMilestones.filter(m => m.threshold_percent !== thresholdPercent);
+      try {
+        const res = await fetch(`/api/goals/${activeGoalEngineGoal.id}/milestones`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ milestones: updated })
+        });
+        if (res.ok) {
+          showAlert('✅ 里程碑門檻已移除');
+          await loadGoalEngineData();
+        } else {
+          showAlert('❌ 移除失敗', 'error');
+        }
+      } catch (err) {
+        showAlert('❌ 網路連線錯誤', 'error');
+      }
+    }
+
+    function renderGoalContributions() {
+      const tbody = document.getElementById('contributionsTableBody');
+      if (!tbody) return;
+
+      if (!activeGoalContributions || activeGoalContributions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 24px;">尚無目標貢獻紀錄</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = activeGoalContributions.slice().reverse().map(c => {
+        const rawMajor = (c.raw_amount_minor || 0) / 100;
+        const rawCur = c.raw_currency || 'TWD';
+        const convMajor = (c.contribution_amount_minor || 0) / 100;
+        const goalCur = activeGoalEngineGoal ? activeGoalEngineGoal.currency : 'TWD';
+        const fxProvenance = c.fx_provenance === 'identity' ? '同幣別 1:1' :
+          c.fx_provenance === 'custom_override' ? '自訂匯率' :
+          c.fx_provenance === 'canonical_registry' ? '參考匯率' : (c.fx_provenance || '-');
+
+        return `
+          <tr>
+            <td><strong>${escapeHtml(c.supporter_name || '匿名好朋友')}</strong></td>
+            <td><span class="goal-meta-badge">${escapeHtml(c.source || '-')}</span></td>
+            <td>${rawCur} ${formatNumber(rawMajor)}</td>
+            <td>
+              <div>匯率: ${c.fx_rate_used || '1.00'}</div>
+              <span class="provenance-pill">${fxProvenance}</span>
+            </td>
+            <td><strong style="color: var(--accent);">${goalCur} ${formatNumber(convMajor)}</strong></td>
+            <td style="color: var(--text-dim); font-size: 12px;">${escapeHtml(c.reason || c.event_type || '')}</td>
+            <td style="color: var(--text-dim); font-size: 12px;">${new Date(c.created_at).toLocaleString('zh-TW')}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Goal Engine Modals
+    function openCreateGoalModal() {
+      const modal = document.getElementById('createGoalModal');
+      if (modal) {
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      }
+    }
+    function closeCreateGoalModal() {
+      const modal = document.getElementById('createGoalModal');
+      if (modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+
+    async function handleCreateGoalSubmit(e) {
+      e.preventDefault();
+      setButtonLoading('createGoalSubmitBtn', true);
+      showFormFeedback('createGoalFeedback', '正在建立目標...', 'info');
+
+      const title = document.getElementById('newGoalTitle').value.trim();
+      const description = document.getElementById('newGoalDescription').value.trim();
+      const targetAmount = parseFloat(document.getElementById('newGoalTarget').value);
+      const currency = document.getElementById('newGoalCurrency').value;
+      const startingAmount = parseFloat(document.getElementById('newGoalStartingAmount').value) || 0;
+      const nextChainId = document.getElementById('newGoalNextChain').value || null;
+      const isActive = document.getElementById('newGoalIsActive').checked;
+
+      const payload = {
+        title,
+        description,
+        target_amount_minor: Math.round(targetAmount * 100),
+        starting_amount_minor: Math.round(startingAmount * 100),
+        currency,
+        next_goal_id: nextChainId
+      };
+
+      try {
+        const res = await fetch('/api/goals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok && data.goal) {
+          if (isActive) {
+            await fetch(`/api/goals/${data.goal.id}/activate`, { method: 'POST' });
+          }
+          setButtonLoading('createGoalSubmitBtn', false);
+          showAlert('✅ 目標建立成功！', 'success');
+          closeCreateGoalModal();
+          await loadGoalEngineData();
+          await loadData();
+        } else {
+          setButtonLoading('createGoalSubmitBtn', false);
+          showFormFeedback('createGoalFeedback', `❌ ${data.error || '建立失敗'}`, 'error');
+        }
+      } catch (err) {
+        setButtonLoading('createGoalSubmitBtn', false);
+        showFormFeedback('createGoalFeedback', '❌ 網路連線錯誤', 'error');
+      }
+    }
+
+    function openAdjustmentModal() {
+      const modal = document.getElementById('goalAdjustmentModal');
+      if (modal) {
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      }
+    }
+    function closeAdjustmentModal() {
+      const modal = document.getElementById('goalAdjustmentModal');
+      if (modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+
+    async function handleAdjustmentSubmit(e) {
+      e.preventDefault();
+      if (!activeGoalEngineGoal) return;
+      setButtonLoading('adjSubmitBtn', true);
+      showFormFeedback('adjFeedback', '正在儲存調整...', 'info');
+
+      const amount = parseFloat(document.getElementById('adjAmount').value);
+      const reason = document.getElementById('adjReason').value.trim();
+
+      const payload = {
+        amount_minor: Math.round(amount * 100),
+        reason
+      };
+
+      try {
+        const res = await fetch(`/api/goals/${activeGoalEngineGoal.id}/adjustments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        setButtonLoading('adjSubmitBtn', false);
+        if (res.ok) {
+          showAlert('✅ 手動調整已套用！', 'success');
+          closeAdjustmentModal();
+          document.getElementById('adjAmount').value = '';
+          document.getElementById('adjReason').value = '';
+          await loadGoalEngineData();
+          await loadData();
+        } else {
+          showFormFeedback('adjFeedback', `❌ ${data.error || '調整失敗'}`, 'error');
+        }
+      } catch (err) {
+        setButtonLoading('adjSubmitBtn', false);
+        showFormFeedback('adjFeedback', '❌ 網路連線錯誤', 'error');
+      }
+    }
+
+    function openResetGoalModal() {
+      const modal = document.getElementById('goalResetModal');
+      if (modal) {
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      }
+    }
+    function closeResetGoalModal() {
+      const modal = document.getElementById('goalResetModal');
+      if (modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+
+    async function handleConfirmGoalReset() {
+      if (!activeGoalEngineGoal) return;
+      setButtonLoading('confirmResetGoalBtn', true);
+      showFormFeedback('resetGoalFeedback', '正在安全重設目標...', 'info');
+
+      try {
+        const res = await fetch(`/api/goals/${activeGoalEngineGoal.id}/reset`, { method: 'POST' });
+        const data = await res.json();
+        setButtonLoading('confirmResetGoalBtn', false);
+        if (res.ok) {
+          showAlert('✅ 目標進度已安全重設 (Epoch +1，歷史已保留)！', 'success');
+          closeResetGoalModal();
+          await loadGoalEngineData();
+          await loadData();
+        } else {
+          showFormFeedback('resetGoalFeedback', `❌ ${data.error || '重設失敗'}`, 'error');
+        }
+      } catch (err) {
+        setButtonLoading('confirmResetGoalBtn', false);
+        showFormFeedback('resetGoalFeedback', '❌ 網路連線錯誤', 'error');
+      }
+    }
+
+    function openAddMilestoneModal() {
+      const modal = document.getElementById('milestoneModal');
+      if (modal) {
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      }
+    }
+    function closeMilestoneModal() {
+      const modal = document.getElementById('milestoneModal');
+      if (modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+
+    async function handleMilestoneSubmit(e) {
+      e.preventDefault();
+      if (!activeGoalEngineGoal) return;
+      setButtonLoading('msSubmitBtn', true);
+      showFormFeedback('msFeedback', '正在儲存里程碑...', 'info');
+
+      const percent = parseInt(document.getElementById('msPercent').value);
+      const label = document.getElementById('msLabel').value.trim();
+      const webhookUrl = document.getElementById('msWebhookUrl').value.trim();
+      const visualAction = document.getElementById('msVisualAction').checked;
+      const soundAction = document.getElementById('msSoundAction').checked;
+
+      const actions = {
+        visual: visualAction,
+        sound: soundAction
+      };
+      if (webhookUrl) actions.webhook_url = webhookUrl;
+
+      const otherMilestones = activeGoalMilestones.filter(m => m.threshold_percent !== percent);
+      const updatedMilestones = [
+        ...otherMilestones,
+        {
+          threshold_percent: percent,
+          label,
+          actions,
+          is_enabled: true
+        }
+      ].sort((a, b) => a.threshold_percent - b.threshold_percent);
+
+      try {
+        const res = await fetch(`/api/goals/${activeGoalEngineGoal.id}/milestones`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ milestones: updatedMilestones })
+        });
+        const data = await res.json();
+        setButtonLoading('msSubmitBtn', false);
+        if (res.ok) {
+          showAlert('✅ 里程碑門檻已設定！', 'success');
+          closeMilestoneModal();
+          document.getElementById('msPercent').value = '';
+          document.getElementById('msLabel').value = '';
+          document.getElementById('msWebhookUrl').value = '';
+          await loadGoalEngineData();
+        } else {
+          showFormFeedback('msFeedback', `❌ ${data.error || '儲存失敗'}`, 'error');
+        }
+      } catch (err) {
+        setButtonLoading('msSubmitBtn', false);
+        showFormFeedback('msFeedback', '❌ 網路連線錯誤', 'error');
+      }
+    }
+
     function withTimeout(promise, ms, name) {
       return Promise.race([
         promise,
@@ -2919,6 +3923,14 @@
       } catch (error) {
         console.error('❌ Failed to load progress data:', error);
         showAlert('⚠️ 無法載入進度資料', 'error');
+      }
+
+      try {
+        console.log('🎯 Loading Goal Engine data...');
+        await withTimeout(loadGoalEngineData(), 10000, 'loadGoalEngineData');
+        console.log('✅ Goal Engine data loaded');
+      } catch (error) {
+        console.error('❌ Failed to load Goal Engine data:', error);
       }
 
       try {
@@ -2975,6 +3987,7 @@
           const data = JSON.parse(event.data);
           if (!data.error) {
             renderProgress(data);
+            loadGoalEngineData();
           }
         } catch (error) {
           console.error('Error parsing SSE data:', error);
