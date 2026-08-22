@@ -222,114 +222,34 @@ Do not mark Stage 2 done until an actual Worker staging deployment is exercised.
 
 ---
 
-# Stage 3 — The Goal Engine
+# Stage 3 — The Goal Engine (COMPLETED)
 
-## Goal
+## Status: COMPLETED
+Stage 3 implementation, automated testing, and Creator Dashboard UI were completed and verified on 2026-08-23.
 
-Build the core product that makes DonationBar worth existing:
+### Deliverables:
+- [`GOAL_ENGINE.md`](docs/architecture/GOAL_ENGINE.md) — Core Goal Engine pipeline orchestration, transaction boundaries, OBS/SSE projection.
+- [`GOAL_RULES.md`](docs/architecture/GOAL_RULES.md) — Canonical rule models (`monetary_passthrough`, `percentage_weighting`, `unit_conversion`, `fixed_amount`, `tier_rules`, `manual_adjustment`).
+- [`GOAL_CONTRIBUTIONS.md`](docs/architecture/GOAL_CONTRIBUTIONS.md) — Idempotent contribution persistence, minor units accounting, epoch tracking.
+- [`GOAL_MILESTONES.md`](docs/architecture/GOAL_MILESTONES.md) — Milestone threshold crossing algorithm, SSRF-safe outbound webhook delivery, epoch trigger deduplication.
+- [`FX_CONVERSION.md`](docs/architecture/FX_CONVERSION.md) — Zero-float integer multi-currency conversion, ISO 4217 registry (USD, TWD, EUR, GBP, JPY), custom overrides.
+- [`STAGE3_GOAL_ENGINE_VERIFICATION.md`](docs/verification/STAGE3_GOAL_ENGINE_VERIFICATION.md) — Verification report confirming 213 passing tests.
+- [`public/admin.html`](public/admin.html) — Visual Goal Management Dashboard with no-code rule builder, milestone configuration, manual adjustments modal, safe reset modal, and live contribution audit table.
 
-> One programmable goal combining multiple revenue/support sources.
-
-A creator must be able to create a Goal with:
-
-* name
-* target
-* display currency
-* starting amount
-* active period
-* selected revenue sources
-
-Each source can optionally define:
-
-* conversion rule
-* fixed contribution value
-* percentage weighting
-* currency conversion behavior
-* inclusion/exclusion rules
-
-Examples:
-
-```text
-YouTube Super Chat:
-actual monetary value
-
-Twitch Bits:
-100 Bits = $1 goal contribution
-
-Tier 1 Twitch Sub:
-+$2.50
-
-Tier 2:
-+$5
-
-Tier 3:
-+$12
-
-Manual:
-custom amount
-```
-
-Implement milestone rules.
-
-Example:
-
-```text
-25%
-→ animation A
-
-50%
-→ animation B
-→ webhook
-
-75%
-→ animation C
-
-100%
-→ celebration
-→ webhook
-→ optionally activate next goal
-```
-
-Actions should initially remain intentionally limited.
-
-Possible V1 actions:
-
-* visual animation
-* sound
-* Generic Webhook
-* automatically activate another Goal
-
-Do not build a full Streamer.bot competitor.
-
-The Goal Engine must be understandable by a normal streamer.
-
-### Done Criteria
-
-Stage 3 is complete only when:
-
-* one Goal can consume events from multiple adapters
-* source weighting works
-* multi-currency behavior is deterministic
-* duplicate events do not double-increment goals
-* milestone crossing is detected exactly once
-* milestone actions execute exactly once
-* goal completion is persisted
-* optional next-goal activation works
-* manual adjustment exists with audit history
-* goal reset exists
-* event history explains why the goal changed
-* creator can test every milestone without real money
-* all critical rules have automated tests
-
-The core UI must allow a non-technical creator to understand:
-
-> What contributes to this goal?
-
-and:
-
-> What happens at each milestone?
-
-without reading documentation.
+### Done Criteria Verification:
+- [x] One Goal consumes events from multiple adapters simultaneously.
+- [x] Source weighting (`percentage_weighting`, `unit_conversion`, `fixed_amount`, `tier_rules`) works deterministically.
+- [x] Multi-currency behavior is deterministic with zero floating point errors.
+- [x] Duplicate events do not double-increment goals via `(goal_id, revenue_event_id)` unique constraint.
+- [x] Milestone crossing is detected exactly once per epoch; milestones fire in ascending order on multi-threshold jumps.
+- [x] Milestone actions (OBS visual, sound, SSRF-safe outbound webhook) execute exactly once.
+- [x] Goal completion is persisted (`status: 'completed'`).
+- [x] Optional next-goal activation works with cycle detection.
+- [x] Manual adjustments (+/-) exist with mandatory audit reason.
+- [x] Safe goal reset increments `epoch` and preserves 100% of historical contributions.
+- [x] Event history explains why the goal changed (`reason`, `rule_applied`, `fx_rate_used`, `fx_provenance`).
+- [x] Creator can test every milestone without real money via test console and manual adjustments.
+- [x] All critical rules have automated tests (213 passing tests).
 
 ---
 

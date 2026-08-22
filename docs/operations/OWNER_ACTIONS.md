@@ -159,3 +159,16 @@ This runs:
    - Table: `revenue_events`
    - Indexes: `idx_revenue_events_lookup`, `uq_revenue_events_external_id`
    - Workspace column: `generic_webhook_token` on `user_workspaces`
+4. Goal Engine schema (`migrations/run-goal-engine-migration.js`), creating:
+   - Tables: `goals`, `goal_source_rules`, `goal_contributions`, `goal_milestones`, `goal_milestone_triggers`, `goal_action_deliveries`
+   - Indexes: `idx_goal_contributions_dedup`, `idx_goal_milestone_triggers_dedup`, `idx_goals_active`
+
+---
+
+## Stage 3 Audit Status
+
+- **Stage 3 (The Programmable Goal Engine)**: **COMPLETED**
+- **External Dashboard Actions Required**: **NONE**
+  - All Goal Engine tables, rules, currency conversions, milestones, and chaining operate directly inside Donatio.
+  - Outbound webhooks for milestone triggers accept public HTTPS URLs configured directly by the streamer in the Creator Dashboard (`public/admin.html`).
+  - No external OAuth or developer console setup is required until Stage 5 (Twitch/YouTube adapters) and Stage 6 (Paddle Merchant of Record).

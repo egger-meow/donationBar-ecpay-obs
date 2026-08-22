@@ -4,6 +4,7 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-08-23 — Stage 3: The Programmable Goal Engine implementation (P0 architecture)
 - 2026-08-22 — Stage 1: Universal Revenue Event Core implementation (P0 architecture)
 - 2026-07-21 — Tabbed admin dashboard IA for faster new-user onboarding
 - 2026-07-21 — Donation page banner image + custom donation-alert image/sound/voice
@@ -66,6 +67,25 @@ delete a past entry — if something it describes later changes or turns out wro
 in a new entry instead. This file records *what happened*; it is not a priority list.
 For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edited in
 place as work completes or priorities shift.
+
+---
+
+## 2026-08-23 — Stage 3: The Programmable Goal Engine implementation (P0 architecture)
+
+Completed Stage 3 of the global product build roadmap ("The Programmable Goal Engine"):
+- Implemented deterministic multi-currency Foreign Exchange (FX) Engine ([`lib/fx/fx-service.js`](../lib/fx/fx-service.js)) using zero-float integer arithmetic with canonical ISO 4217 registry (USD base with TWD=32.0, EUR=0.92, GBP=0.78, JPY=155), custom overrides, and provenance tracking.
+- Created PostgreSQL migration ([`migrations/20260823-create-goal-engine.sql`](../migrations/20260823-create-goal-engine.sql)) and runner (`migrations/run-goal-engine-migration.js`) for tables: `goals`, `goal_source_rules`, `goal_contributions`, `goal_milestones`, `goal_milestone_triggers`, `goal_action_deliveries`.
+- Added atomic persistence, transaction wrappers, idempotency dedup index `(goal_id, revenue_event_id)`, milestone trigger records `(goal_id, epoch, threshold_percent)`, and safe epoch reset methods to [`lib/database.js`](../lib/database.js) (with dual PostgreSQL and JSON sandbox support).
+- Built canonical source rules and schemas ([`lib/goal-engine/goal-rules.js`](../lib/goal-engine/goal-rules.js)) supporting `monetary_passthrough`, `percentage_weighting`, `unit_conversion`, `fixed_amount`, `tier_rules`, and `manual_adjustment`, while protecting against unreleased Stage 5 sources.
+- Built pure deterministic rule evaluator ([`lib/goal-engine/goal-evaluator.js`](../lib/goal-engine/goal-evaluator.js)) with comprehensive audit rationale strings.
+- Implemented milestone threshold crossing detection ([`lib/goal-engine/milestone-evaluator.js`](../lib/goal-engine/milestone-evaluator.js)) supporting sequential multi-threshold leaps without double-firing in the same epoch.
+- Built SSRF-safe outbound webhook dispatcher ([`lib/goal-engine/outbound-webhook.js`](../lib/goal-engine/outbound-webhook.js)) with private IP, loopback, and metadata endpoint blocking.
+- Implemented cycle-protected goal auto-chaining ([`lib/goal-engine/goal-chaining.js`](../lib/goal-engine/goal-chaining.js)) activating successor goals upon 100% completion.
+- Built central ingestion pipeline ([`lib/goal-engine/goal-engine.js`](../lib/goal-engine/goal-engine.js)) orchestrating rules, idempotency, contributions, milestones, and chaining.
+- Wired Goal Engine into [`server.js`](../server.js) with full REST API suite (`/api/goals/*`) and backward-compatible OBS/SSE progress projection.
+- Added visual Goal Management Dashboard in [`public/admin.html`](../public/admin.html) with active goal switcher, interactive rule builder, milestone configuration, manual adjustments modal, safe reset modal, and live contributions table.
+- Added comprehensive architecture documentation: `GOAL_ENGINE.md`, `GOAL_RULES.md`, `GOAL_CONTRIBUTIONS.md`, `GOAL_MILESTONES.md`, `FX_CONVERSION.md`, and `STAGE3_GOAL_ENGINE_VERIFICATION.md`.
+- Expanded automated test suite to 213 tests across 33 test suites with 100% pass rate.
 
 ---
 
