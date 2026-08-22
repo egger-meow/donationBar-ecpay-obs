@@ -1,4 +1,4 @@
-# DonationBar Global Product Build Stages
+# Donatio (斗內條) Global Product Build Stages
 
 Repository:
 
@@ -8,27 +8,37 @@ Working branch:
 
 `multiuser`
 
+Official Brand Definition:
+
+* **Global Brand:** Donatio
+* **Traditional Chinese Brand:** 斗內條 (Origin: Phonetic translation of "斗內條")
+* **Category:** Programmable multi-source revenue/support goal for streamers
+* **Production Domain:** `https://donatio.jjmowlab.com`
+* **Brand Taglines:**
+  * English: *Donatio — One goal. Every support source.*
+  * Traditional Chinese: *斗內條 — 所有斗內，一條搞定。*
+
 Final product direction:
 
-> **DonationBar — The programmable revenue goal for live streams.**
+> **Donatio (斗內條) — The programmable revenue goal for live streams.**
 
 Core product promise:
 
 > Connect multiple creator revenue/support sources into one beautiful, programmable OBS goal bar.
 
-The product is no longer Taiwan-first and is no longer primarily an ECPay donation platform.
+The product is global from Day 1 and is no longer primarily an ECPay donation platform.
 
 ECPay becomes one revenue-source adapter.
 
 The final system should support a global SaaS model where:
 
 * creators connect existing revenue/support sources
-* DonationBar normalizes those events
+* Donatio normalizes those events
 * one goal can aggregate multiple sources
 * creators define weights, currencies, milestones, and actions
 * OBS receives a reliable real-time goal visualization
-* DonationBar charges creators through Paddle
-* DonationBar does not custody creator donation revenue
+* Donatio charges creators through Paddle
+* Donatio does not custody creator donation revenue
 
 ## Permanent Operating & Go-To-Market Strategy
 
@@ -130,7 +140,7 @@ Migrate the deployable application from the current Render-oriented Node deploym
 Target architecture:
 
 ```text
-donationbar.jjmowlab.com
+donatio.jjmowlab.com
         ↓
 Cloudflare Worker
         ↓
@@ -202,7 +212,7 @@ Stage 2 is complete only when:
 * connect the existing database
 * set each required secret
 * configure Workers Builds if used
-* configure `donationbar.jjmowlab.com`
+* configure `donatio.jjmowlab.com`
 * configure DNS
 * verify HTTPS
 * perform staging deployment

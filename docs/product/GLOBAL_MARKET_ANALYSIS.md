@@ -1,6 +1,7 @@
 # Global Market Analysis: The Programmable Revenue Goal Wedge
 
-**Product:** DonationBar  
+**Product:** Donatio (斗內條)  
+**Production Domain:** `https://donatio.jjmowlab.com`  
 **Repository:** `egger-meow/donationBar-ecpay-obs`  
 **Date:** 2026-08-22  
 **Status:** Stage 0 Completed — Recommendation: **PROCEED (Refined Wedge)**  
@@ -17,7 +18,7 @@ However, **cross-platform and multi-source revenue tracking is severely broken**
 3. **The Complexity Chasm:** Power tools (Streamer.bot, SAMMI) can technically achieve multi-source logic, but require local desktop installations, C#/JavaScript scripting, and WebSocket configuration. 95% of streamers find this too complex and fragile.
 
 **Strategic Wedge:**  
-DonationBar should position as **The programmable revenue goal for live streams**: a lightweight, cloud-native SaaS that normalizes arbitrary revenue/support sources (Twitch Bits/Subs, YouTube Super Chats, Ko-fi, ECPay, Webhooks) into a single, beautiful OBS goal bar with custom point/monetary weighting, multi-milestone automation, and rock-solid reliability.
+Donatio should position as **The programmable revenue goal for live streams**: a lightweight, cloud-native SaaS that normalizes arbitrary revenue/support sources (Twitch Bits/Subs, YouTube Super Chats, Ko-fi, ECPay, Webhooks) into a single, beautiful OBS goal bar with custom point/monetary weighting, multi-milestone automation, and rock-solid reliability.
 
 ### Permanent Operating & Go-To-Market Strategy
 - **Market:** Global

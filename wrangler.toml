@@ -1,0 +1,46 @@
+name = "donatio"
+main = "src/worker.js"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# Static Assets served directly by Cloudflare edge
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# Default non-secret runtime configuration
+[vars]
+ENVIRONMENT = "staging"
+BASE_URL = "https://donatio.jjmowlab.com"
+GOOGLE_CALLBACK_URL = "https://donatio.jjmowlab.com/api/auth/google/callback"
+ECPAY_ENVIRONMENT = "stage"
+NODE_ENV = "production"
+
+# Hyperdrive binding for PostgreSQL connection acceleration and pooling
+# Run `npx wrangler hyperdrive create donatio-db --connection-string="<postgres-url>"` to obtain the ID
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "HYPERDRIVE_CONFIG_ID"
+
+# Staging Environment
+[env.staging]
+name = "donatio-staging"
+[env.staging.vars]
+ENVIRONMENT = "staging"
+BASE_URL = "https://donatio.jjmowlab.com"
+GOOGLE_CALLBACK_URL = "https://donatio.jjmowlab.com/api/auth/google/callback"
+ECPAY_ENVIRONMENT = "stage"
+NODE_ENV = "production"
+
+# Production Environment
+[env.production]
+name = "donatio-production"
+routes = [
+  { pattern = "donatio.jjmowlab.com/*", custom_domain = true }
+]
+[env.production.vars]
+ENVIRONMENT = "production"
+BASE_URL = "https://donatio.jjmowlab.com"
+GOOGLE_CALLBACK_URL = "https://donatio.jjmowlab.com/api/auth/google/callback"
+ECPAY_ENVIRONMENT = "production"
+NODE_ENV = "production"

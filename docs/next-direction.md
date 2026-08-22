@@ -1,8 +1,17 @@
-# Next Direction: The Global Programmable Revenue Goal Wedge
+# Next Direction: Donatio (斗內條) — Global Programmable Revenue Goal
 
-DonationBar's strategic direction is validated in [Stage 0](product/GLOBAL_MARKET_ANALYSIS.md): **The programmable revenue goal for live streams**.
+Donatio's strategic direction is validated in [Stage 0](product/GLOBAL_MARKET_ANALYSIS.md): **The programmable revenue goal for live streams**.
 
 The authoritative execution roadmap is [ROADMAP.md](../ROADMAP.md).
+
+## Official Brand Definition
+- **Global Brand:** Donatio
+- **Traditional Chinese Brand:** 斗內條 (Origin: Phonetic translation of "斗內條")
+- **Category:** Programmable multi-source revenue/support goal for streamers
+- **Production Domain:** `https://donatio.jjmowlab.com`
+- **Brand Taglines:**
+  - English: *Donatio — One goal. Every support source.*
+  - Traditional Chinese: *斗內條 — 所有斗內，一條搞定。*
 
 ## Strategic Wedge
 1. **From Single-Gateway to Universal Normalization:** ECPay becomes one revenue adapter alongside Twitch, Ko-fi, Streamlabs Socket Bridge, and Generic Webhooks.

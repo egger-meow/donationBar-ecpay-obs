@@ -1,6 +1,8 @@
-# DonationBar Product Positioning Document
+# Donatio (斗內條) Product Positioning Document
 
-**Product:** DonationBar  
+**Global Brand:** Donatio  
+**Traditional Chinese Brand:** 斗內條 (Origin: Phonetic translation of "斗內條")  
+**Production Domain:** `https://donatio.jjmowlab.com`  
 **Repository:** `egger-meow/donationBar-ecpay-obs`  
 **Date:** 2026-08-22  
 **Status:** Stage 0 Final Output  
@@ -57,8 +59,15 @@
 
 ---
 
-## 6. Homepage Headline (One Sentence)
-> **One goal bar for all your revenue: combine Twitch, YouTube, Ko-fi, and tips with custom rules in minutes.**
+## 6. Official Brand Taglines & Headlines
+
+### English
+> **Donatio — One goal. Every support source.**  
+> *One goal bar for all your revenue: combine Twitch, YouTube, Ko-fi, and tips with custom rules in minutes.*
+
+### Traditional Chinese (中文品牌)
+> **斗內條 — 所有斗內，一條搞定。**  
+> *一條進度條整合所有支持：Twitch、YouTube、Ko-fi 與綠界斗內，幾分鐘輕鬆設定。*
 
 ---
 

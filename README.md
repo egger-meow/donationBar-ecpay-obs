@@ -1,20 +1,22 @@
-# DonationBar ECPay OBS
+# Donatio (斗內條) — Programmable Stream Goal Overlay
 
-🎮 **ECPay 綠界金流 + OBS 捐款進度條系統**
+> **English:** *Donatio — One goal. Every support source.*  
+> **中文：** *斗內條 — 所有斗內，一條搞定。*  
+> **Production Domain:** `https://donatio.jjmowlab.com`
 
-一套完整的台灣實況主捐款解決方案，支援綠界金流並提供即時更新的 OBS 進度條 overlay。
+🎮 **Programmable multi-source revenue & support goal for live streamers.**
 
-![Demo](https://img.shields.io/badge/Status-Ready%20to%20Use-brightgreen) ![Node](https://img.shields.io/badge/Node.js-18%2B-brightgreen) ![ECPay](https://img.shields.io/badge/ECPay-Supported-orange)
+整合綠界金流（ECPay）、Twitch、YouTube、Ko-fi 與通用 Webhook 的全方位 OBS 斗內進度條系統，支援 Cloudflare Workers 全球邊緣運算與即時 Server-Sent Events (SSE) 推播。
+
+![Node](https://img.shields.io/badge/Node.js-18%2B-brightgreen) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-orange) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Hyperdrive-blue)
 
 ## ✨ 特色功能
 
-- 🏦 **綜界金流整合** - 支援信用卡、ATM、超商付款
-- 📊 **即時進度條** - Server-Sent Events 即時更新，無需重新整理
-- 🎨 **美觀 OBS Overlay** - 透明背景、動畫效果、可自訂顏色
-- 📱 **響應式設計** - 手機、桌面完美支援
-- ⚡ **零延遲更新** - 付款完成立即更新進度條
-- 🔧 **管理後台** - 輕鬆設定目標金額、查看捐款記錄
-- 🎯 **目標導向** - 設定募資目標，追蹤達成進度
+- 🎯 **多來源一條整合** - 支援綠界、通用 Webhook 等多金流整合至單一 OBS 進度條
+- ⚡ **Cloudflare Workers 邊緣運算** - 全球邊緣加速與 Hyperdrive PostgreSQL 連線池
+- 📊 **即時進度推播** - Server-Sent Events (SSE) 零延遲推播至 OBS Browser Source
+- 🎨 **美觀 OBS Overlay** - 透明背景、慶祝動畫、自訂音效與客製化外觀
+- 🔒 **企業級安全架構** - 嚴格簽章驗證、等冪性儲存、無浮點數 ISO 4217 貨幣處理
 
 ## 🚀 快速開始
 

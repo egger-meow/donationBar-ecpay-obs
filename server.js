@@ -90,12 +90,13 @@ app.use(MEDIA_UPLOAD_PATHS, bodyParser.json({ limit: '8mb' }));
 
 // Session middleware
 const PgSession = connectPgSimple(session);
+const dbConnString = process.env.DATABASE_URL || process.env.HYPERDRIVE_CONNECTION_STRING;
 app.use(session({
-  store: production ? new PgSession({ conString: process.env.DATABASE_URL, createTableIfMissing: true }) : undefined,
+  store: production && dbConnString ? new PgSession({ conString: dbConnString, createTableIfMissing: true }) : undefined,
   secret: process.env.SESSION_SECRET || 'super-secret',
   resave: false,
   saveUninitialized: false,
-  name: 'donationbar.sid',
+  name: 'donatio.sid',
   cookie: { secure: production, httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 }
 }));
 
@@ -172,7 +173,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3000/api/auth/google/callback',
+    callbackURL: process.env.GOOGLE_CALLBACK_URL || (production ? 'https://donatio.jjmowlab.com/api/auth/google/callback' : 'http://localhost:3000/api/auth/google/callback'),
     passReqToCallback: true // Enable access to req in callback
   },
     async (req, accessToken, refreshToken, profile, done) => {
@@ -2581,35 +2582,58 @@ app.use((error, req, res, next) => {
   return res.status(500).json({ error: 'Internal server error', requestId: req.requestId });
 });
 
-// Start server
-const port = process.env.PORT || 3000;
-await database.ready;
-const server = app.listen(port, () => {
-  console.log(`🚀 DonationBar server running on port ${port}`);
-  console.log(`📊 Overlay URL: http://localhost:${port}/overlay`);
-  console.log(`💰 Donation page: http://localhost:${port}/donate`);
-  console.log(`⚙️  Admin panel: http://localhost:${port}/admin`);
-});
+// Start server if executed directly as entrypoint
+let server = null;
+const isMain = process.argv[1] && (
+  process.argv[1].endsWith('server.js') ||
+  process.argv[1].endsWith('server')
+);
+
+if (isMain && !process.env.NO_SERVER_LISTEN) {
+  const port = process.env.PORT || 3000;
+  await database.ready;
+  server = app.listen(port, () => {
+    console.log(`🚀 Donatio server running on port ${port}`);
+    console.log(`📊 Overlay URL: http://localhost:${port}/overlay`);
+    console.log(`💰 Donation page: http://localhost:${port}/donate`);
+    console.log(`⚙️  Admin panel: http://localhost:${port}/admin`);
+  });
+}
 
 let shuttingDown = false;
 async function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
   logInfo('shutdown_initiated', { signal });
-  for (const client of sseClients.keys()) client.end();
+  for (const client of sseClients.keys()) client.end?.();
   const forceExit = setTimeout(() => process.exit(1), 10_000);
   forceExit.unref();
-  server.close(async error => {
+  if (server) {
+    server.close(async error => {
+      try {
+        await database.close();
+        clearTimeout(forceExit);
+        process.exit(error ? 1 : 0);
+      } catch (closeError) {
+        logError('shutdown_failed');
+        process.exit(1);
+      }
+    });
+  } else {
     try {
       await database.close();
-      clearTimeout(forceExit);
-      process.exit(error ? 1 : 0);
-    } catch (closeError) {
-      logError('shutdown_failed');
-      process.exit(1);
+    } catch {
+      // ignore
     }
-  });
+    clearTimeout(forceExit);
+    process.exit(0);
+  }
 }
 
-process.once('SIGTERM', () => shutdown('SIGTERM'));
-process.once('SIGINT', () => shutdown('SIGINT'));
+if (isMain) {
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+  process.once('SIGINT', () => shutdown('SIGINT'));
+}
+
+export { app, sseClients, broadcastProgress, broadcastOverlaySettings, broadcastAdminNotification, shutdown };
+export default app;
