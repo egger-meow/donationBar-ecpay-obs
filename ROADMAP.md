@@ -1,237 +1,862 @@
-# DonationBar Taiwan-First Roadmap
+# DonationBar Global Product Build Stages
 
-Status: execution baseline, 2026-07-16 (competitive reset). This is authoritative for priorities; code and tests are authoritative for shipped behavior.
+Repository:
 
-**2026-07-16 competitive reset:** a direct, operating competitor — Nekolive Network —
-was identified. It already provides Taiwan-local payment aggregation (six providers),
-OBS donation alerts, progress bars, alert replay, donation cards, leaderboards, media
-requests, Discord notifications, Twitch bot integrations, and an overtime timer. This
-invalidates "Taiwan-local payment connected to OBS" as a standalone differentiator. See
-[docs/competitive/NEKOLIVE_ANALYSIS.md](docs/competitive/NEKOLIVE_ANALYSIS.md) for the
-full comparison. The project is not abandoned and is not pivoting to out-feature
-Nekolive; broad feature expansion is paused in favor of proving a narrower,
-evidence-backed differentiation (section 2–5 and section 6 below reflect this reset).
+`egger-meow/donationBar-ecpay-obs`
 
-## 1. Current repository assessment
+Working branch:
 
-Shipped in code: Google OAuth state validation with post-authentication session rotation, collision-resistant provider trade numbers, explicit Asia/Taipei ECPay order timestamps, a thin provider-independent donation event plus ECPay adapter, sandbox-only non-persistent OBS test-alert delivery, Chinese activation test-alert controls, bounded PostgreSQL readiness probes, PostgreSQL production sessions, workspace-scoped routes, separate ECPay donation and platform recurring billing, raw-body signature verification, idempotency, trial/paywall/cancellation, encrypted provider credentials, same-origin protection including public order creation, rate limits/security headers including an enforced ECPay-compatible CSP, health checks, graceful shutdown, migrations, Docker/CI configuration, reconnecting SSE overlays, structured request/error logging with a fixed-vocabulary external alert webhook, a redacted staging-preflight CLI check, a recurring-subscription callback lifecycle test suite (success/failure/replay/duplicate), P1 "Guided activation" timestamp/funnel measurement, configuration-backed public closed-beta pricing, and an authenticated creator data export. Donation and platform payment-history persistence enforce positive integer TWD money; database/email paths no longer log donor PII, provider payment references, fingerprints, certificate content, or raw provider errors; public progress/SSE payloads use opaque donation alert IDs rather than provider references; public SSE clients cannot receive owner webhook diagnostics; provider callbacks have an isolated rate-limit budget. A source audit confirms one registered workspace webhook and idempotent fallback routes. The suite currently contains 95 tests.
+`multiuser`
 
-The P1 "Guided activation" row below is **not** fully proven: the checklist and funnel/activation-time measurement are built, but neither has been verified against real staging or a real OBS Browser Source — only sandbox/local testing. The delivered-live-alert milestone remains a documented event-order heuristic, not proof of visual observation.
+Final product direction:
 
-P1 "Beta operations" now has a prepared support/interview/weekly-review/exit runbook,
-but it has not operated with a real cohort; the required four weeks of support and
-retention evidence remain open.
+> **DonationBar — The programmable revenue goal for live streams.**
 
-The P0 Legal/data baseline now has a self-service creator workspace export and a
-deletion-request operating boundary, but legal/accounting approval of retention,
-subprocessors, tax/e-invoice, identity verification, and deletion handling remains
-required before accepting customers.
+Core product promise:
 
-The current production npm dependency graph has a clean `npm audit --omit=dev` result
-(2026-07-11); repeat the audit on every dependency change and before release.
+> Connect multiple creator revenue/support sources into one beautiful, programmable OBS goal bar.
 
-PostgreSQL migration/backup/restore has been rehearsed against a real **local** PostgreSQL 17 instance (2026-07-11, see [MIGRATION_GUIDE.md](docs/migration/MIGRATION_GUIDE.md) Section 7) — not staging/hosted, but a real database engine, not JSON sandbox mode. The rehearsal found and fixed two real bugs that would have broken `npm run migrate` against any genuinely fresh production database (an unguarded legacy-data query, and a wrong file path), plus documented a real limitation of `npm run restore` (it recreates what the backup contains but doesn't remove newer unrelated objects). Monitoring alert delivery has similarly been exercised against a real local HTTP listener, not a real vendor endpoint (see `docs/operations/MONITORING_AND_INCIDENT_RESPONSE.md` Section 7).
+The product is no longer Taiwan-first and is no longer primarily an ECPay donation platform.
 
-Not proven in real staging or production: all of the above against a real hosted database and domain, production-domain OAuth, ECPay initial/recurring callbacks and failures, callback replay, cancellation, container CI outcome, OBS/browser coverage, and monitoring alert delivery against a real vendor endpoint. The service is not production-ready.
+ECPay becomes one revenue-source adapter.
 
-## 2–5. Market, customer, gap, positioning
+The final system should support a global SaaS model where:
 
-- **Market:** Taiwan creators need familiar local payments, Traditional Chinese onboarding/support, and direct payment-to-OBS interactions. This market already has an operating incumbent (Nekolive Network), so the opportunity is not an empty category — it is a specific incumbent weakness (manual approval gating, revenue-share pricing, unverified reliability/diagnostics) validated through interviews, not assumed.
-- **Initial customer (revised):** Twitch/YouTube creators who **already monetize seriously** — real, recurring donation volume, not beginners — who value reliability, activation speed, actionable diagnostics, and predictable pricing over a maximal feature list. This replaces the prior "beginner creator" framing; a beginner with no volume has little reason to care about fixed-vs-revenue-share pricing or diagnostic depth.
-- **Gap:** Nekolive gates onboarding behind manual Discord/human approval with no published SLA, charges a revenue-share fee (3% above NT$10,000/month, capped at NT$1,500), and publishes no reliability signals (no status page, no SLA, no public incident history). None of these are proven weaknesses yet — they are the specific claims the required interviews (section 13) must confirm or reject.
-- **Position (revised):** "The fastest, most reliable, fully self-service payment-to-OBS product for serious Taiwanese streamers" — not a feature-parity alternative to Nekolive. Differentiation is speed-to-first-alert, zero manual approval, diagnosability of failures, and fixed pricing, not overlay/bot feature breadth. DonationBar does not custody viewer funds.
+* creators connect existing revenue/support sources
+* DonationBar normalizes those events
+* one goal can aggregate multiple sources
+* creators define weights, currencies, milestones, and actions
+* OBS receives a reliable real-time goal visualization
+* DonationBar charges creators through Paddle
+* DonationBar does not custody creator donation revenue
 
-## 6. Build now
+## Global execution rule
 
-**Measurable competitive targets** (added 2026-07-16, replaces vague "build more
-features" framing as the next milestone — see section 17):
+Do not implement later stages early.
 
-| Target | Threshold | Why this number |
-|---|---|---|
-| Signup to test alert | Under 15 minutes, median | Nekolive requires manual Discord/form approval with no published SLA; a bounded, no-human-in-the-loop time is a structural advantage only if actually measured and met |
-| Developer intervention | Zero, for the gating first-streamer test | Matches existing Product DoD; Nekolive's onboarding is inherently human-mediated, so "no developer intervention" only differentiates if literally true, not aspirational |
-| Real payment rendered in OBS | At least one real ECPay payment, unmocked, visually observed in a real OBS Browser Source | Mocked/sandbox success does not count as competitive proof; Nekolive's users already have this working today, so parity here is the floor, not the win |
-| Diagnostic state coverage | Every failed step in the activation funnel (provider connect, callback verify, OBS delivery) has a specific, actionable creator-facing message | No evidence Nekolive exposes this beyond a manual resend button; this is the highest-leverage, lowest-cost plausible differentiator (see NEKOLIVE_ANALYSIS.md) |
-| Pricing presented | Fixed founder price shown and explained against the revenue-share crossover, not a bare number | Flat pricing is only a real advantage above roughly NT$6,600–13,300/month net donation revenue (see NEKOLIVE_ANALYSIS.md); presenting it without that context oversells it |
+For every stage:
 
-**Do not build now** (formalized from the 2026-07-16 competitive reset; see
-[NEKOLIVE_ANALYSIS.md](docs/competitive/NEKOLIVE_ANALYSIS.md#roadmap-items-that-would-merely-reproduce-nekolive-features)
-for the audit — none of these were already on this roadmap, this exclusion list exists
-to keep it that way): Twitch chat bot feature parity, media request feature parity,
-overtime timer, loyalty points, VIP automation, check-in systems, viewer queues, a large
-surface of overlay configuration pages, and additional production payment providers
-before interview-backed demand evidence. A future proposal matching one of these needs
-an explicit evidence-backed override, not silent inclusion.
+1. inspect the current repository first
+2. reuse existing working code where possible
+3. implement only the scope required for that stage
+4. add or update tests
+5. run the complete relevant test/release suite
+6. update `ROADMAP.md`
+7. update the project progress log
+8. document architectural decisions
+9. report anything requiring manual owner action
 
-| Priority / deliverable | Why and impact | Difficulty | Dependency | Definition of done |
-|---|---|---|---|---|
-| P0 Staging release proof | Removes payment/data-loss launch risk | High | Hosted Postgres, domain, provider sandbox | Donation and recurring success/failure/replay/cancel, migrations, rollback, backup and restore have redacted evidence |
-| P0 Observable operations | Detects and shortens incidents | Medium | Monitoring vendor | Request IDs and safe structured errors exist; readiness, callback and 5xx alerts are exercised |
-| P0 Legal/data baseline | Required before real users and money | Medium | Taiwan legal/accounting review | Terms/privacy, retention, subprocessors, support, tax/e-invoice and incident ownership are approved |
-| P1 Guided activation | Raises first-alert completion | Medium | Stable staging | Checklist covers provider, test payment, OBS and live alert; funnel and activation time are measured |
-| P1 Actionable failure diagnostics | Primary claimed differentiator vs. Nekolive's opaque failure handling | Medium | Guided activation, Observable operations | Provider-connect, callback-verify, and OBS-delivery failures each show a specific, non-generic creator-facing message and next step; no failure surfaces as a silent stuck state |
-| P1 Beta operations | Converts feedback into evidence | Low | 10–20 recruits | Support SLA, interview cadence, weekly metrics review and exit process operate four weeks |
-| P1 Paid conversion | Tests willingness to pay and creates MRR | Medium | Stable billing and plan policy | Pricing/limits visible; trial, renewal failure, upgrade/cancel and access states pass tests and staging |
-| P2 Core retention slice | Improves repeat use after evidence | Medium | Activation baseline | Selected goal/top/latest/replay/TTS slice has tests, OBS verification and usage tracking |
+At the end of every stage create or update:
 
-## 7. Validate later
+`docs/operations/OWNER_ACTIONS.md`
 
-| Candidate | Why and impact | Difficulty | Dependency | Definition of done |
-|---|---|---|---|---|
-| Provider adapter | Enables demand-led expansion without widget coupling | High | 5 qualified requests for provider two | One canonical donation event supports two sandbox providers |
-| NewebPay or LINE Pay | May lift creator activation/conversion | High | Interview and lost-conversion data | Provider wins scored demand/compliance/cost review and sandbox proof |
-| Advanced TTS/moderation/templates | Potential retention and plan value | Medium–High | Retained cohort demand | Prototype reaches a pre-agreed usage/retention threshold |
-| Agency/multi-channel | Higher ARPU | High | 3 paying agency prospects | Workflow, permissions, pricing and support cost validated |
+It must contain exact manual actions the owner must perform outside the repository.
 
-## 8. Reject for now
+Do not write generic instructions.
 
-| Item | Why and impact | Difficulty | Dependency | Definition of done |
-|---|---|---|---|---|
-| International expansion | Dilutes Taiwan learning and adds tax/provider scope | High | Taiwan profitability | Outside backlog until Taiwan metrics hold two quarters |
-| Custody/pooling donations | Adds reconciliation, trust and regulatory risk | High | Legal model | No build; creator-owned settlement remains a constraint |
-| OBS dock, Stream Deck, public API | Weak evidence versus activation work | High | 30 retained paid workspaces plus demand | Reconsider only when threshold is documented |
-| Broad monolith rewrite | High regression risk, no direct user value | High | Measured scaling constraint | Allow only focused extraction tied to a proven bottleneck |
+Use the exact URLs, environment variable names, webhook paths, Cloudflare bindings, Paddle product IDs, OAuth callback paths, and configuration names created by the implementation.
 
-## 9. Production blockers
+---
 
-Release stays blocked until staged payment evidence exists; migrations and restore are rehearsed; alerts are exercised; OAuth uses the real domain; legal/business/tax/privacy decisions are signed off; CI including container build is green; and mobile/desktop plus exact transparent OBS viewport checks are recorded. Explicitly review duplicate webhook routes, sessions, CSRF, rate limits, headers, dependency audit, retention/deletion/export, rollback, and provider restrictions.
+# Stage 0 — Market Wedge Validation (COMPLETED)
 
-## 10–11. Phases and first 12 weeks
+## Status: PROCEED (Refined Wedge)
+Stage 0 market research and competitive validation was completed on 2026-08-22.
 
-| Weeks / outcome | Why and impact | Difficulty | Dependency | Definition of done |
-|---|---|---|---|---|
-| 1–2 Production gate | Prevents beta payment/data incidents before any external user | High | Hosted staging and provider sandbox | Hosted staging, production-style OAuth, migrations/restore, ECPay callback lifecycle, monitoring, and legal baseline each have redacted evidence, owner, rollback, and pass/fail |
-| 3–4 Payment Core + Activation | Makes one ECPay path reliable without premature universal architecture | High | Production gate scope and current ECPay flow | Thin payment abstraction, ECPay adapter, safe test adapter, normalized provider-independent donation event, Chinese onboarding checklist, OBS connection verification, and a 15-minute test-alert path |
-| 5–6 First external streamer | Proves self-service value with a real person outside the build team | High | Payment Core + Activation | One completely unfamiliar streamer, without database edits or remote developer operation, self-configures ECPay, adds the OBS Browser Source, succeeds with a test alert, completes a real payment, and sees a real OBS alert; only then expand to five and then 10–20 |
-| 7–8 Founder paid validation | Tests willingness to pay with a concrete offer | Medium | First external streamer evidence | Founder price is shown; refusal reasons and willingness reasons are recorded; at least one creator subscribes or makes a clear payment commitment; NT$199 / 299 / 399 acceptance is compared |
-| 9–10 One retention release | Avoids feature sprawl | Medium | Usage/interview evidence | One evidence-backed interaction ships with tests, OBS proof and usage tracking |
-| 11–12 Public-launch decision | Makes launch evidence-based | High | 4 stable beta weeks | Go/no-go covers reliability, activation, retention, conversion, support, legal, restore and economics |
+### Deliverables:
+- [`GLOBAL_MARKET_ANALYSIS.md`](docs/product/GLOBAL_MARKET_ANALYSIS.md) — Comprehensive competitive analysis, user pain evidence, revenue-source scoring, pricing research, and strategic wedge evaluation.
+- [`COMPETITIVE_MATRIX.md`](docs/product/COMPETITIVE_MATRIX.md) — Detailed feature comparison matrix across 8 competitor categories and 20 dimensions.
+- [`PRODUCT_POSITIONING.md`](docs/product/PRODUCT_POSITIONING.md) — Finalized customer persona, problem statement, product promise, headline, frozen V1 scope, and explicit non-goals.
 
-## Architecture and product/business definition of done
+### Core Stage 0 Conclusions:
+1. **Hypothesis Validated:** Single-source goals and standard alert boxes are 100% commoditized and free. The clear, underserved pain is multi-source revenue aggregation with programmable weighting, multi-currency normalization, and milestone automation.
+2. **Initial Target Segment:** Monetized multi-platform streamers and VTubers (25–500 CCV) who simulcast or collect revenue across Twitch, YouTube, Ko-fi, and local payment providers.
+3. **The 80/10 Opportunity:** Delivering 80% of Streamer.bot's goal automation power with 10% of the setup complexity (cloud-based, no-code, 5-minute OBS setup).
+4. **Frozen V1 Source Scope:** Twitch (Bits & Subs), Ko-fi (Tips & Subs), Streamlabs Socket Bridge (PayPal & Super Chats), ECPay (Taiwan local), Generic Inbound Webhook, and Manual/Test Console.
+5. **Pricing:** Free ($0, 1 Goal, 2 Sources) / Pro ($7.99/mo or $69/yr for unlimited sources, custom weighting, auto-currency conversion, milestone actions, goal chaining, and permanent audit history).
 
-### Thin payment core (build now)
+---
 
-ECPay stays behind a small provider boundary. The current scope is deliberately limited
-to `create payment`, `verify callback`, `normalize status`, `persist donation`, `emit
-OBS event`, `query diagnostics`, and idempotency. The canonical internal donation event
-is provider-independent, so donation history, goals, OBS rendering, and diagnostics do
-not consume ECPay-specific payloads. A safe test adapter may exercise that event without
-real payment credentials.
+# Stage 1 — Universal Revenue Event Core
 
-Refunds, partial refunds, provider capability matrices, and complex reconciliation get
-explicit boundaries but are not prerequisites for this first external-streamer test.
-Do not build a second real provider until user evidence proves the demand; an
-unimplemented provider must never appear in the user-facing product.
+## Goal
 
-### Architecture DoD
+Refactor the current ECPay-centric system into a provider-independent revenue event architecture without breaking the existing working ECPay path.
 
-- ECPay is behind the provider adapter boundary.
-- Donation, OBS, goals, and history consume the normalized donation event only.
-- A second provider can later target the same event without rewriting OBS.
-- The test adapter is safe and cannot reach live payment credentials.
+Transform:
 
-### Product DoD
+```text
+ECPay
+→ donation
+→ OBS
+```
 
-- One unfamiliar streamer completes onboarding without database edits or remote developer operation.
-- The streamer sees a test alert within 15 minutes, completes a real payment, and sees the real alert in OBS.
-- Donation history is correct after the real payment and callback replay.
+into:
 
-### Business DoD
+```text
+Revenue Source
+→ Source Adapter
+→ Normalized Revenue Event
+→ Goal Engine
+→ OBS / History / Automation
+```
 
-- The creator sees a real Founder Plan offer.
-- Reasons for willingness and refusal are recorded.
-- At least one creator starts or clearly commits to a monthly payment.
+The system must support future sources such as:
 
-## 12. Pricing and profitability
+```text
+Twitch
+YouTube
+Ko-fi
+Streamlabs
+StreamElements
+ECPay
+Generic Webhook
+Manual/Test
+```
 
-Pricing experiment: 30-day free closed beta followed by a Founder Plan test at NT$199,
-NT$299, and NT$399/month. Show the actual founder offer, record acceptance/refusal
-reasons, and keep the current NT$70 configuration explicitly as a sandbox/beta
-validation price—not a public-launch promise. Agency pricing remains deferred until
-the founder experiment and retained-user evidence justify it.
+Do NOT implement all of these production integrations yet.
 
-**Fixed vs. revenue-share (2026-07-16):** Nekolive charges 0% below NT$10,000/month net
-donation revenue, then 3% up to a NT$1,500/month cap (reached at NT$50,000/month net
-revenue) — see [NEKOLIVE_ANALYSIS.md](docs/competitive/NEKOLIVE_ANALYSIS.md#fixed-vs-revenue-share-pricing-crossover).
-A flat NT$199–399/month price beats that only above roughly NT$6,600–13,300/month net
-donation revenue; below that, Nekolive is cheaper because it charges nothing. This
-sharpens the target customer to streamers already past that volume, and means the
-founder pricing pitch must state the crossover explicitly rather than claim flat
-pricing is a universal win.
+Implement the architecture.
 
-ECPay periodic billing requires eligible merchant arrangements and fixed TWD periodic charges; contracted fees must be confirmed before publishing margins ([recurring documentation](https://developers.ecpay.com.tw/2868/), [eligibility guidance](https://support.ecpay.com.tw/25120/)).
+Create a canonical event model covering concepts such as:
 
-Illustrative, not forecast: 10 Pro users = NT$2,990 MRR; 34 = NT$10,166. With assumed NT$8,000 monthly fixed cost and 85% contribution after fees/variable support, break-even is about 32 Pro users. Replace assumptions with invoices, contract fees, hosting measurements and support hours.
+```text
+source
+event type
+external event id
+workspace
+amount
+currency
+quantity/weight
+supporter
+message
+timestamp
+metadata
+```
 
-Costs: hosting/database/backups, monitoring/email, payment fees, support, accounting/tax/e-invoice, legal/privacy, and incidents. Path: founder-supported cohort → repeatable self-service → 32+ retained Pro-equivalent accounts → expand only from demonstrated margin.
+Support non-monetary contribution events where appropriate, such as:
 
-## 13. Beta recruitment
+```text
+subscription
+membership
+bits
+channel reward
+manual increment
+```
 
-Recruit via the confirming professional streamer, Taiwan Twitch/YouTube communities, creator managers, and referrals. Offer 30 free days, assisted setup, and a feedback agreement—not lifetime discounts. Screen streaming frequency, monetization, ECPay eligibility, and pain. Observe onboarding; check in week one; interview biweekly and at exit.
+Build:
 
-Success threshold: first pass requires one unfamiliar streamer to complete the full
-self-service path and produce a real OBS alert. Only after that pass should the cohort
-expand to five and then 10–20; the later cohort target remains 7 streaming and 5 weekly
-active in week four, with no unresolved critical payment/data incident and recorded
-pricing objections.
+* source adapter interface
+* source registry
+* normalized revenue event
+* event idempotency
+* source capability metadata
+* provider-independent persistence
+* provider-independent history
+* provider-independent OBS delivery
+* safe Manual/Test adapter
+* ECPay adapter using existing logic
+* Generic Webhook adapter
 
-### Market validation (added 2026-07-16)
+Preserve existing payment security invariants.
 
-Before expanding the general beta cohort, run interviews across five segments to test
-the competitive hypotheses in
-[NEKOLIVE_ANALYSIS.md](docs/competitive/NEKOLIVE_ANALYSIS.md): current Nekolive users,
-former Nekolive users, streamers who applied to Nekolive but didn't complete
-onboarding, monetized creators using ECPay directly with no aggregator, and creators
-using another donation platform. Full question set and per-segment follow-ups are in
-[STREAMER_INTERVIEW_GUIDE.md](docs/beta/STREAMER_INTERVIEW_GUIDE.md). Core questions:
-why they chose or rejected Nekolive, how long setup actually took, what fails during
-real streams, how often they need human support, whether they'd prefer flat monthly
-pricing, what would make them switch, which features are essential versus decorative,
-and whether they'd trust a new platform with payment-to-alert delivery. Treat any
-feature repeatedly called "essential" by interviewees as a signal to revisit the
-do-not-build list in section 6 — not as authorization to add it unilaterally.
+Do not build a universal abstraction monster.
 
-## 14. Metrics
+The abstraction only needs to support realistic V1 sources.
 
-- OAuth → workspace → provider → test donation → OBS → live alert; median time to each.
-- Payment success, callback latency, duplicate/replay and unmatched-event rates.
-- Weekly active streams; week-1/week-4 and paid-month retention.
-- Trial conversion, MRR, failed renewals, voluntary/involuntary churn.
-- Support minutes/tickets per activation and incident recovery time.
+### Done Criteria
 
-## 15–16. Risks
+Stage 1 is complete only when:
 
-| Risk | Why and impact | Difficulty | Dependency | Definition of done |
-|---|---|---|---|---|
-| Callback edge cases | Lost/duplicate money events | High | Provider access | Failure/replay/out-of-order suite and staging evidence pass |
-| Tenant/secret exposure | Existential trust impact | High | Security review | Authorization/encryption tests pass; sensitive values absent from logs |
-| OBS/network instability | Fails at moment of value | Medium | OBS test setup | Reconnect, viewport, transparent background, long-text and interruption checks pass |
-| Provider dependence | Eligibility and outage risk | High | Demand data | Incident/status playbook exists; adapter waits for validated choice |
-| Low willingness to pay | Invalid economics | Medium | Real price conversations | Qualified retained users see offer; responses recorded |
-| Support-heavy setup | Prevents scale | Medium | Funnel data | Setup time/support targets set after first five and then met |
-| Legal/tax gaps | Can block charging | High | Professional advice | Written entity, tax/e-invoice, privacy, retention and restriction decisions stored |
-| Undifferentiated vs. incumbent | Nekolive already serves this market; feature-parity competition is unwinnable for a single-provider product | High | Interview evidence | Section 13 market validation confirms at least one real gap (speed, diagnostics, or pricing) that a monetized streamer states as a switching reason |
+* no downstream goal/OBS code depends directly on ECPay payloads
+* ECPay still works through an adapter
+* Manual/Test events work
+* Generic Webhook events work
+* duplicate external events are rejected safely
+* events can contain different currencies
+* events can represent money and non-money contributions
+* source-specific metadata remains isolated
+* public OBS payloads contain no secrets
+* existing ECPay regression tests still pass
+* adding a new source does not require rewriting OBS rendering
+* architecture documentation exists
 
-## 17. Immediate next 10 actions
+Required docs:
 
-Each action inherits the rationale, impact, difficulty, dependency and DoD of its referenced row.
+`docs/architecture/REVENUE_EVENT_CORE.md`
 
-**Next milestone (revised 2026-07-16 — replaces "build more creator features"):**
-Prove that one external monetized streamer can onboard faster than Nekolive's
-manual-approval flow, understand any failure clearly through actionable diagnostics,
-complete a real ECPay-to-OBS payment reliably, and consider paying a fixed monthly fee
-instead of Nekolive's revenue share. This is a proof milestone, not a feature-count
-milestone — it is satisfied by evidence from one real external streamer, not by shipping
-more of the roadmap's build-now table.
+`docs/architecture/SOURCE_ADAPTERS.md`
 
-1. Provision staging Postgres, HTTPS domain, secrets, and encrypted backups.
-2. Run migrations; rehearse documented rollback and full restore.
-3. Exercise Google OAuth on the production-style domain.
-4. Exercise ECPay donation success, bad signature, duplicate, replay, and failure.
-5. Exercise recurring initial payment, renewal, failed renewal, and cancellation.
-6. Install monitoring and test readiness/callback/5xx alerts.
-7. Obtain Taiwan legal/accounting review for terms, privacy, retention, tax/e-invoice, and merchant eligibility.
-8. Use the sandbox-only OBS test-alert path to verify the real Browser Source, then finish the thin normalized payment event, ECPay adapter, actionable failure diagnostics, and Chinese onboarding evidence.
-9. Run market-validation interviews (section 13) across current/former Nekolive users, rejected applicants, direct-ECPay creators, and other-platform creators, in parallel with the above — this does not block the production/first-streamer gates but must inform the founder pricing pitch and any post-gate feature decision.
-10. Recruit exactly one unfamiliar, already-monetized streamer and observe the complete no-database-edit, no-remote-operation journey, measuring signup-to-test-alert time against the sub-15-minute target.
-11. Hold the production gate, then the first-streamer gate, before expanding the cohort or showing Founder pricing. Do not resume broad feature expansion (see section 6 do-not-build-now list) until this milestone is proven with real evidence.
+`docs/architecture/ADDING_A_SOURCE.md`
+
+---
+
+# Stage 2 — Cloudflare Production Infrastructure
+
+## Goal
+
+Migrate the deployable application from the current Render-oriented Node deployment to Cloudflare Workers while preserving the existing PostgreSQL database.
+
+Target architecture:
+
+```text
+donationbar.jjmowlab.com
+        ↓
+Cloudflare Worker
+        ↓
+Cloudflare Hyperdrive
+        ↓
+Existing PostgreSQL / Aiven
+```
+
+Do not migrate PostgreSQL to Supabase merely for this project.
+
+Audit:
+
+* Express compatibility
+* static asset serving
+* session implementation
+* PostgreSQL connection behavior
+* SSE / streaming behavior
+* timers
+* filesystem assumptions
+* backup tooling
+* migrations
+* graceful shutdown assumptions
+* environment configuration
+* Node APIs
+* email
+* observability
+
+Use Cloudflare's current Node compatibility capabilities where appropriate.
+
+Avoid rewriting the application framework unless necessary.
+
+Prepare:
+
+* Worker entry point
+* Wrangler configuration
+* environment separation
+* secrets configuration
+* Hyperdrive binding
+* production/staging settings
+* deployment scripts
+* health checks
+* production domain configuration documentation
+
+Keep migrations and backups runnable from an appropriate controlled environment if they should not execute inside Workers.
+
+### Done Criteria
+
+Stage 2 is complete only when:
+
+* application runs successfully in Cloudflare Workers staging
+* production Node/Express behavior needed by the app is verified
+* PostgreSQL works through Hyperdrive or a documented safe alternative
+* authentication works
+* sessions work
+* event history works
+* OBS real-time delivery works
+* test events work
+* no request depends on writable local filesystem
+* production secrets are not committed
+* staging health checks pass
+* deployment is reproducible
+* existing tests remain green
+* owner has an exact manual Cloudflare setup checklist
+
+`OWNER_ACTIONS.md` must tell the owner exactly how to:
+
+* create/connect the Worker
+* configure Hyperdrive
+* connect the existing database
+* set each required secret
+* configure Workers Builds if used
+* configure `donationbar.jjmowlab.com`
+* configure DNS
+* verify HTTPS
+* perform staging deployment
+* perform production deployment
+
+Do not mark Stage 2 done until an actual Worker staging deployment is exercised.
+
+---
+
+# Stage 3 — The Goal Engine
+
+## Goal
+
+Build the core product that makes DonationBar worth existing:
+
+> One programmable goal combining multiple revenue/support sources.
+
+A creator must be able to create a Goal with:
+
+* name
+* target
+* display currency
+* starting amount
+* active period
+* selected revenue sources
+
+Each source can optionally define:
+
+* conversion rule
+* fixed contribution value
+* percentage weighting
+* currency conversion behavior
+* inclusion/exclusion rules
+
+Examples:
+
+```text
+YouTube Super Chat:
+actual monetary value
+
+Twitch Bits:
+100 Bits = $1 goal contribution
+
+Tier 1 Twitch Sub:
++$2.50
+
+Tier 2:
++$5
+
+Tier 3:
++$12
+
+Manual:
+custom amount
+```
+
+Implement milestone rules.
+
+Example:
+
+```text
+25%
+→ animation A
+
+50%
+→ animation B
+→ webhook
+
+75%
+→ animation C
+
+100%
+→ celebration
+→ webhook
+→ optionally activate next goal
+```
+
+Actions should initially remain intentionally limited.
+
+Possible V1 actions:
+
+* visual animation
+* sound
+* Generic Webhook
+* automatically activate another Goal
+
+Do not build a full Streamer.bot competitor.
+
+The Goal Engine must be understandable by a normal streamer.
+
+### Done Criteria
+
+Stage 3 is complete only when:
+
+* one Goal can consume events from multiple adapters
+* source weighting works
+* multi-currency behavior is deterministic
+* duplicate events do not double-increment goals
+* milestone crossing is detected exactly once
+* milestone actions execute exactly once
+* goal completion is persisted
+* optional next-goal activation works
+* manual adjustment exists with audit history
+* goal reset exists
+* event history explains why the goal changed
+* creator can test every milestone without real money
+* all critical rules have automated tests
+
+The core UI must allow a non-technical creator to understand:
+
+> What contributes to this goal?
+
+and:
+
+> What happens at each milestone?
+
+without reading documentation.
+
+---
+
+# Stage 4 — OBS Experience
+
+## Goal
+
+Make DonationBar's visible output exceptionally good.
+
+The bar is not merely a technical visualization.
+
+It is the product surface viewers see.
+
+Build a focused OBS experience including:
+
+* beautiful default goal bar
+* transparent OBS background
+* responsive scaling
+* long text handling
+* customizable title
+* current value
+* target value
+* percentage
+* configurable display currency
+* milestone indicators
+* milestone animations
+* completion animation
+* alert queue safety
+* reconnect behavior
+* connection state
+* offline recovery
+* test event
+* test milestone
+* replay visualization
+* browser-source URL copying
+* recommended OBS dimensions
+
+Offer a small number of excellent themes rather than dozens of mediocre themes.
+
+Prioritize:
+
+1. reliability
+2. readability
+3. visual quality
+4. customization
+
+in that order.
+
+### Done Criteria
+
+Stage 4 is complete only when:
+
+* OBS Browser Source setup works without developer assistance
+* overlay reconnects after network interruption
+* long creator names/messages cannot break layout
+* small and large OBS viewport tests pass
+* transparent background works
+* milestone animations render correctly
+* goal completion renders correctly
+* source events update the overlay in real time
+* reconnect does not double-play completed events
+* creator can trigger safe test events
+* creator-facing connection diagnostics exist
+* setup documentation contains screenshots or equivalent clear instructions
+* real OBS verification has been performed, not only browser simulation
+
+Target:
+
+> New creator reaches a working test Goal inside OBS in under 10 minutes.
+
+---
+
+# Stage 5 — Real Global Source Integrations
+
+## Goal
+
+Connect enough real-world revenue sources that DonationBar's multi-source promise becomes genuine.
+
+Implement the highest-value sources identified in Stage 0.
+
+Initial target set:
+
+* Twitch
+* YouTube
+* Ko-fi
+* ECPay
+* Generic Webhook
+* Manual/Test
+
+Evaluate Streamlabs and StreamElements during implementation and include them if their APIs, access model, and maintenance cost make them appropriate for V1.
+
+For every source:
+
+* authentication/setup
+* event verification
+* normalization
+* idempotency
+* reconnection/retry
+* diagnostics
+* test mode where possible
+* removal/revocation
+* clear setup UI
+
+Twitch should evaluate at minimum:
+
+* Bits
+* subscriptions
+
+YouTube should evaluate at minimum:
+
+* Super Chats
+* memberships
+
+Ko-fi should evaluate monetary support events.
+
+Do not build payment processing.
+
+DonationBar consumes events from platforms/providers.
+
+Money stays with the creator's existing platform/provider.
+
+### Done Criteria
+
+Stage 5 is complete only when:
+
+* at least 3 real external sources beyond Manual/Test can feed the same Goal
+* Twitch works with at least one real supported revenue event
+* YouTube works with at least one real supported revenue event
+* ECPay continues working
+* Generic Webhook works
+* source connection UI exists
+* source disconnect/reconnect works
+* expired credentials fail clearly
+* duplicate events do not double-count
+* source outages cannot corrupt totals
+* a single Goal can receive events from at least two different real sources during one session
+* source-specific errors are diagnosable
+
+At least one real cross-source Goal must be demonstrated end-to-end.
+
+Example:
+
+```text
+Twitch contribution
++
+YouTube contribution
+→ same Goal
+→ same OBS bar
+```
+
+---
+
+# Stage 6 — Global SaaS, Paddle, Onboarding, and Launch Readiness
+
+## Goal
+
+Turn the working tool into an actual globally sellable SaaS product.
+
+Replace platform subscription billing with Paddle.
+
+Important separation:
+
+```text
+Creator → Paddle → DonationBar SaaS subscription
+
+Viewer revenue → creator's connected revenue source
+```
+
+DonationBar must never route creator donation revenue through Paddle.
+
+Implement:
+
+* Paddle Checkout
+* Paddle webhook verification
+* subscription states
+* trial if selected
+* monthly plan
+* yearly plan
+* cancellation
+* failed payment
+* renewal
+* entitlement enforcement
+* pricing page
+* customer billing management
+* global currency-friendly checkout
+* production billing diagnostics
+
+Recommended initial hypothesis:
+
+```text
+Free
+Pro ≈ US$7.99/month
+Pro yearly ≈ US$69/year
+```
+
+Do not hardcode these assumptions unnecessarily.
+
+Build public:
+
+* landing page
+* pricing
+* features
+* documentation
+* Terms
+* Privacy
+* Refund policy
+* support/contact path
+
+Landing positioning:
+
+> One bar. Every revenue source. Any rule.
+
+or the final positioning validated in Stage 0.
+
+Onboarding must guide:
+
+```text
+Sign up
+→ create Goal
+→ connect source
+→ add OBS
+→ run test
+→ go live
+```
+
+### Done Criteria
+
+Stage 6 is complete only when:
+
+* Paddle sandbox subscription works end-to-end
+* Paddle webhook verification works
+* subscription renewal works
+* failed subscription payment is handled
+* cancellation works
+* entitlements change correctly
+* monthly and yearly prices are configuration-backed
+* Free → Pro upgrade works
+* paid → cancelled behavior works
+* landing page exists
+* pricing page exists
+* Terms exist
+* Privacy Policy exists
+* Refund Policy exists
+* support path exists
+* onboarding is self-service
+* mobile landing/payment UX works
+* production domain is configured
+* Google OAuth production callback works
+* production monitoring exists
+* database backup/restore has been rehearsed
+* owner receives an exact Paddle go-live checklist
+
+`OWNER_ACTIONS.md` must include exact instructions for:
+
+### Paddle
+
+* account verification
+* product creation
+* monthly price creation
+* yearly price creation
+* client token
+* API key
+* webhook destination
+* webhook secret
+* domain approval
+* default payment link
+* sandbox testing
+* live catalog recreation
+* live credential replacement
+
+### Cloudflare
+
+* production Worker
+* Hyperdrive
+* secrets
+* production domain
+* DNS
+* deployment
+
+### Google
+
+* production OAuth origin
+* production callback URL
+
+Do not call Stage 6 done if the owner cannot follow the document line-by-line and complete the external-account setup.
+
+---
+
+# Stage 7 — Real User Proof and Public Launch Gate
+
+## Goal
+
+Take DonationBar from technically launchable to genuinely released.
+
+This stage must end in:
+
+> **Public production release.**
+
+Do not postpone release because additional features could be built.
+
+Use external users who have never touched the repository.
+
+Test the complete flow:
+
+```text
+Visit donationbar.jjmowlab.com
+→ understand product
+→ sign up
+→ create Goal
+→ connect revenue source
+→ configure Goal
+→ add OBS Browser Source
+→ trigger test contribution
+→ receive a real contribution/event
+→ Goal updates
+→ milestone behaves correctly
+→ creator understands pricing
+→ optionally subscribe through Paddle
+```
+
+Recruit at least several external streamers.
+
+Observe without taking control of their computer.
+
+Record:
+
+* activation time
+* setup failures
+* confusing UI
+* source connection failures
+* OBS failures
+* event latency
+* missing integrations
+* pricing reactions
+* willingness to pay
+* reasons not to use the product
+
+Fix only launch-blocking or severe activation issues.
+
+Do not start another broad feature cycle.
+
+Then complete the production launch.
+
+### Final Done Criteria
+
+Stage 7 is complete only when:
+
+#### Product
+
+* production site is publicly accessible
+* signup is publicly accessible
+* at least one real creator outside the development process completes onboarding
+* at least one real external revenue event updates a real OBS Goal
+* at least one Goal receives multiple source types or the V1 cross-source promise has been realistically demonstrated
+* core Goal configuration is self-service
+* error states are actionable
+* no developer database edits are required
+
+#### Reliability
+
+* production health checks pass
+* no confirmed event is silently lost in the tested flows
+* duplicate events do not double-count
+* OBS reconnect works
+* critical errors are observable
+* credentials do not appear in public responses/logs
+* backup and restore procedures are documented and tested
+
+#### Billing
+
+* Paddle production account is approved
+* production domain is approved
+* live Paddle product/prices exist
+* live Checkout opens
+* live webhook is configured
+* one real live subscription or controlled live-purchase validation has been completed
+* cancellation/recovery path is documented
+
+#### Website
+
+Public site contains:
+
+* product explanation
+* working signup
+* pricing
+* documentation
+* Terms
+* Privacy Policy
+* Refund Policy
+* support/contact
+* status/incident communication path where appropriate
+
+#### Operations
+
+* `OWNER_ACTIONS.md` has no unresolved launch blocker
+* production secrets are configured
+* production OAuth works
+* Cloudflare production deployment works
+* Aiven/Postgres production connection works
+* monitoring works
+* backup process works
+
+#### Release
+
+* production version/tag exists
+* release notes exist
+* README matches the actual product
+* old Taiwan-only/ECPay-only positioning is removed
+* `ROADMAP.md` marks Public Launch complete
+
+## FINAL RELEASE RULE
+
+Once all Stage 7 Done Criteria pass:
+
+> **Do not delay public promotion for additional features.**
+
+The product is considered launched.
+
+At that point the owner can immediately begin:
+
+* Reddit launch posts
+* streamer community outreach
+* X/Twitter posts
+* Threads
+* Discord communities
+* direct streamer outreach
+* Product Hunt if appropriate
+* demo videos
+* SEO content
+* Twitch/YouTube creator outreach
+* referral recruitment
+
+Create:
+
+`docs/launch/PROMOTION_PLAYBOOK.md`
+
+with:
+
+* target communities
+* launch positioning
+* demo assets required
+* suggested posts
+* outreach message
+* launch-week metrics
+* feedback capture
+* first 30-day growth experiments
+
+The agent must clearly state:
+
+> **DonationBar is technically and operationally ready for public promotion.**
+
+or list the exact remaining blockers.
+
+No ambiguous "almost ready" status is allowed.
+
+---
+
+# Overall Definition of Success
+
+These stages do not require DonationBar to already have product-market fit.
+
+They require DonationBar to become a real product.
+
+The project succeeds at the end of this build sequence when:
+
+> DonationBar is publicly deployed, globally usable, connected to real creator revenue sources, able to combine those sources into a programmable OBS Goal, able to charge SaaS subscriptions through Paddle, and ready to be actively promoted to streamers.
+
+Traction comes after shipping.
+
+Public launch is a required deliverable, not a reward for already having traction.
