@@ -10,3 +10,13 @@ The authoritative execution roadmap is [ROADMAP.md](../ROADMAP.md).
 3. **No-Code Simplicity:** Provide 80% of Streamer.bot's goal automation power with 10% of the friction (cloud-native SaaS, no C# coding, 5-minute setup).
 4. **Subscription Monetization:** Non-custodial SaaS subscription via Paddle (Free tier for 1 goal/2 sources; Pro tier at $7.99/mo or $69/yr for unlimited sources, custom weighting, multi-currency conversion, milestone webhooks, and goal chaining).
 
+## Permanent Operating & Go-To-Market Strategy
+- **Market:** Global
+- **Beachhead Market:** Taiwan
+- **Primary Language at Initial Launch:** Traditional Chinese
+- **Secondary Language:** English
+- **Architecture:** Global from Day 1
+- **Marketing / GTM:** Taiwan first
+
+> **Explicit Invariant:** Taiwan-first GTM does not mean Taiwan-first architecture or product scope. The system architecture, canonical event core, multi-currency engine, and cloud infrastructure are global from Day 1. Taiwan provides the high-density creator beachhead for rapid feedback before international expansion.
+

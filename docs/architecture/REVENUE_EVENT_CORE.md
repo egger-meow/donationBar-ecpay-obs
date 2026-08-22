@@ -85,9 +85,58 @@ A Canonical Revenue Event represents a single factual transaction or supporter i
 1. **Separation of Source Event from Goal Contribution**:
    - The Revenue Event answers: *What happened at the source?* (e.g., "$25.00 USD received from Alice").
    - It does **not** prematurely compute Goal progress or weighting (e.g., "add 25 points to Sub Goal"). That computation belongs exclusively to the **Goal Engine** (Stage 3).
-2. **Strict Integer Minor Unit Money**:
-   - Monetary values are stored as integers representing the smallest unit of the given ISO 4217 currency (e.g., `1000` minor units of `USD` = `$10.00`; `1000` minor units of `TWD` = `NT$1000`; `1000` minor units of `JPY` = `¥1000`).
+2. **Authoritative ISO 4217 Integer Minor Unit Money**:
+   - Monetary values are stored as integers representing the smallest minor unit of the given ISO 4217 currency.
    - Floating-point numbers are strictly rejected at the HTTP boundary and during normalization.
+
+---
+
+## Money Representation & ISO 4217 Semantics
+
+DonationBar explicitly distinguishes three representations of monetary value:
+
+### 1. Provider-Native Transport Representation
+How external payment providers or platforms encode money in their API or webhook payloads:
+- **ECPay**: Transports `TradeAmt` as integer whole TWD dollars (e.g. `TradeAmt: 300` represents NT$ 300).
+- **Stripe / Paddle**: Transports amounts as integer minor units (e.g. `amount: 1000` represents $10.00 USD).
+- **Ko-fi**: Transports amounts as decimal string major units (e.g. `amount: "5.00"` USD).
+
+Source adapters MUST translate provider transport formats into canonical ISO minor units during normalization.
+
+### 2. Currency Major Units (Human-Facing)
+The conventional denomination used in human communication, creator dashboards, and OBS displays:
+- `$10.00 USD` (10 major units)
+- `NT$ 300 TWD` (300 major units)
+- `¥300 JPY` (300 major units)
+- `500 HUF` (500 major units)
+
+### 3. Canonical ISO Minor Units (Persistent Event Core)
+The authoritative integer minor unit format persisted in `revenue_events.amount_minor`:
+- `USD 10.00` = `1000` minor units (ISO 4217 exponent 2: $10.00 \times 100$)
+- `TWD 300` = `30000` minor units (ISO 4217 exponent 2: NT$300 \times 100)
+- `JPY 300` = `300` minor units (ISO 4217 exponent 0: ¥300 \times 1)
+- `HUF 500` = `50000` minor units (ISO 4217 exponent 2: 500 \times 100)
+- `KRW 1000` = `1000` minor units (ISO 4217 exponent 0)
+- `EUR 25.50` = `2550` minor units (ISO 4217 exponent 2)
+
+### ISO 4217 Minor Unit Exponent Reference Table
+
+| Currency | Code | Exponent (Decimals) | Minor Unit Name | Example Major Unit | Canonical Minor Units |
+|---|---|:---:|---|---|:---:|
+| US Dollar | `USD` | 2 | Cent | `$10.00` | `1000` |
+| Euro | `EUR` | 2 | Cent | `€10.00` | `1000` |
+| Pound Sterling | `GBP` | 2 | Penny | `£10.00` | `1000` |
+| New Taiwan Dollar | `TWD` | 2 | Cent (分) | `NT$300` | `30000` |
+| Hungarian Forint | `HUF` | 2 | Fillér | `500 Ft` | `50000` |
+| Japanese Yen | `JPY` | 0 | Yen | `¥300` | `300` |
+| South Korean Won | `KRW` | 0 | Won | `₩1000` | `1000` |
+| Chilean Peso | `CLP` | 0 | Peso | `$5000` | `5000` |
+| Vietnamese Dong | `VND` | 0 | Dong | `20,000 ₫` | `20000` |
+| Canadian Dollar | `CAD` | 2 | Cent | `$10.00` | `1000` |
+| Australian Dollar | `AUD` | 2 | Cent | `$10.00` | `1000` |
+| Singapore Dollar | `SGD` | 2 | Cent | `$10.00` | `1000` |
+| Hong Kong Dollar | `HKD` | 2 | Cent | `$10.00` | `1000` |
+
 3. **Immutability and Sanitization**:
    - Canonical events returned by `normalizeRevenueEvent` are deep-frozen (`Object.freeze`).
    - Metadata is scrubbed of all sensitive authentication keys, passwords, card numbers, session secrets, and credentials.

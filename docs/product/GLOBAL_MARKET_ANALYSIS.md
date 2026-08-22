@@ -19,6 +19,16 @@ However, **cross-platform and multi-source revenue tracking is severely broken**
 **Strategic Wedge:**  
 DonationBar should position as **The programmable revenue goal for live streams**: a lightweight, cloud-native SaaS that normalizes arbitrary revenue/support sources (Twitch Bits/Subs, YouTube Super Chats, Ko-fi, ECPay, Webhooks) into a single, beautiful OBS goal bar with custom point/monetary weighting, multi-milestone automation, and rock-solid reliability.
 
+### Permanent Operating & Go-To-Market Strategy
+- **Market:** Global
+- **Beachhead Market:** Taiwan
+- **Primary Language at Initial Launch:** Traditional Chinese
+- **Secondary Language:** English
+- **Architecture:** Global from Day 1
+- **Marketing / GTM:** Taiwan first
+
+> **Explicit Invariant:** Taiwan-first GTM does not mean Taiwan-first architecture or product scope. The system architecture, canonical event core, multi-currency engine, and cloud infrastructure are global from Day 1. Taiwan provides the high-density creator beachhead for rapid feedback before international expansion.
+
 ---
 
 ## 2. Streaming Market Map

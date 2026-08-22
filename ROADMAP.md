@@ -30,6 +30,17 @@ The final system should support a global SaaS model where:
 * DonationBar charges creators through Paddle
 * DonationBar does not custody creator donation revenue
 
+## Permanent Operating & Go-To-Market Strategy
+
+- **Market:** Global
+- **Beachhead Market:** Taiwan
+- **Primary Language at Initial Launch:** Traditional Chinese
+- **Secondary Language:** English
+- **Architecture:** Global from Day 1
+- **Marketing / GTM:** Taiwan first
+
+> **Explicit Invariant:** Taiwan-first GTM does not mean Taiwan-first architecture or product scope. The system architecture, canonical event core, multi-currency engine, and cloud infrastructure are global from Day 1. Taiwan provides the high-density creator beachhead for rapid feedback before international expansion.
+
 ## Global execution rule
 
 Do not implement later stages early.

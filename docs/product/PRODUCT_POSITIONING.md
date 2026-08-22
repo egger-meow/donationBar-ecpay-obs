@@ -15,6 +15,19 @@
 
 ---
 
+## 1.1 Permanent Operating & Go-To-Market Strategy
+- **Market:** Global
+- **Beachhead Market:** Taiwan
+- **Primary Language at Initial Launch:** Traditional Chinese
+- **Secondary Language:** English
+- **Architecture:** Global from Day 1
+- **Marketing / GTM:** Taiwan first
+
+> **Explicit Invariant:** Taiwan-first GTM does not mean Taiwan-first architecture or product scope.
+> The product architecture, canonical data models, multi-currency engine, and cloud infrastructure are designed and built globally from Day 1 to support streamers worldwide. Taiwan serves as the focused, high-density beachhead for initial creator onboarding and payment validation before scaling international marketing.
+
+---
+
 ## 2. The Core Problem
 **Fragmented revenue tracking and inflexible stream goal widgets.**
 - Incumbent tools (Streamlabs, StreamElements) force streamers to display separate, disconnected goal bars for each platform or monetization type.
