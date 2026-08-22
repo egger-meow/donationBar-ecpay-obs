@@ -37,7 +37,6 @@ const app = express();
 const __dirname = path.resolve();
 const production = isProduction();
 
-validateProductionConfig();
 if (production) app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.use(helmet(getHelmetOptions({ production })));
@@ -2590,6 +2589,7 @@ const isMain = process.argv[1] && (
 );
 
 if (isMain && !process.env.NO_SERVER_LISTEN) {
+  validateProductionConfig();
   const port = process.env.PORT || 3000;
   await database.ready;
   server = app.listen(port, () => {

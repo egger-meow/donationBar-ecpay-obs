@@ -15,6 +15,7 @@ BASE_URL = "https://donatio-staging.jjmowlab.com"
 GOOGLE_CALLBACK_URL = "https://donatio-staging.jjmowlab.com/api/auth/google/callback"
 ECPAY_ENVIRONMENT = "stage"
 NODE_ENV = "production"
+PLATFORM_ADMIN_EMAILS = "admin@jjmowlab.com"
 
 # Top-level Hyperdrive binding for local/default development
 [[hyperdrive]]
@@ -33,6 +34,7 @@ BASE_URL = "https://donatio-staging.jjmowlab.com"
 GOOGLE_CALLBACK_URL = "https://donatio-staging.jjmowlab.com/api/auth/google/callback"
 ECPAY_ENVIRONMENT = "stage"
 NODE_ENV = "production"
+PLATFORM_ADMIN_EMAILS = "admin@jjmowlab.com"
 
 # Hyperdrive bindings are non-inheritable across named environments
 [[env.staging.hyperdrive]]
@@ -51,6 +53,7 @@ BASE_URL = "https://donatio.jjmowlab.com"
 GOOGLE_CALLBACK_URL = "https://donatio.jjmowlab.com/api/auth/google/callback"
 ECPAY_ENVIRONMENT = "production"
 NODE_ENV = "production"
+PLATFORM_ADMIN_EMAILS = "admin@jjmowlab.com"
 
 # Hyperdrive bindings are non-inheritable across named environments
 [[env.production.hyperdrive]]
