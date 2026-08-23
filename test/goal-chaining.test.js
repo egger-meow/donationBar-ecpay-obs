@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { v4 as uuidv4 } from 'uuid';
-import { detectGoalChainCycles, handleGoalCompletionAndChaining } from '../lib/goal-engine/goal-chaining.js';
+import { detectGoalChainCycles, validateGoalChainingConfig, handleGoalCompletionAndChaining } from '../lib/goal-engine/goal-chaining.js';
 import database from '../lib/database.js';
 
 test('detectGoalChainCycles: detects self loops and multi-step cycles', () => {
@@ -94,3 +94,37 @@ test('handleGoalCompletionAndChaining: does not re-chain if goal was already com
   assert.equal(result.isCompleted, true);
   assert.equal(result.chainedGoalActivated, false);
 });
+
+test('validateGoalChainingConfig: rejects self reference, missing target, and indirect loops at write time', () => {
+  const goalA = { id: 'goal-A', nextGoalId: 'goal-B' };
+  const goalB = { id: 'goal-B', nextGoalId: 'goal-C' };
+  const goalC = { id: 'goal-C', nextGoalId: null };
+  const allWorkspaceGoals = [goalA, goalB, goalC];
+
+  // Self-reference
+  const selfCheck = validateGoalChainingConfig('goal-A', 'goal-A', allWorkspaceGoals);
+  assert.equal(selfCheck.valid, false);
+  assert.equal(selfCheck.reason, 'self_reference_forbidden');
+
+  // Non-existent target
+  const missingCheck = validateGoalChainingConfig('goal-A', 'non-existent-goal-id', allWorkspaceGoals);
+  assert.equal(missingCheck.valid, false);
+  assert.equal(missingCheck.reason, 'target_goal_not_found_in_workspace');
+
+  // Indirect loop: C trying to chain to A when A -> B -> C
+  const loopCheck = validateGoalChainingConfig('goal-C', 'goal-A', allWorkspaceGoals);
+  assert.equal(loopCheck.valid, false);
+  assert.equal(loopCheck.reason, 'circular_chain_detected');
+
+  // Valid forward chaining: C chaining to a new goal D
+  const goalD = { id: 'goal-D', nextGoalId: null };
+  const validCheck = validateGoalChainingConfig('goal-C', 'goal-D', [...allWorkspaceGoals, goalD]);
+  assert.equal(validCheck.valid, true);
+  assert.equal(validCheck.reason, null);
+
+  // Clearing nextGoalId (null) is valid
+  const nullCheck = validateGoalChainingConfig('goal-A', null, allWorkspaceGoals);
+  assert.equal(nullCheck.valid, true);
+  assert.equal(nullCheck.reason, null);
+});
+

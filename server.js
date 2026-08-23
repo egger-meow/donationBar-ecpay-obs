@@ -34,6 +34,7 @@ import { createTestRevenueEvent } from './lib/source-adapters/test-adapter.js';
 import { getActiveSources, getSourceDefinition } from './lib/source-registry.js';
 import { processRevenueEventForGoalEngine } from './lib/goal-engine/goal-engine.js';
 import { getCrossedMilestones } from './lib/goal-engine/milestone-evaluator.js';
+import { validateGoalChainCycles, validateGoalChainingConfig } from './lib/goal-engine/goal-chaining.js';
 import { validateGoalRule, RULE_TYPES } from './lib/goal-engine/goal-rules.js';
 import { validateOutboundWebhookUrl } from './lib/goal-engine/outbound-webhook.js';
 import { minorToMajorUnits, majorToMinorUnits, parseMinorUnitAmount, normalizeRevenueCurrency } from './lib/money.js';
@@ -1675,6 +1676,14 @@ app.post('/api/goals', requireAdmin, requireSameOrigin, async (req, res) => {
 
     const { title, description, targetMinor, displayCurrency, startingAmountMinor, isActive, nextGoalId } = req.body || {};
 
+    if (nextGoalId) {
+      const allWorkspaceGoals = await database.getWorkspaceGoals(workspace.id);
+      const chainValidation = validateGoalChainingConfig(null, nextGoalId, allWorkspaceGoals);
+      if (!chainValidation.valid) {
+        return res.status(400).json({ error: `Invalid goal chaining configuration: ${chainValidation.reason}` });
+      }
+    }
+
     const goal = await database.createGoal(workspace.id, {
       title,
       description,
@@ -1757,6 +1766,15 @@ app.patch('/api/goals/:goalId', requireAdmin, requireSameOrigin, async (req, res
     if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
 
     const { goalId } = req.params;
+
+    if (req.body?.nextGoalId !== undefined && req.body.nextGoalId !== null) {
+      const allWorkspaceGoals = await database.getWorkspaceGoals(workspace.id);
+      const chainValidation = validateGoalChainingConfig(goalId, req.body.nextGoalId, allWorkspaceGoals);
+      if (!chainValidation.valid) {
+        return res.status(400).json({ error: `Invalid goal chaining configuration: ${chainValidation.reason}` });
+      }
+    }
+
     const updated = await database.updateGoal(workspace.id, goalId, req.body);
     if (!updated) return res.status(404).json({ error: 'Goal not found' });
 
