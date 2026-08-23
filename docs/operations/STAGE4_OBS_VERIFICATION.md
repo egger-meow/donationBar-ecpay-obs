@@ -56,3 +56,19 @@ Perform these steps on the staging environment:
 2. Width: `800`, Height: `250`.
 3. Confirm page background is completely transparent and does not display scrollbars.
 4. Trigger a test event from the dashboard $\to$ verify OBS Studio renders animations in real-time.
+
+---
+
+## 3. Real OBS Sign-Off / Verification Results
+
+| Item | Test Scenario | Expected Result | Sign-Off Status |
+|---|---|---|---|
+| 1 | **Transparent Browser Source** | OBS Canvas shows zero black/white box or layout shift | `[ ] PENDING OWNER SIGN-OFF` |
+| 2 | **Initial Goal State** | Authoritative current/target amounts display immediately on load | `[ ] PENDING OWNER SIGN-OFF` |
+| 3 | **Real-Time Progress Update** | Progress bar and numbers advance smoothly on contribution | `[ ] PENDING OWNER SIGN-OFF` |
+| 4 | **Ordered Multi-Threshold Milestones** | Leaping 50% $\to$ 75% $\to$ 100% executes sequentially in order | `[ ] PENDING OWNER SIGN-OFF` |
+| 5 | **Action Combinations** | `visualAction: false` plays sound only; `soundAction: false` plays visual only | `[ ] PENDING OWNER SIGN-OFF` |
+| 6 | **100% Completion Celebration** | Fanfare and confetti trigger once per completion epoch | `[ ] PENDING OWNER SIGN-OFF` |
+| 7 | **Network Disconnect & Reconnect** | SSE reconnects with exponential backoff and re-syncs state | `[ ] PENDING OWNER SIGN-OFF` |
+| 8 | **Browser Source Reload** | Reloading OBS source does not replay already-seen milestone animations | `[ ] PENDING OWNER SIGN-OFF` |
+

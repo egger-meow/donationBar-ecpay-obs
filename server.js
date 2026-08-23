@@ -667,6 +667,8 @@ async function getProgress(workspaceId = null) {
     const formattedDonations = contributions.map(c => ({
       alertId: c.id,
       amount: minorToMajorUnits(c.contributionMinor, currency),
+      amountMinor: c.contributionMinor,
+      currency,
       payer: c.supporterName || '贊助者',
       message: c.message || '',
       at: c.createdAt
@@ -692,6 +694,10 @@ async function getProgress(workspaceId = null) {
       actualDonations: actualDonationsMajor,
       startFrom: startingMajor,
       goal: targetMajor,
+      currentAmountMinor: activeGoal.currentAmountMinor,
+      targetAmountMinor: activeGoal.targetMinor,
+      startingAmountMinor: activeGoal.startingAmountMinor,
+      actualDonationsMinor: Math.max(0, activeGoal.currentAmountMinor - activeGoal.startingAmountMinor),
       percent,
       currency,
       goalId: activeGoal.id,
@@ -712,6 +718,11 @@ async function getProgress(workspaceId = null) {
       actualDonations: 0,
       startFrom: 0,
       goal: 1000,
+      currentAmountMinor: 0,
+      targetAmountMinor: 100000,
+      startingAmountMinor: 0,
+      actualDonationsMinor: 0,
+      currency: 'TWD',
       percent: 0,
       donations: []
     };
@@ -744,6 +755,11 @@ async function getProgress(workspaceId = null) {
     actualDonations,
     startFrom,
     goal,
+    currentAmountMinor: current * 100,
+    targetAmountMinor: goal * 100,
+    startingAmountMinor: startFrom * 100,
+    actualDonationsMinor: actualDonations * 100,
+    currency: 'TWD',
     percent,
     donations: displayDonations,
     latestDonation: progress.donations[0] || null,

@@ -84,6 +84,8 @@ export class OverlayApp {
   async _handlePresentationItem(item) {
     if (item.type === 'milestone') {
       const isSound = item.soundAction !== false;
+      const isVisual = item.visualAction !== false;
+
       if (isSound) {
         if (item.thresholdPercent >= 100) {
           this.audioController.queueSound('completion');
@@ -91,19 +93,32 @@ export class OverlayApp {
           this.audioController.queueSound('milestone');
         }
       }
-      if (item.thresholdPercent >= 100) {
-        await this.renderer.presentCompletion({ title: item.goalTitle || item.label }, 5000);
-      } else {
-        await this.renderer.presentMilestone(item, 4000);
+
+      if (isVisual) {
+        if (item.thresholdPercent >= 100) {
+          await this.renderer.presentCompletion({ title: item.goalTitle || item.label, visualAction: true }, 5000);
+        } else {
+          await this.renderer.presentMilestone(item, 4000);
+        }
+      } else if (isSound) {
+        // Provide a bounded pause for audio playback before advancing queue
+        await new Promise(r => setTimeout(r, 600));
       }
     } else if (item.type === 'donation_alert') {
-      if (item.soundAction !== false) {
+      const isSound = item.soundAction !== false;
+      const isVisual = item.visualAction !== false;
+
+      if (isSound) {
         this.audioController.queueSound('donation');
       }
-      await this.renderer.presentMilestone({
-        label: `${item.payer || '觀眾'} 斗內了！`,
-        visualAction: true
-      }, 3500);
+      if (isVisual) {
+        await this.renderer.presentMilestone({
+          label: `${item.payer || '觀眾'} 斗內了！`,
+          visualAction: true
+        }, 3500);
+      } else if (isSound) {
+        await new Promise(r => setTimeout(r, 500));
+      }
     }
   }
 

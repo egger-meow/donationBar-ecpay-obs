@@ -120,10 +120,18 @@ export class PresentationQueue {
       return false;
     }
 
-    // Bounded queue protection: prevent flood memory buildup
+    const isCritical = item.type === 'milestone' || item.type === 'goal_completion';
+
+    // Bounded queue protection: only drop transient donation alerts under pressure
     if (this.queue.length >= MAX_QUEUE_SIZE) {
-      // Drop lowest priority or oldest item
-      this.queue.shift();
+      const dropIndex = this.queue.findIndex(q => q.type === 'donation_alert');
+      if (dropIndex !== -1) {
+        this.queue.splice(dropIndex, 1);
+      } else if (!isCritical) {
+        // Drop transient alert if queue has only critical milestone events
+        return false;
+      }
+      // Critical milestone/completion events are never dropped
     }
 
     this.queue.push(item);

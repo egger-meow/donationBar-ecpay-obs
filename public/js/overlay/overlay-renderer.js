@@ -5,7 +5,7 @@
  * and confetti celebration effects.
  */
 
-import { formatCurrencyAmount } from './currency-formatter.js';
+import { formatCurrencyAmount, majorToMinor } from './currency-formatter.js';
 
 export class OverlayRenderer {
   constructor(containerElement, options = {}) {
@@ -151,9 +151,9 @@ export class OverlayRenderer {
       currentMinor = data.currentAmountMinor;
       targetMinor = data.targetAmountMinor;
     } else if (Number.isFinite(data.current) && Number.isFinite(data.goal)) {
-      // Legacy compatibility: data.current and data.goal might be in major units or minor
-      currentMinor = data.current * 100; // TWD default minor scale
-      targetMinor = data.goal * 100;
+      // Legacy major unit fallback - convert using actual currency exponent, NEVER blindly * 100
+      currentMinor = majorToMinor(data.current, currency);
+      targetMinor = majorToMinor(data.goal, currency);
     }
 
     const percent = targetMinor > 0
@@ -187,13 +187,17 @@ export class OverlayRenderer {
     const latest = data.latestDonation || (data.donations && data.donations[0]);
     if (latest && (latest.payer || latest.supporterName)) {
       const name = latest.payer || latest.supporterName || '匿名觀眾';
-      const amt = Number.isFinite(latest.amountMinor)
-        ? formatCurrencyAmount(latest.amountMinor, currency, { locale: this.locale })
-        : (latest.amount ? `NT$ ${latest.amount}` : '');
+      const donationCurrency = latest.currency || currency;
+      let amtStr = '';
+      if (Number.isFinite(latest.amountMinor)) {
+        amtStr = formatCurrencyAmount(latest.amountMinor, donationCurrency, { locale: this.locale });
+      } else if (Number.isFinite(latest.amount)) {
+        amtStr = formatCurrencyAmount(majorToMinor(latest.amount, donationCurrency), donationCurrency, { locale: this.locale });
+      }
       const msg = latest.message ? `：${latest.message}` : '';
 
       this.elements.supporterName.textContent = name;
-      this.elements.supporterAmount.textContent = amt ? ` (${amt})` : '';
+      this.elements.supporterAmount.textContent = amtStr ? ` (${amtStr})` : '';
       this.elements.supporterMessage.textContent = msg;
       this.elements.supporterBox.style.display = 'flex';
     } else {
@@ -208,6 +212,10 @@ export class OverlayRenderer {
    * @returns {Promise<void>}
    */
   async presentMilestone(milestone = {}, durationMs = 4000) {
+    if (milestone.visualAction === false) {
+      return;
+    }
+
     const label = milestone.label || `${milestone.thresholdPercent}% 里程碑達成！`;
     
     // Set banner text safely
@@ -218,9 +226,7 @@ export class OverlayRenderer {
     this.elements.fill.classList.add('shimmer-active');
     this.elements.card.classList.add('pulse-active');
 
-    if (milestone.visualAction !== false) {
-      this.triggerConfetti(25);
-    }
+    this.triggerConfetti(25);
 
     return new Promise((resolve) => {
       setTimeout(() => {
@@ -239,6 +245,10 @@ export class OverlayRenderer {
    * @returns {Promise<void>}
    */
   async presentCompletion(goal = {}, durationMs = 5000) {
+    if (goal.visualAction === false) {
+      return;
+    }
+
     const title = goal.title || this.elements.title.textContent || '目標達成';
     this.elements.milestoneBanner.textContent = `🏆 ${title} 100% 達成！`;
     this.elements.milestoneBanner.classList.add('active');
@@ -260,7 +270,7 @@ export class OverlayRenderer {
    * @param {number} count
    */
   triggerConfetti(count = 30) {
-    if (typeof document === 'undefined') return;
+    if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
 
     let layer = document.getElementById('confettiLayer');
     if (!layer) {
