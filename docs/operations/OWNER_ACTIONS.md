@@ -172,3 +172,38 @@ This runs:
   - All Goal Engine tables, rules, currency conversions, milestones, and chaining operate directly inside Donatio.
   - Outbound webhooks for milestone triggers accept public HTTPS URLs configured directly by the streamer in the Creator Dashboard (`public/admin.html`).
   - No external OAuth or developer console setup is required until Stage 5 (Twitch/YouTube adapters) and Stage 6 (Paddle Merchant of Record).
+
+---
+
+## Stage 5 — Global Source Integrations Setup
+
+To enable Twitch and Ko-fi integrations, the repository owner must configure the following provider applications:
+
+### 1. Twitch Developer Console Setup
+1. Go to the [Twitch Developer Console](https://dev.twitch.tv/console/apps).
+2. Click **Register Your Application**.
+3. **Name**: `Donatio` (or `Donatio Staging`)
+4. **OAuth Redirect URLs**:
+   - Staging: `https://donatio-staging.jjmowlab.com/api/integrations/twitch/callback`
+   - Production: `https://donatio.jjmowlab.com/api/integrations/twitch/callback`
+5. **Category**: `Website Integration` / `Broadcaster Tools`
+6. Copy the generated **Client ID** and **Client Secret**.
+7. Provision secrets in Cloudflare Workers:
+   ```bash
+   npx wrangler secret put TWITCH_CLIENT_ID --env staging
+   npx wrangler secret put TWITCH_CLIENT_SECRET --env staging
+   npx wrangler secret put TWITCH_EVENTSUB_SECRET --env staging
+   ```
+8. Required Scopes requested during creator OAuth:
+   - `bits:read`
+   - `channel:read:subscriptions`
+
+### 2. Ko-fi Webhook Setup
+1. In the Creator Dashboard, navigate to **Integrations** $\to$ **Ko-fi**.
+2. Copy the workspace-specific Webhook URL:
+   - `https://donatio-staging.jjmowlab.com/api/webhooks/kofi/<workspaceSlug>`
+3. In [Ko-fi Account Settings](https://ko-fi.com/manage/webhooks) (under **Advanced / Webhooks**):
+   - Paste the Webhook URL.
+   - Copy the Ko-fi **Verification Token** and paste it into Donatio's Ko-fi configuration modal.
+4. Click **Send Test** in the Ko-fi dashboard to verify immediate delivery.
+
