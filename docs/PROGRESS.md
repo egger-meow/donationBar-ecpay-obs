@@ -4,6 +4,7 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-08-23 — Stage 4: Production OBS Experience and Modular Overlay Architecture (P0 architecture)
 - 2026-08-23 — Stage 3: Correctness and Production-Readiness Closure (P0 architecture)
 - 2026-08-23 — Stage 3: The Programmable Goal Engine implementation (P0 architecture)
 - 2026-08-22 — Stage 1: Universal Revenue Event Core implementation (P0 architecture)
@@ -68,6 +69,28 @@ delete a past entry — if something it describes later changes or turns out wro
 in a new entry instead. This file records *what happened*; it is not a priority list.
 For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edited in
 place as work completes or priorities shift.
+
+---
+
+## 2026-08-23 — Stage 4: Production OBS Experience and Modular Overlay Architecture (P0 architecture)
+
+Make Donatio's OBS Browser Source experience production-quality: reliable, readable, visually polished, resilient to disconnects, excellent with milestone events, and usable by streamers without developer help.
+
+- **Modular Vanilla Overlay Architecture**: Refactored monolithic overlay into clean standard ES modules:
+  - `public/js/overlay/currency-formatter.js`: Locale-aware ISO 4217 currency formatting (`TWD`, `USD`, `EUR`, `GBP`, `JPY`) converting minor units to display figures without floating point corruption.
+  - `public/js/overlay/presentation-queue.js`: Deterministic sequential presentation queue ensuring multi-threshold leaps (e.g. 50% -> 75% -> 100%) execute in strictly ascending order with session deduplication.
+  - `public/js/overlay/audio-controller.js`: Zero-dependency Web Audio melodic chime and fanfare synthesizer with HTMLAudio fallback and non-overlapping queue scheduling.
+  - `public/js/overlay/theme-manager.js`: 3 curated shipped themes (`minimal`, `gaming`, `creator`) with CSS custom properties and `prefers-reduced-motion` compliance.
+  - `public/js/overlay/realtime-client.js`: Resilient SSE client featuring initial state hydration, exponential backoff with jitter, and state catch-up on reconnect.
+  - `public/js/overlay/overlay-renderer.js`: Safe DOM rendering engine with strict XSS sanitization (`textContent`), overshoot percentages, and celebration banner/confetti.
+- **Creator Dashboard OBS Console**:
+  - 1-click Browser Source URL copy with recommended dimensions (`800x250` / `600x200`).
+  - Concise 4-step OBS setup instructions.
+  - OBS live test event console: Test Progress, Test Milestone, Test Completion, Test Sound (synthetic events that do not alter durable accounting totals).
+  - Theme selector and live preview.
+- **Architecture Documentation & Tests**:
+  - Created `docs/architecture/OBS_OVERLAY.md`, `docs/architecture/OBS_PRESENTATION_QUEUE.md`, `docs/architecture/OBS_REALTIME_CLIENT.md`, `docs/architecture/OBS_AUDIO.md`, and `docs/operations/STAGE4_OBS_VERIFICATION.md`.
+  - Added unit test suites for all modules; full test suite passes.
 
 ---
 

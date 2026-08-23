@@ -253,15 +253,19 @@ Stage 3 implementation, automated testing, and Creator Dashboard UI were complet
 
 ---
 
-# Stage 4 — OBS Experience
+# Stage 4 — OBS Experience [✅ Shipped & Complete]
 
 ## Goal
 
-Make DonationBar's visible output exceptionally good.
+Make Donatio's visible OBS Browser Source output exceptionally reliable, readable, and visually polished.
 
-The bar is not merely a technical visualization.
-
-It is the product surface viewers see.
+**Shipped Status (2026-08-23)**:
+- Modular ES client (`currency-formatter.js`, `presentation-queue.js`, `audio-controller.js`, `theme-manager.js`, `realtime-client.js`, `overlay-renderer.js`).
+- 3 shipped themes (`Minimal`, `Gaming Neon`, `Creator Soft`).
+- Deterministic sequential milestone queue (50% -> 75% -> 100%) with deduplication.
+- Web Audio zero-copyright tone synthesis + HTMLAudio support.
+- One-click OBS URL copy, 4-step setup instructions, and interactive test event console on creator dashboard.
+- Full automated test suite & operational verification runbook.
 
 Build a focused OBS experience including:
 
