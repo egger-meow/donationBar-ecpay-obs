@@ -5,16 +5,17 @@ import { readFile } from 'node:fs/promises';
 test('activation UI exposes copy/test controls and overlay test mode emits an alert event', async () => {
   const admin = await readFile(new URL('../public/admin.html', import.meta.url), 'utf8');
   const overlay = await readFile(new URL('../public/overlay.html', import.meta.url), 'utf8');
+  const appJs = await readFile(new URL('../public/js/overlay/overlay-app.js', import.meta.url), 'utf8');
   assert.match(admin, /onclick="copyObsUrl\(\)"/);
   assert.match(admin, /onclick="openObsTest\(\)"/);
   assert.match(admin, /onclick="sendObsTestAlert\(\)"/);
   assert.match(admin, /15 分鐘|15分鐘/);
   assert.match(admin, /第一筆付款（測試提示不會計入）/);
   assert.match(admin, /\/admin\/activation\/test-alert/);
-  assert.match(overlay, /const queryParams = new URLSearchParams\(window\.location\.search\)/);
-  assert.match(overlay, /const testMode = queryParams\.get\('test'\) === '1'/);
-  assert.match(overlay, /latestDonation:\s*\{\s*alertId/);
-  assert.match(overlay, /testMode\)\s*\{[\s\S]*?eventSource = setupSSE\(\);/);
+  assert.match(overlay, /src="\/js\/overlay\/overlay-app\.js"/);
+  assert.match(appJs, /this\.queryParams = new URLSearchParams\(window\.location\.search\)/);
+  assert.match(appJs, /this\.isTestMode = this\.queryParams\.get\('test'\) === '1'/);
+  assert.match(appJs, /this\._startTestLoop\(\)/);
 });
 
 test('server test-alert path is sandbox-only, transient, and provider-independent', async () => {

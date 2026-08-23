@@ -10,8 +10,8 @@ test('public workspace progress uses opaque alert IDs instead of provider trade 
 });
 
 test('overlay deduplicates alerts using alertId and never logs donor values', async () => {
-  const source = await readFile(new URL('../public/overlay.html', import.meta.url), 'utf8');
-  assert.match(source, /latestDonation\.alertId/);
-  assert.doesNotMatch(source, /latestDonation\.tradeNo/);
+  const source = await readFile(new URL('../public/js/overlay/presentation-queue.js', import.meta.url), 'utf8');
+  assert.match(source, /item\.alertId/);
+  assert.doesNotMatch(source, /item\.tradeNo/);
   assert.doesNotMatch(source, /console\.log\('Showing donation alert for:'/);
 });

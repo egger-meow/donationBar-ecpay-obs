@@ -2,10 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-test('overlay alert layout stays inside short OBS viewports and bounds long messages', async () => {
-  const source = await readFile(new URL('../public/overlay.html', import.meta.url), 'utf8');
-  assert.match(source, /top:\s*clamp\(20px,\s*22vh,\s*170px\)/);
-  assert.match(source, /max-height:\s*calc\(100vh - 20px\)/);
-  assert.match(source, /\.alert-user-message[\s\S]*?max-height:\s*30vh/);
-  assert.match(source, /\.alert-user-message[\s\S]*?overflow-y:\s*auto/);
+test('overlay layout has transparent background and responsive viewport bounds', async () => {
+  const htmlSource = await readFile(new URL('../public/overlay.html', import.meta.url), 'utf8');
+  assert.match(htmlSource, /<main id="overlayApp"/);
+  assert.match(htmlSource, /href="\/css\/overlay-base\.css"/);
+
+  const cssSource = await readFile(new URL('../public/css/overlay-base.css', import.meta.url), 'utf8');
+  assert.match(cssSource, /background:\s*transparent\s*!important/);
+  assert.match(cssSource, /overflow:\s*hidden/);
+  assert.match(cssSource, /@media\s*\(max-height:\s*250px\)/);
+  assert.match(cssSource, /@media\s*\(max-width:\s*600px\)/);
 });
