@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS goals (
 );
 
 CREATE INDEX IF NOT EXISTS idx_goals_workspace ON goals(workspace_id);
-CREATE INDEX IF NOT EXISTS idx_goals_workspace_active ON goals(workspace_id, is_active);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_goals_workspace_active ON goals(workspace_id) WHERE is_active = TRUE;
 CREATE INDEX IF NOT EXISTS idx_goals_status ON goals(workspace_id, status);
 
 -- 2. Goal Source Rules Table
