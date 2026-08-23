@@ -1094,6 +1094,18 @@
         }
       });
 
+      // Listen for milestone trigger events
+      connection.addEventListener('milestone', function(event) {
+        try {
+          const milestoneData = JSON.parse(event.data);
+          // Realtime milestone event payload with visualAction and soundAction
+          // Milestone rendering is executed in Stage 4; received and parsed here safely
+          console.log('Milestone reached:', milestoneData);
+        } catch (error) {
+          console.error('Error parsing milestone event:', error);
+        }
+      });
+
       connection.onerror = function(error) {
         console.error('SSE connection error:', error);
 

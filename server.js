@@ -33,6 +33,7 @@ import { createManualRevenueEvent } from './lib/source-adapters/manual-adapter.j
 import { createTestRevenueEvent } from './lib/source-adapters/test-adapter.js';
 import { getActiveSources, getSourceDefinition } from './lib/source-registry.js';
 import { processRevenueEventForGoalEngine } from './lib/goal-engine/goal-engine.js';
+import { getCrossedMilestones } from './lib/goal-engine/milestone-evaluator.js';
 import { validateGoalRule, RULE_TYPES } from './lib/goal-engine/goal-rules.js';
 import { validateOutboundWebhookUrl } from './lib/goal-engine/outbound-webhook.js';
 import { minorToMajorUnits, majorToMinorUnits, parseMinorUnitAmount, normalizeRevenueCurrency } from './lib/money.js';
@@ -496,6 +497,53 @@ async function broadcastOverlaySettings(workspaceId = null) {
   }
 }
 
+// Broadcast structured milestone events to all connected clients in workspace
+function broadcastMilestoneEvents(workspaceId, triggeredMilestones, goal, newAmountMinor) {
+  if (!triggeredMilestones || !triggeredMilestones.length) return;
+  const currency = goal?.displayCurrency || 'TWD';
+  const targetMinor = Number(goal?.targetMinor || 0);
+
+  for (const milestone of triggeredMilestones) {
+    const milestoneEvent = {
+      milestoneId: milestone.id,
+      goalId: goal?.id,
+      thresholdPercent: Number(milestone.thresholdPercent),
+      label: milestone.label || `${milestone.thresholdPercent}% Milestone`,
+      visualAction: Boolean(milestone.visualAction !== false),
+      soundAction: Boolean(milestone.soundAction !== false),
+      currentAmountMinor: newAmountMinor,
+      targetAmountMinor: targetMinor,
+      currentAmount: minorToMajorUnits(newAmountMinor, currency),
+      targetAmount: minorToMajorUnits(targetMinor, currency),
+      currency,
+      epoch: goal?.epoch || 1,
+      triggeredAt: milestone.triggerRecord?.triggeredAt || new Date().toISOString()
+    };
+
+    const payload = `event: milestone\ndata: ${JSON.stringify(milestoneEvent)}\n\n`;
+
+    for (const [res, client] of sseClients.entries()) {
+      if (client.workspaceId === workspaceId) {
+        try {
+          if (!res.writableEnded && !res.destroyed) {
+            res.write(payload);
+          } else {
+            sseClients.delete(res);
+          }
+        } catch (error) {
+          logWarn('sse_milestone_write_failed');
+          sseClients.delete(res);
+        }
+      }
+    }
+
+    logInfo('sse_milestone_broadcast_completed', {
+      workspace_id: workspaceId,
+      threshold_percent: milestone.thresholdPercent
+    });
+  }
+}
+
 // Broadcast admin notifications (warnings/errors) to connected admin panels
 function broadcastAdminNotification(workspaceId, type, message, details = null) {
   const notification = {
@@ -735,11 +783,14 @@ async function addDonation(workspaceId, donationEvent) {
       });
 
       await database.addRevenueEvent(workspaceId, revenueEvent);
-      await processRevenueEventForGoalEngine({
+      const engineResult = await processRevenueEventForGoalEngine({
         database,
         workspaceId,
         revenueEvent
       });
+      if (engineResult?.triggeredMilestones?.length) {
+        broadcastMilestoneEvents(workspaceId, engineResult.triggeredMilestones, engineResult.goal, engineResult.newAmountMinor);
+      }
     } catch (engineErr) {
       logWarn('goal_engine_ecpay_ingest_failed', { error: engineErr.message });
     }
@@ -1438,11 +1489,17 @@ app.post('/api/webhook/generic/:slug', async (req, res) => {
     });
 
     if (result.workspaceId && !result.wasDuplicate && result.event) {
-      await processRevenueEventForGoalEngine({
+      const engineResult = await processRevenueEventForGoalEngine({
         database,
         workspaceId: result.workspaceId,
         revenueEvent: result.event
-      }).catch(err => logWarn('goal_engine_webhook_ingest_failed', { error: err.message }));
+      }).catch(err => {
+        logWarn('goal_engine_webhook_ingest_failed', { error: err.message });
+        return null;
+      });
+      if (engineResult?.triggeredMilestones?.length) {
+        broadcastMilestoneEvents(result.workspaceId, engineResult.triggeredMilestones, engineResult.goal, engineResult.newAmountMinor);
+      }
       await broadcastProgress(result.workspaceId);
     }
 
@@ -1500,11 +1557,17 @@ app.post('/api/events/manual', requireAdmin, requireSameOrigin, async (req, res)
 
     const result = await database.addRevenueEvent(workspace.id, event);
     if (result.event) {
-      await processRevenueEventForGoalEngine({
+      const engineResult = await processRevenueEventForGoalEngine({
         database,
         workspaceId: workspace.id,
         revenueEvent: result.event
-      }).catch(err => logWarn('goal_engine_manual_ingest_failed', { error: err.message }));
+      }).catch(err => {
+        logWarn('goal_engine_manual_ingest_failed', { error: err.message });
+        return null;
+      });
+      if (engineResult?.triggeredMilestones?.length) {
+        broadcastMilestoneEvents(workspace.id, engineResult.triggeredMilestones, engineResult.goal, engineResult.newAmountMinor);
+      }
     }
     await broadcastProgress(workspace.id);
     return res.status(201).json({ status: 'success', event: result.event });
@@ -1535,11 +1598,17 @@ app.post('/api/events/test', requireAdmin, requireSameOrigin, async (req, res) =
     if (persist) {
       const result = await database.addRevenueEvent(workspace.id, event);
       if (result.event) {
-        await processRevenueEventForGoalEngine({
+        const engineResult = await processRevenueEventForGoalEngine({
           database,
           workspaceId: workspace.id,
           revenueEvent: result.event
-        }).catch(err => logWarn('goal_engine_test_ingest_failed', { error: err.message }));
+        }).catch(err => {
+          logWarn('goal_engine_test_ingest_failed', { error: err.message });
+          return null;
+        });
+        if (engineResult?.triggeredMilestones?.length) {
+          broadcastMilestoneEvents(workspace.id, engineResult.triggeredMilestones, engineResult.goal, engineResult.newAmountMinor);
+        }
       }
       await broadcastProgress(workspace.id);
     } else {
@@ -1849,6 +1918,40 @@ app.post('/api/goals/:goalId/adjustments', requireAdmin, requireSameOrigin, asyn
       reason,
       metadata
     });
+
+    if (result.goal && result.newAmountMinor > result.previousAmountMinor) {
+      try {
+        const milestones = await database.getGoalMilestones(goalId);
+        const existingTriggers = await database.getGoalMilestoneTriggers(goalId, result.goal.epoch || 1);
+        const crossed = getCrossedMilestones({
+          milestones,
+          previousAmountMinor: result.previousAmountMinor,
+          newAmountMinor: result.newAmountMinor,
+          targetMinor: Number(result.goal.targetMinor),
+          epoch: result.goal.epoch || 1,
+          existingTriggers
+        });
+        const triggered = [];
+        for (const m of crossed) {
+          const triggerRecord = await database.recordMilestoneTrigger(
+            workspace.id,
+            goalId,
+            m.id,
+            m.thresholdPercent,
+            result.goal.epoch || 1,
+            result.contribution?.id || null
+          );
+          if (triggerRecord.triggered) {
+            triggered.push({ ...m, triggerRecord: triggerRecord.triggerRecord });
+          }
+        }
+        if (triggered.length) {
+          broadcastMilestoneEvents(workspace.id, triggered, result.goal, result.newAmountMinor);
+        }
+      } catch (milestoneErr) {
+        logWarn('adjustment_milestone_evaluation_failed', { error: milestoneErr.message });
+      }
+    }
 
     await broadcastProgress(workspace.id);
     return res.status(201).json({ status: 'success', ...result });

@@ -75,3 +75,29 @@ test('getCrossedMilestones: no progression or negative change triggers nothing',
 
   assert.equal(crossed.length, 0);
 });
+
+test('getCrossedMilestones: preserves visualAction, soundAction and label', () => {
+  const customMilestones = [
+    { id: 'm-50', thresholdPercent: 50, label: 'Halfway!', visualAction: true, soundAction: true, enabled: true },
+    { id: 'm-75', thresholdPercent: 75, label: 'Three Quarters!', visualAction: false, soundAction: true, enabled: true }
+  ];
+
+  const crossed = getCrossedMilestones({
+    milestones: customMilestones,
+    previousAmountMinor: 49000, // 49%
+    newAmountMinor: 76000,      // 76%
+    targetMinor: 100000
+  });
+
+  assert.equal(crossed.length, 2);
+  assert.equal(crossed[0].thresholdPercent, 50);
+  assert.equal(crossed[0].label, 'Halfway!');
+  assert.equal(crossed[0].visualAction, true);
+  assert.equal(crossed[0].soundAction, true);
+
+  assert.equal(crossed[1].thresholdPercent, 75);
+  assert.equal(crossed[1].label, 'Three Quarters!');
+  assert.equal(crossed[1].visualAction, false);
+  assert.equal(crossed[1].soundAction, true);
+});
+
