@@ -96,17 +96,179 @@ app.use((req, res, next) => {
 });
 app.use(MEDIA_UPLOAD_PATHS, bodyParser.json({ limit: '8mb' }));
 
-// Session middleware
-const PgSession = connectPgSimple(session);
-const dbConnString = process.env.DATABASE_URL || process.env.HYPERDRIVE_CONNECTION_STRING;
-app.use(session({
-  store: production && dbConnString ? new PgSession({ conString: dbConnString, createTableIfMissing: true }) : undefined,
-  secret: process.env.SESSION_SECRET || 'super-secret',
-  resave: false,
-  saveUninitialized: false,
-  name: 'donatio.sid',
-  cookie: { secure: production, httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 }
-}));
+// Session and OAuth initialization
+let activeSessionMiddleware = null;
+let activeGoogleStrategy = false;
+
+export function configureAuthAndSession(env = {}) {
+  const isProd = isProduction() || env.ENVIRONMENT === 'production' || env.ENVIRONMENT === 'staging' || process.env.ENVIRONMENT === 'staging' || process.env.ENVIRONMENT === 'production';
+  const dbConn = env.HYPERDRIVE_CONNECTION_STRING ||
+                 env.DATABASE_URL ||
+                 (env.HYPERDRIVE && env.HYPERDRIVE.connectionString) ||
+                 process.env.HYPERDRIVE_CONNECTION_STRING ||
+                 process.env.DATABASE_URL;
+  const sessionSecret = env.SESSION_SECRET || process.env.SESSION_SECRET || 'super-secret';
+
+  // Configure Session Store
+  let store = undefined;
+  if (isProd && dbConn) {
+    try {
+      store = new PgSession({
+        conString: dbConn,
+        createTableIfMissing: true,
+        tableName: 'session'
+      });
+    } catch (e) {
+      logWarn('pg_session_store_init_failed', { message: e?.message });
+    }
+  }
+
+  activeSessionMiddleware = session({
+    store,
+    secret: sessionSecret,
+    resave: false,
+    saveUninitialized: false,
+    name: 'donatio.sid',
+    cookie: {
+      secure: isProd,
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    }
+  });
+
+  // Configure Google OAuth Strategy
+  const googleClientId = env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+  const googleClientSecret = env.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET;
+  const googleCallbackUrl = env.GOOGLE_CALLBACK_URL || process.env.GOOGLE_CALLBACK_URL ||
+    (isProd
+      ? (env.BASE_URL ? `${env.BASE_URL}/api/auth/google/callback` : (process.env.BASE_URL ? `${process.env.BASE_URL}/api/auth/google/callback` : 'https://donatio-staging.jjmowlab.com/api/auth/google/callback'))
+      : 'http://localhost:3000/api/auth/google/callback');
+
+  if (googleClientId && googleClientSecret) {
+    try {
+      passport.use('google', new GoogleStrategy({
+        clientID: googleClientId,
+        clientSecret: googleClientSecret,
+        callbackURL: googleCallbackUrl,
+        passReqToCallback: true
+      }, async (req, accessToken, refreshToken, profile, done) => {
+        try {
+          const email = profile?.emails?.[0]?.value;
+          if (!email) {
+            logError('google_oauth_no_email');
+            return done(new Error('No email found in Google profile'), null);
+          }
+
+          let user = await database.findUserByEmail(email);
+
+          if (!user) {
+            const fingerprint = generateDeviceFingerprint(req);
+            const hasUsedTrial = await database.hasUsedTrial(fingerprint);
+
+            const displayName = profile.displayName || email.split('@')[0];
+            const cleanUser = email.split('@')[0].toLowerCase().replace(/[^a-z0-9-]/g, '') || 'user';
+            const username = cleanUser + '-' + Date.now();
+
+            if (hasUsedTrial) {
+              logWarn('trial_abuse_detected');
+              user = await database.createUser({
+                email,
+                username,
+                passwordHash: null,
+                displayName,
+                authProvider: 'google',
+                oauthProviderId: profile.id,
+                emailVerified: true
+              });
+
+              await database.createSubscription(user.id, {
+                planType: 'free',
+                status: 'active',
+                isTrial: false,
+                pricePerMonth: 0
+              });
+
+              logInfo('trial_abuse_fallback_applied');
+            } else {
+              user = await database.createUser({
+                email,
+                username,
+                passwordHash: null,
+                displayName,
+                authProvider: 'google',
+                oauthProviderId: profile.id,
+                emailVerified: true
+              });
+
+              await database.createSubscription(user.id, {
+                planType: 'trial',
+                status: 'active',
+                isTrial: true
+              });
+
+              await database.recordTrialUsage(user.id, fingerprint, {
+                ipAddress: req.ip || req.connection?.remoteAddress,
+                userAgent: req.headers['user-agent'],
+                email: user.email
+              });
+            }
+
+            const allWorkspaces = await database.getAllWorkspaces();
+            const isFirstWorkspace = allWorkspaces.length === 0;
+            const workspaceSlug = isFirstWorkspace ? 'default' : username;
+
+            await database.createWorkspace(user.id, {
+              workspaceName: isFirstWorkspace ? 'Default Workspace' : `${displayName}'s Workspace`,
+              slug: workspaceSlug
+            });
+
+            logInfo('oauth_user_created');
+          } else {
+            logInfo('oauth_existing_user_login');
+            const userWorkspaces = await database.getUserWorkspaces(user.id);
+            if (!userWorkspaces || userWorkspaces.length === 0) {
+              logInfo('oauth_workspace_missing_creating');
+              const allWorkspaces = await database.getAllWorkspaces();
+              const isFirstWorkspace = allWorkspaces.length === 0;
+              const workspaceSlug = isFirstWorkspace
+                ? 'default'
+                : (user.username || 'user-' + Date.now()).toLowerCase().replace(/[^a-z0-9-]/g, '');
+
+              await database.createWorkspace(user.id, {
+                workspaceName: isFirstWorkspace ? 'Default Workspace' : `${user.displayName || user.username}'s Workspace`,
+                slug: workspaceSlug
+              });
+              logInfo('oauth_workspace_created_for_existing_user');
+            }
+          }
+
+          return done(null, user);
+        } catch (error) {
+          logError('google_oauth_failed', { message: error?.message });
+          return done(error, null);
+        }
+      }));
+      activeGoogleStrategy = true;
+      logInfo('google_oauth_configured');
+    } catch (e) {
+      logError('google_strategy_init_failed', { message: e?.message });
+    }
+  } else {
+    logWarn('google_oauth_not_configured');
+  }
+}
+
+// Initial configuration using process.env (for Node environment & unit tests)
+configureAuthAndSession(process.env);
+
+// Session middleware wrapper
+app.use((req, res, next) => {
+  if (!activeSessionMiddleware) {
+    configureAuthAndSession(req.env || process.env);
+  }
+  return activeSessionMiddleware(req, res, next);
+});
 
 // Initialize Passport
 app.use(passport.initialize());
@@ -151,7 +313,7 @@ passport.deserializeUser(async (id, done) => {
 // Fraud Prevention: Generate device fingerprint from request
 function generateDeviceFingerprint(req) {
   // Normalize IP address to prevent IPv4/IPv6 format mismatches
-  let ip = req.ip || req.connection.remoteAddress || '';
+  let ip = req.ip || req.connection?.remoteAddress || '';
 
   // Convert IPv6-mapped IPv4 addresses to pure IPv4
   // ::ffff:127.0.0.1 → 127.0.0.1
@@ -174,119 +336,6 @@ function generateDeviceFingerprint(req) {
 
   const raw = components.join('|');
   return crypto.createHash('sha256').update(raw).digest('hex');
-}
-
-// Google OAuth Strategy
-if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-  passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: process.env.GOOGLE_CALLBACK_URL || (production ? 'https://donatio.jjmowlab.com/api/auth/google/callback' : 'http://localhost:3000/api/auth/google/callback'),
-    passReqToCallback: true // Enable access to req in callback
-  },
-    async (req, accessToken, refreshToken, profile, done) => {
-      try {
-        // Check if user exists by OAuth provider ID
-        let user = await database.findUserByEmail(profile.emails[0].value);
-
-        if (!user) {
-          // === FRAUD PREVENTION: Check if device already used trial ===
-          const fingerprint = generateDeviceFingerprint(req);
-          const hasUsedTrial = await database.hasUsedTrial(fingerprint);
-
-          if (hasUsedTrial) {
-            logWarn('trial_abuse_detected');
-            // Create user without trial (direct to free plan or require payment)
-            user = await database.createUser({
-              email: profile.emails[0].value,
-              username: profile.emails[0].value.split('@')[0] + '-' + Date.now(),
-              passwordHash: null,
-              displayName: profile.displayName,
-              authProvider: 'google',
-              oauthProviderId: profile.id,
-              emailVerified: true
-            });
-
-            // No trial - create free plan instead
-            await database.createSubscription(user.id, {
-              planType: 'free',
-              status: 'active',
-              isTrial: false,
-              pricePerMonth: 0
-            });
-
-            logInfo('trial_abuse_fallback_applied');
-          } else {
-            // Normal flow - create user with trial
-            user = await database.createUser({
-              email: profile.emails[0].value,
-              username: profile.emails[0].value.split('@')[0] + '-' + Date.now(),
-              passwordHash: null,
-              displayName: profile.displayName,
-              authProvider: 'google',
-              oauthProviderId: profile.id,
-              emailVerified: true
-            });
-
-            // Create trial subscription (30 days by default)
-            await database.createSubscription(user.id, {
-              planType: 'trial',
-              status: 'active',
-              isTrial: true
-              // trialEndDate will be automatically calculated in database.createSubscription()
-            });
-
-            // Record trial usage to prevent future abuse
-            await database.recordTrialUsage(user.id, fingerprint, {
-              ipAddress: req.ip || req.connection.remoteAddress,
-              userAgent: req.headers['user-agent'],
-              email: user.email
-            });
-          }
-
-          // Check if any workspaces exist
-          const allWorkspaces = await database.getAllWorkspaces();
-          const isFirstWorkspace = allWorkspaces.length === 0;
-
-          // Create workspace - use 'default' slug for first workspace
-          await database.createWorkspace(user.id, {
-            workspaceName: isFirstWorkspace ? 'Default Workspace' : `${profile.displayName}'s Workspace`,
-            slug: isFirstWorkspace ? 'default' : user.username.toLowerCase().replace(/[^a-z0-9-]/g, '')
-          });
-
-          logInfo('oauth_user_created');
-        } else {
-          // Existing user - check if they have a workspace
-          logInfo('oauth_existing_user_login');
-
-          const userWorkspaces = await database.getUserWorkspaces(user.id);
-          if (!userWorkspaces || userWorkspaces.length === 0) {
-            logInfo('oauth_workspace_missing_creating');
-
-            // Check if any workspaces exist in the system
-            const allWorkspaces = await database.getAllWorkspaces();
-            const isFirstWorkspace = allWorkspaces.length === 0;
-
-            // Create workspace for existing user
-            await database.createWorkspace(user.id, {
-              workspaceName: isFirstWorkspace ? 'Default Workspace' : `${user.displayName || user.username}'s Workspace`,
-              slug: isFirstWorkspace ? 'default' : user.username.toLowerCase().replace(/[^a-z0-9-]/g, '')
-            });
-
-            logInfo('oauth_workspace_created_for_existing_user');
-          }
-        }
-
-        return done(null, user);
-      } catch (error) {
-        logError('google_oauth_failed');
-        return done(error, null);
-      }
-    }
-  ));
-  logInfo('google_oauth_configured');
-} else {
-  logWarn('google_oauth_not_configured');
 }
 
 const DB_PATH = path.join(__dirname, 'db.json');
@@ -1366,6 +1415,16 @@ function regenerateOAuthSession(req, res, next) {
 
 // Google OAuth - Initiate authentication
 app.get('/api/auth/google',
+  (req, res, next) => {
+    if (!activeGoogleStrategy) {
+      configureAuthAndSession(req.env || process.env);
+    }
+    if (!activeGoogleStrategy) {
+      logWarn('google_oauth_attempt_unconfigured');
+      return res.redirect('/login?error=oauth_unconfigured');
+    }
+    return next();
+  },
   passport.authenticate('google', {
     scope: ['profile', 'email'],
     state: true
@@ -1374,6 +1433,16 @@ app.get('/api/auth/google',
 
 // Google OAuth - Callback
 app.get('/api/auth/google/callback',
+  (req, res, next) => {
+    if (!activeGoogleStrategy) {
+      configureAuthAndSession(req.env || process.env);
+    }
+    if (!activeGoogleStrategy) {
+      logWarn('google_oauth_callback_unconfigured');
+      return res.redirect('/login?error=oauth_unconfigured');
+    }
+    return next();
+  },
   passport.authenticate('google', { failureRedirect: '/login?error=oauth_failed', state: true }),
   regenerateOAuthSession,
   async (req, res) => {
@@ -1387,14 +1456,6 @@ app.get('/api/auth/google/callback',
     await database.updateUserLastLogin(req.user.id);
 
     logInfo('oauth_login_success');
-    /* Session fields are intentionally not logged. */
-    /*
-      userId: req.session.userId,
-      email: req.session.email,
-      username: req.session.username,
-      sessionID: req.sessionID
-    }); */
-
     res.redirect('/admin');
   }
 );

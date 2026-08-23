@@ -1,4 +1,4 @@
-import app from '../server.js';
+import app, { configureAuthAndSession } from '../server.js';
 import database from '../lib/database.js';
 import { validateProductionConfig } from '../lib/config.js';
 import { handleFetchWithExpress } from '../lib/worker-adapter.js';
@@ -39,6 +39,9 @@ export default {
               database.ready = database.initPostgreSQL({ env });
               await database.ready;
             }
+
+            // Configure dynamic session store & Google OAuth strategy
+            configureAuthAndSession(env || process.env);
             initialized = true;
           } catch (err) {
             console.error('Worker initialization error:', err);
