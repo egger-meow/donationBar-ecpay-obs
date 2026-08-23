@@ -1,0 +1,106 @@
+/* ==========================================================================
+   Donatio OBS Overlay - Theme Styles
+   1. Minimal (Clean / Monochrome / Polished)
+   2. Gaming (Cyberpunk Neon / High Contrast / Angular)
+   3. Creator (Soft / Glassmorphism / Pastel)
+   ========================================================================== */
+
+/* 1. Minimal Theme */
+.theme-minimal {
+  --fg: #ffffff;
+  --bg: rgba(11, 17, 32, 0.88);
+  --bar: #10b981;
+  --bar-light: #34d399;
+  --accent: #10b981;
+  --border-radius: 14px;
+  --border-style: 1px solid rgba(255, 255, 255, 0.14);
+  --box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  --glow: 0 0 14px rgba(16, 185, 129, 0.35);
+}
+
+.theme-minimal .goal-card {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(11, 17, 32, 0.88));
+}
+
+.theme-minimal .progress-track {
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 8px;
+}
+
+.theme-minimal .progress-bar-fill {
+  border-radius: 8px;
+}
+
+/* 2. Gaming Neon Theme */
+.theme-gaming {
+  --fg: #ffffff;
+  --bg: rgba(10, 15, 30, 0.94);
+  --bar: #06b6d4;
+  --bar-light: #38bdf8;
+  --accent: #ec4899;
+  --border-radius: 6px;
+  --border-style: 2px solid rgba(6, 182, 212, 0.6);
+  --box-shadow: 0 0 20px rgba(6, 182, 212, 0.35), inset 0 0 15px rgba(6, 182, 212, 0.15);
+  --glow: 0 0 20px rgba(6, 182, 212, 0.8);
+}
+
+.theme-gaming .goal-card {
+  border: 2px solid rgba(6, 182, 212, 0.7);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(8, 12, 24, 0.94));
+  clip-path: polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px));
+  box-shadow: 0 0 25px rgba(6, 182, 212, 0.3);
+}
+
+.theme-gaming .goal-title {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #38bdf8;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+}
+
+.theme-gaming .progress-track {
+  background: rgba(5, 8, 16, 0.8);
+  border: 1px solid rgba(6, 182, 212, 0.4);
+  border-radius: 4px;
+}
+
+.theme-gaming .progress-bar-fill {
+  background: linear-gradient(90deg, #06b6d4, #38bdf8, #ec4899);
+  border-radius: 4px;
+}
+
+.theme-gaming .percentage-display {
+  color: #ec4899;
+  text-shadow: 0 0 12px rgba(236, 72, 153, 0.8);
+}
+
+/* 3. Creator Soft Theme */
+.theme-creator {
+  --fg: #ffffff;
+  --bg: rgba(30, 27, 75, 0.85);
+  --bar: #8b5cf6;
+  --bar-light: #a78bfa;
+  --accent: #fb7185;
+  --border-radius: 24px;
+  --border-style: 1px solid rgba(255, 255, 255, 0.22);
+  --box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  --glow: 0 0 18px rgba(139, 92, 246, 0.55);
+}
+
+.theme-creator .goal-card {
+  background: linear-gradient(160deg, rgba(49, 46, 129, 0.88), rgba(30, 27, 75, 0.82));
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.theme-creator .progress-track {
+  background: rgba(15, 12, 45, 0.6);
+  border-radius: 9999px;
+}
+
+.theme-creator .progress-bar-fill {
+  background: linear-gradient(90deg, #8b5cf6, #ec4899, #fb7185);
+  border-radius: 9999px;
+}

@@ -1,0 +1,122 @@
+/* ==========================================================================
+   Donatio OBS Overlay - Curated Animation Keyframes
+   Lightweight, GPU-accelerated CSS animations with reduced-motion support
+   ========================================================================== */
+
+/* Shimmer on progress fill update */
+@keyframes barShimmer {
+  0% {
+    filter: brightness(1);
+    box-shadow: var(--glow);
+  }
+  50% {
+    filter: brightness(1.35);
+    box-shadow: 0 0 30px var(--bar-light);
+  }
+  100% {
+    filter: brightness(1);
+    box-shadow: var(--glow);
+  }
+}
+
+.shimmer-active {
+  animation: barShimmer 0.75s ease-out;
+}
+
+/* Subtle Goal Pulse on Donation */
+@keyframes cardPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.015);
+  }
+}
+
+.pulse-active {
+  animation: cardPulse 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Milestone Celebration Burst */
+@keyframes milestoneBurst {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  40% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  70% {
+    transform: scale(0.98);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.milestone-active {
+  animation: milestoneBurst 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Completion Celebration Glow & Shake */
+@keyframes completionGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px var(--bar);
+  }
+  50% {
+    box-shadow: 0 0 40px var(--bar), 0 0 70px var(--accent);
+  }
+}
+
+.goal-completed-card {
+  animation: completionGlow 2.5s ease-in-out infinite;
+}
+
+/* Confetti Particles Container */
+.confetti-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.confetti-particle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  opacity: 0.9;
+  animation: confettiFall 3s linear forwards;
+  will-change: transform;
+}
+
+@keyframes confettiFall {
+  0% {
+    transform: translateY(-20px) rotate(0deg);
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(105vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+/* Accessibility: prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .confetti-layer {
+    display: none !important;
+  }
+}
