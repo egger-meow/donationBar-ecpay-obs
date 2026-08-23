@@ -42,16 +42,18 @@
 
 1. **Deterministic Multi-Source Aggregation:**
    A single live goal can aggregate events across multiple active adapters simultaneously without collision.
-2. **Strict Integer Accounting (Zero-Float Minor Units):**
-   All monetary amounts, targets, starting progress, and contributions are calculated, stored, and compared as integer minor units (e.g. cents, $1.00 USD = `100`, NT$ 100 TWD = `10000`). Floating-point arithmetic is strictly forbidden in monetary pipelines.
+2. **Strict Integer Accounting & Bounded Rounding:**
+   All monetary amounts, targets, starting progress, and contributions are stored and reconciled as integer minor units (e.g. cents in USD, cents in TWD). FX and point-conversion formulas use bounded round-half-up integer rounding with recorded rate snapshots.
 3. **Idempotent Ingestion & Single-Credit Guarantee:**
    A unique composite index `(goal_id, revenue_event_id)` ensures that retried webhook deliveries, replayed callbacks, or network reconnects never double-credit a creator's goal.
-4. **Safe Reset with Epoch Versioning:**
+4. **Database-Enforced Single Active Goal Invariant:**
+   A PostgreSQL partial unique index `CREATE UNIQUE INDEX uq_goals_workspace_active ON goals (workspace_id) WHERE is_active = TRUE;` combined with serialized parent workspace row locking (`FOR UPDATE`) guarantees at most one active goal per workspace across concurrent operations.
+5. **Safe Reset with Epoch Versioning:**
    Resetting a goal increments its `epoch` counter (`epoch = epoch + 1`) and resets progress to `starting_amount_minor` while **preserving 100% of historical donation and audit logs**. Milestone triggers are scoped by `(goal_id, epoch, threshold_percent)`, enabling milestones to fire fresh in the new round.
-5. **SSRF-Safe Outbound Automations:**
-   Outbound webhooks to streamer tools (e.g. Streamer.bot, Discord Webhook, IFTTT) are strictly validated against private IP ranges (`127.0.0.0/8`, `10.0.0.0/8`, `192.168.0.0/16`, `172.16.0.0/12`), AWS/Cloudflare metadata endpoints (`169.254.169.254`), non-HTTP schemes, and unsafe credentials.
-6. **Cycle-Protected Goal Chaining:**
-   Goals can link to a `next_goal_id`. When the active goal reaches 100% target progress, the engine automatically completes the current goal and activates the successor, guarded by Tarjan-based cycle detection.
+6. **SSRF-Hardened Outbound Automations & Manual Redirect Validation:**
+   Outbound webhooks to streamer tools (e.g. Streamer.bot, Discord Webhook, IFTTT) are validated against private IP ranges (`127.0.0.0/8`, `10.0.0.0/8`, `192.168.0.0/16`, `172.16.0.0/12`), cloud metadata endpoints (`169.254.169.254`, `metadata.google.internal`), internal TLDs, and IPv6 unique-local addresses. Redirects are handled with `redirect: 'manual'` and revalidated at every hop before following.
+7. **Write-Time & Runtime Validated Goal Chaining:**
+   Goals can link to a `next_goal_id`. The configuration is validated at write time (rejecting cross-workspace targets, self-references, and circular loops) and checked at runtime during 100% target progress transitions.
 
 ---
 

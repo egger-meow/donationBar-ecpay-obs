@@ -4,6 +4,7 @@
 
 This is an index only; the complete dated entries and building path remain below.
 
+- 2026-08-23 — Stage 3: Correctness and Production-Readiness Closure (P0 architecture)
 - 2026-08-23 — Stage 3: The Programmable Goal Engine implementation (P0 architecture)
 - 2026-08-22 — Stage 1: Universal Revenue Event Core implementation (P0 architecture)
 - 2026-07-21 — Tabbed admin dashboard IA for faster new-user onboarding
@@ -67,6 +68,19 @@ delete a past entry — if something it describes later changes or turns out wro
 in a new entry instead. This file records *what happened*; it is not a priority list.
 For what's next, see [ROADMAP.md](../ROADMAP.md), whose priority tables get edited in
 place as work completes or priorities shift.
+
+---
+
+## 2026-08-23 — Stage 3: Correctness and Production-Readiness Closure (P0 architecture)
+
+Executed the narrow Stage 3 correctness and production-readiness closure:
+- **FX Provider Architecture & Bounded Precision:** Replaced hardcoded market exchange rates as silent production defaults. Introduced pluggable `FxProvider` interface (`lib/fx/fx-service.js`), exact $1:1$ same-currency identity resolution (`same_currency` provider `system`), creator-configured fixed overrides, and explicit failure (`FX_RATE_UNAVAILABLE`) when an external exchange rate is missing. Persisted provider, timestamp, pair, and exact rate snapshot on every contribution. Documented IEEE-754 bounded half-up integer rounding semantics.
+- **Ordered Real-time Milestone Delivery:** Emitted structured `event: milestone` Server-Sent Events over `/events` whenever contributions cross thresholds (e.g. 49% -> 76% triggers both 50% and 75% sequentially). Exposed `visualAction` and `soundAction` properties directly to OBS overlay clients (`public/overlay.html`). Scoped triggers with idempotent database persistence (`uq_goal_milestone_triggers`).
+- **Cloudflare Worker Lifecycle-Safe Webhooks:** Replaced fire-and-forget outbound webhook promises with `dispatchMilestoneWebhookAction` integrating `executionCtx.waitUntil(promise)` when running on Cloudflare Workers. Implemented explicit delivery tracking (`pending` -> `delivered` / `failed`) in `goal_action_deliveries` with bounded exponential backoff retries (up to 2 retries). Ensured goal completion and contribution persistence never fail on remote webhook errors.
+- **Hardened SSRF & Manual Redirect Revalidation:** Hardened `validateOutboundWebhookUrl` to block private IPv4 subnets (RFC 1918, CGNAT, link-local, test nets), IPv6 private/unique-local/mapped addresses, decimal/hex IP representations, internal TLDs, and cloud metadata services (`169.254.169.254`, `metadata.google.internal`). Added `redirect: 'manual'` with manual resolution and revalidation of each redirect target hop.
+- **Database-Enforced Single Active Goal:** Created migration `migrations/20260823-enforce-single-active-goal.sql` adding PostgreSQL partial unique index `CREATE UNIQUE INDEX uq_goals_workspace_active ON goals (workspace_id) WHERE is_active = TRUE;`. Enforced atomic parent workspace row locking (`FOR UPDATE`) on goal activation.
+- **Write-Time Goal Chaining Validation:** Validated next-goal configurations on `POST /api/goals` and `PATCH /api/goals/:goalId` with `validateGoalChainingConfig` (`lib/goal-engine/goal-chaining.js`), rejecting cross-workspace targets, self-references, and indirect circular chains before persistence.
+- **Documentation Claims Audit:** Truthfully updated `GOAL_ENGINE.md`, `FX_CONVERSION.md`, `GOAL_MILESTONES.md`, and `PROGRESS.md` regarding provider boundaries, database invariants, and rounding semantics.
 
 ---
 

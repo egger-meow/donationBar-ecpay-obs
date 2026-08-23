@@ -5,10 +5,11 @@
 Milestones allow streamers to celebrate community achievements and automate their broadcast workflow when reaching progress thresholds (e.g. 25%, 50%, 75%, 100%).
 
 Supported actions in V1:
-- **Visual Animation** on OBS Browser Source (`visual: true`)
-- **Sound Effect Alert** (`sound: true`)
-- **Outbound Webhook Dispatch** (`webhook_url: 'https://...'`) to external streamer bots (Streamer.bot, Discord, IFTTT)
-- **Automated Next-Goal Chaining** at 100% completion
+- **Ordered Real-time SSE Delivery (`event: milestone`)** broadcast to OBS overlays containing visual and sound directives.
+- **Visual Animation** on OBS Browser Source (`visualAction: true`).
+- **Sound Effect Alert** (`soundAction: true`).
+- **SSRF-Hardened Outbound Webhook Dispatch** (`webhookActionUrl: 'https://...'`) with manual redirect revalidation and Cloudflare Worker lifecycle safety (`ctx.waitUntil`).
+- **Automated Next-Goal Chaining** at 100% completion with write-time and runtime cycle protection.
 
 ---
 
@@ -17,64 +18,61 @@ Supported actions in V1:
 The Milestone Evaluator (`lib/goal-engine/milestone-evaluator.js`) uses a deterministic threshold-crossing algorithm:
 
 ```javascript
-export function evaluateMilestones({
+export function getCrossedMilestones({
+  milestones,
   previousAmountMinor,
   newAmountMinor,
-  targetAmountMinor,
-  milestones,
-  triggeredMilestones = [],
-  currentEpoch = 1
-}) {
-  const prevPercent = Math.min(100, Math.floor((previousAmountMinor / targetAmountMinor) * 100));
-  const newPercent = Math.min(100, Math.floor((newAmountMinor / targetAmountMinor) * 100));
-
-  // Find all active milestones where threshold <= newPercent and was not crossed at prevPercent
-  // AND has not already been recorded in triggeredMilestones for currentEpoch
-  return milestones
-    .filter(m => m.is_enabled !== false)
-    .filter(m => m.threshold_percent > prevPercent && m.threshold_percent <= newPercent)
-    .filter(m => !triggeredMilestones.some(t => t.threshold_percent === m.threshold_percent && t.epoch === currentEpoch))
-    .sort((a, b) => a.threshold_percent - b.threshold_percent);
-}
+  targetMinor,
+  epoch = 1,
+  existingTriggers = []
+})
 ```
 
 ### Key Properties:
-- **Sequential Multi-Cross Handling:** If a large donation jumps progress from 40% to 80%, both 50% and 75% milestones are returned in strictly ascending order (`[50, 75]`).
+- **Sequential Multi-Cross Handling:** If a large donation jumps progress from 40% to 80%, both 50% and 75% milestones are returned in strictly ascending order (`[50, 75]`) and emitted sequentially over SSE.
 - **Zero Double-Fires:** Each milestone is recorded in `goal_milestone_triggers` with composite key `(goal_id, epoch, threshold_percent)`. It can never fire a second time within the same epoch.
 - **Negative Adjustments Support:** If an administrator reduces goal progress from 80% to 40%, milestones that were already triggered remain marked as triggered for that epoch unless the goal is explicitly reset.
 
 ---
 
-## 3. SSRF-Protected Outbound Webhook Dispatcher
+## 3. Realtime SSE Broadcast (`event: milestone`)
 
-When a milestone with `actions.webhook_url` triggers, the engine dispatches an HTTP POST payload via `lib/goal-engine/outbound-webhook.js`.
-
-### Security Protections:
-1. **Private IP & Loopback Blocking:**
-   Blocks `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `localhost`, `::1`.
-2. **Cloud Metadata Protection:**
-   Blocks cloud instance metadata endpoints: `169.254.169.254`.
-3. **Protocol Whitelisting:**
-   Enforces `https:` only (or `http:` in local sandbox environments).
-4. **Credential & Header Sanitization:**
-   Rejects URLs embedding embedded credentials (`https://user:pass@domain`).
-5. **Non-Blocking Delivery with Audit:**
-   Webhook dispatch runs asynchronously with a 5-second timeout and records delivery status in `goal_action_deliveries`. Delivery failures are logged as non-fatal warnings and never disrupt the core transaction.
-
-### Webhook Payload Schema:
+When milestones are crossed, the server emits a dedicated `event: milestone` Server-Sent Event over `/events` for each triggered milestone:
 
 ```json
 {
-  "event": "milestone_triggered",
-  "workspace_id": "ws_12345",
-  "goal_id": "goal_67890",
-  "goal_title": "New PC Goal",
-  "threshold_percent": 50,
-  "milestone_label": "50% Halfway there!",
-  "current_amount_minor": 250000,
-  "target_amount_minor": 500000,
+  "type": "milestone",
+  "goalId": "cf203d10-ba93-4396-94d7-aeaf411e8c95",
+  "milestoneId": "m-50",
+  "thresholdPercent": 50,
+  "label": "50% Halfway!",
+  "visualAction": true,
+  "soundAction": true,
+  "currentAmountMinor": 50000,
+  "targetAmountMinor": 100000,
   "currency": "TWD",
   "epoch": 1,
-  "triggered_at": "2026-08-23T02:00:00.000Z"
+  "timestamp": "2026-08-23T11:50:00.000Z"
 }
 ```
+
+The OBS overlay client in `public/overlay.html` listens for `event: milestone` and triggers celebration animations and sounds.
+
+---
+
+## 4. SSRF-Protected Outbound Webhook Dispatcher
+
+When a milestone with `webhookActionUrl` triggers, the engine dispatches an HTTP POST payload via `dispatchMilestoneWebhookAction` in `lib/goal-engine/outbound-webhook.js`.
+
+### Security Protections:
+1. **Private IP, Loopback & CGNAT Blocking:**
+   Blocks `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `100.64.0.0/10`, `198.18.0.0/15`, `localhost`, `::1`, `fc00::/7`, `fe80::/10`, and decimal/hex IP encodings.
+2. **Cloud Metadata Protection:**
+   Unconditionally blocks cloud instance metadata endpoints (`169.254.169.254`, `metadata.google.internal`, `metadata.azure.internal`, `instance-data`).
+3. **Manual Redirect Revalidation (`redirect: 'manual'`):**
+   Re-validates each intermediate `Location` header to prevent redirect-based SSRF pivoting to private addresses.
+4. **Lifecycle-Safe Dispatch & Bounded Retries:**
+   Uses `ctx.waitUntil(promise)` when running on Cloudflare Workers. Tracks delivery states (`pending` -> `delivered` / `failed`) in `goal_action_deliveries` with up to 2 retries on transient network errors.
+5. **Isolation Guarantee:**
+   Goal completion, contribution persistence, and OBS broadcast never depend on remote webhook success.
+

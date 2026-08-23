@@ -34,7 +34,7 @@ import { createTestRevenueEvent } from './lib/source-adapters/test-adapter.js';
 import { getActiveSources, getSourceDefinition } from './lib/source-registry.js';
 import { processRevenueEventForGoalEngine } from './lib/goal-engine/goal-engine.js';
 import { getCrossedMilestones } from './lib/goal-engine/milestone-evaluator.js';
-import { validateGoalChainCycles, validateGoalChainingConfig } from './lib/goal-engine/goal-chaining.js';
+import { validateGoalChainingConfig } from './lib/goal-engine/goal-chaining.js';
 import { validateGoalRule, RULE_TYPES } from './lib/goal-engine/goal-rules.js';
 import { validateOutboundWebhookUrl } from './lib/goal-engine/outbound-webhook.js';
 import { minorToMajorUnits, majorToMinorUnits, parseMinorUnitAmount, normalizeRevenueCurrency } from './lib/money.js';
