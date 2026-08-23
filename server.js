@@ -2364,6 +2364,63 @@ app.post('/admin/activation/test-alert', requireAdmin, requireSameOrigin, async 
   }
 });
 
+// Broadcast transient test events to OBS overlay without altering persisted revenue data
+app.post('/api/overlay/test-event', requireAdmin, requireSameOrigin, async (req, res) => {
+  try {
+    const workspace = await getUserWorkspaceFromSession(req);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+    const { type = 'progress', thresholdPercent = 50 } = req.body || {};
+    const activeGoal = await database.getActiveGoal(workspace.id);
+    const goalTitle = activeGoal ? activeGoal.title : '直播目標';
+    const currency = activeGoal ? activeGoal.displayCurrency : 'TWD';
+    const targetMinor = activeGoal ? activeGoal.targetMinor : 100000;
+
+    if (type === 'progress') {
+      const donationEvent = createTestDonationEvent({
+        externalId: `test-progress-${Date.now()}`,
+        amount: 300,
+        payer: '測試觀眾',
+        message: '這是一筆 OBS 測試贊助！'
+      });
+      await broadcastProgress(workspace.id, donationEvent);
+    } else if (type === 'milestone') {
+      const percent = Number(thresholdPercent) || 50;
+      broadcastMilestoneEvents(workspace.id, [{
+        id: `test-milestone-${percent}`,
+        thresholdPercent: percent,
+        label: `${percent}% 里程碑達成！`,
+        visualAction: true,
+        soundAction: true,
+        isSynthetic: true
+      }], activeGoal || { id: 'test-goal', title: goalTitle, displayCurrency: currency, targetMinor }, Math.round(targetMinor * (percent / 100)));
+    } else if (type === 'completion') {
+      broadcastMilestoneEvents(workspace.id, [{
+        id: `test-completion-100`,
+        thresholdPercent: 100,
+        label: `100% 目標圓滿達成！`,
+        visualAction: true,
+        soundAction: true,
+        isSynthetic: true
+      }], activeGoal || { id: 'test-goal', title: goalTitle, displayCurrency: currency, targetMinor }, targetMinor);
+    } else if (type === 'sound') {
+      broadcastMilestoneEvents(workspace.id, [{
+        id: `test-sound-${Date.now()}`,
+        thresholdPercent: 50,
+        label: `音效測試`,
+        visualAction: false,
+        soundAction: true,
+        isSynthetic: true
+      }], activeGoal || { id: 'test-goal', title: goalTitle, displayCurrency: currency, targetMinor }, Math.round(targetMinor * 0.5));
+    }
+
+    res.json({ success: true, type });
+  } catch (error) {
+    logError('overlay_test_event_failed', { error: error.message, request_id: req.requestId });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 // Aggregate activation funnel data is available only to a platform administrator. It
 // deliberately returns counts and median durations, never tenant-level event records.
 app.get('/admin/platform/activation-funnel', requirePlatformAdmin, async (req, res) => {
@@ -2548,6 +2605,12 @@ app.post('/admin/overlay', requireAdmin, requireSameOrigin, async (req, res) => 
     const overlaySettings = currentSettings?.overlaySettings || {};
 
     // Update settings with validation
+    if (typeof settings.theme === 'string') {
+      const validThemes = ['minimal', 'gaming', 'creator'];
+      if (validThemes.includes(settings.theme)) {
+        overlaySettings.theme = settings.theme;
+      }
+    }
     if (typeof settings.showDonationAlert === 'boolean') {
       overlaySettings.showDonationAlert = settings.showDonationAlert;
     }

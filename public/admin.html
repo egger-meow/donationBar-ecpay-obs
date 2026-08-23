@@ -1225,6 +1225,15 @@
         <h2>斗內條外觀設定</h2>
         <form id="overlaySettingsForm">
           <div class="form-group">
+            <label for="themeInput">風格主題 (Theme)</label>
+            <select id="themeInput">
+              <option value="minimal" selected>極簡俐落 (Minimal / Clean)</option>
+              <option value="gaming">電競霓虹 (Gaming / Cyberpunk)</option>
+              <option value="creator">柔和創作者 (Creator / Soft Pastel)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
             <label>
               <input type="checkbox" id="alertEnabledInput"> 啟用捐款提醒彈窗
             </label>
@@ -1367,20 +1376,37 @@
 
       <!-- OBS Setup -->
       <div class="card" id="obsSetupCard" data-tab="overlay">
-        <h2>OBS 設定</h2>
-        <p style="color: #a0a0a0; margin-bottom: 10px;">
-          在 OBS 中添加 Browser Source，使用以下 URL：
+        <h2>OBS 直播外觀設定與測試控制台</h2>
+        <div style="background: rgba(255, 255, 255, 0.04); padding: 14px 18px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid var(--accent);">
+          <strong style="color: var(--fg); font-size: 14px;">OBS 設定 4 步驟：</strong>
+          <div style="margin-top: 6px; color: #a0a0a0; font-size: 13.5px; line-height: 1.6;">
+            1. 開啟 OBS → 來源 (Sources) → 點擊 ➕ 新增<br>
+            2. 選擇「瀏覽器」(Browser Source) 並命名為「Donatio 斗內條」<br>
+            3. 在 URL 欄位貼上下方專屬網址，尺寸建議設為 <code>800 x 250</code> 或 <code>600 x 200</code><br>
+            4. 勾選「控制音訊」或「在場景處於使用狀態時刷新瀏覽器」
+          </div>
+        </div>
+
+        <p style="color: #a0a0a0; margin-bottom: 10px; font-size: 13.5px;">
+          您的專屬 OBS Browser Source URL：
         </p>
-        <div style="background: var(--bg); padding: 15px; border-radius: 10px; border: 1px solid var(--border-strong);">
-          <code id="obsUrl" style="color: var(--accent); word-break: break-all;"></code>
+        <div style="background: var(--bg); padding: 15px; border-radius: 10px; border: 1px solid var(--border-strong); display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+          <code id="obsUrl" style="color: var(--accent); word-break: break-all; font-weight: bold;"></code>
+          <button class="btn btn-primary" type="button" onclick="copyObsUrl()" style="white-space: nowrap; flex-shrink: 0;">一鍵複製網址</button>
         </div>
-        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px;">
+
+        <h3 style="margin-top: 20px; margin-bottom: 10px; font-size: 15px; color: var(--fg);">🎮 OBS 即時測試控制台 (不會計入真實收益)</h3>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
           <button class="btn btn-secondary" type="button" onclick="copyObsUrl()">複製 OBS URL</button>
-          <button class="btn btn-info" type="button" onclick="openObsTest()">開啟測試提示</button>
+          <button class="btn btn-info" type="button" onclick="openObsTest()">開啟測試分頁 (?test=1)</button>
           <button class="btn btn-accent" type="button" onclick="sendObsTestAlert()">發送到 OBS</button>
+          <button class="btn btn-secondary" type="button" onclick="sendObsTestEvent('progress')">測試進度 (+NT$300)</button>
+          <button class="btn btn-secondary" type="button" onclick="sendObsTestEvent('milestone', 50)">測試 50% 里程碑</button>
+          <button class="btn btn-secondary" type="button" onclick="sendObsTestEvent('completion')">測試 100% 達成慶祝</button>
+          <button class="btn btn-secondary" type="button" onclick="sendObsTestEvent('sound')">測試音效</button>
         </div>
-        <p style="color: #a0a0a0; margin-top: 10px; font-size: 14px;">
-          建議尺寸：900 x 150 pixels，啟用透明背景。先貼入 OBS，再按「發送到 OBS」；15 分鐘內確認畫面可看到測試斗內，再進行真實付款。
+        <p style="color: #a0a0a0; margin-top: 12px; font-size: 13px;">
+          💡 提示：先將網址貼入 OBS Browser Source，再點擊上方測試按鈕，可即時在 OBS 畫面看到動畫與音效反饋。
         </p>
       </div>
 
@@ -1883,6 +1909,7 @@
 
     // Overlay settings form elements
     const overlaySettingsForm = document.getElementById('overlaySettingsForm');
+    const themeInput = document.getElementById('themeInput');
     const alertEnabledInput = document.getElementById('alertEnabledInput');
     const alertSoundInput = document.getElementById('alertSoundInput');
     const fontSizeInput = document.getElementById('fontSizeInput');
@@ -2021,6 +2048,20 @@
         showAlert('✅ 測試提示已發送，請確認 OBS Browser Source 畫面');
       } catch {
         showAlert('⚠️ 測試提示目前只能在 sandbox 發送，或 OBS 尚未連線', 'error');
+      }
+    }
+
+    async function sendObsTestEvent(type = 'progress', thresholdPercent = 50) {
+      try {
+        const response = await fetch('/api/overlay/test-event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type, thresholdPercent })
+        });
+        if (!response.ok) throw new Error('test_event_failed');
+        showAlert(`✅ 測試事件 (${type}) 已成功發送到 OBS 直播畫面！`);
+      } catch (err) {
+        showAlert('⚠️ 測試事件發送失敗，請確認已登入管理員', 'error');
       }
     }
 
@@ -2455,6 +2496,7 @@
         const settings = await response.json();
         console.log('🎨 Overlay settings parsed');
 
+        if (themeInput) themeInput.value = settings.theme || 'minimal';
         alertEnabledInput.checked = settings.alertEnabled !== false;
         alertSoundInput.checked = settings.alertSound !== false;
         fontSizeInput.value = settings.fontSize || 16;
@@ -2691,6 +2733,7 @@
       showFormFeedback('overlayFeedback', '正在更新斗內條設定...', 'info');
 
       const settings = {
+        theme: themeInput ? themeInput.value : 'minimal',
         alertEnabled: alertEnabledInput.checked,
         alertSound: alertSoundInput.checked,
         fontSize: parseInt(fontSizeInput.value),
